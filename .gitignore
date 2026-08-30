@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+
+# 微信开发者工具 / 构建产物
+miniprogram/miniprogram_npm/
+
+# IDE
+.idea/
+.vscode/
