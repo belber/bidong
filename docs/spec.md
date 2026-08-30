@@ -32,7 +32,7 @@
 | 功能 | 说明 |
 |:--|:--|
 | 机器人账号 | B站机器人账号，模拟登录 |
-| 激活码 + 绑定 | 用户关注机器人 → 激活码 → 小程序绑定 B站 UID |
+| 激活码 + 绑定 | 用户关注机器人 → 机器人私信激活码 → 小程序粘贴激活码绑定 |
 | @ 触发收藏 | @机器人 + 链接 + #标签 → 自动存到对应用户收藏夹 |
 | 专属分组 | 特定 @ 词 → 存到指定分组收藏夹 |
 
@@ -117,13 +117,14 @@ card_tag (                     -- 卡片-标签 多对多
 binding (                      -- Phase 1：激活码绑定 B站账号
   id                PK,
   user_id           FK -> user,
-  bili_uid          text,     -- 用户的 B站 UID
-  activation_code   text,
+  bili_uid          text,     -- 用户的 B站 UID（发码时由机器人记录，用户无需手填）
+  activation_code   text,     -- 一次性激活码（用户在小程序粘贴，后端反查 UID）
   created_at        timestamp
 )
 ```
 
 - **标签体系**：用户标签多对多；「分组」不单独建模，就是一个标签（如"帅哥"）。机器人触发时 `#标签` 直接落到 card_tag。
+- **固有标签落库**：解析时，B站视频自带的标签（`x/tag/archive/tags`，匿名可读）自动作为**默认标签**写入 `card_tag` 预填，成为该卡片的一个默认分组；用户可在收藏夹/卡片上再增删。与用户手动标签共用一套 `tag/card_tag`，不单独建表。
 - **月份分组**：由 `collected_at` 派生，`month` 冗余存储便于查询，**与标签正交**。
 - **B站分区**（tname）是视频元数据，存 `partition`，与用户自定义标签分开。
 
@@ -140,7 +141,7 @@ Phase 0：贴链接
 5. 前端按 month 分组 + 标签过滤渲染
 
 Phase 1：机器人触发
-1. 用户关注机器人 → 拿激活码 → 小程序绑定 B站 UID
+1. 用户关注机器人 → 拿激活码 → 小程序粘贴激活码完成绑定
 2. 用户 @机器人 视频链接 #标签
 3. worker 轮询机器人私信/@ → 解析出 发消息者UID + 视频 + 标签
 4. 匹配 binding → 复用核心闭环存卡片（带标签）
@@ -160,7 +161,7 @@ Phase 1：机器人触发
 | DELETE | `/api/cards/:id` | 删除卡片 |
 | POST | `/api/tags` | 新建标签 |
 | POST | `/api/cards/:id/tags` | 给卡片打标签 |
-| POST | `/api/binding` | Phase 1：激活码绑定 B站 UID |
+| POST | `/api/binding` | Phase 1：粘贴激活码绑定（后端反查 UID） |
 
 ---
 
@@ -169,7 +170,7 @@ Phase 1：机器人触发
 - **监听方式**：轮询 B站私信/@ 消息接口（需机器人账号 cookie 模拟登录），低频（30–60s）
 - **指令解析**：`@机器人 <链接> [#标签...]`，标签落到 card_tag；无标签存默认分组
 - **绑定匹配**：消息发送者 bili_uid → 查 `binding` → 落到对应 user 的收藏
-- **激活码流程**：用户关注机器人 → worker 检测到新粉丝 → 机器人私信回激活码 → 小程序输入激活码 + B站 UID → 绑定
+- **激活码流程**：用户关注机器人 → worker 检测到新粉丝 → 机器人私信回激活码（发码时记录「激活码 → bili_uid」）→ 小程序粘贴激活码 → 绑定
 - **关注检测**：轮询 `x/msgfeed/follow`（新粉丝通知流，需 cookie）取 `user.mid` / `user.uname`；兜底用 `x/relation/followers` 粉丝列表做差集
 - **激活码回送**：私信接口 `web_im/send_msg`（`msg[content]` = 激活码）
 - **Cookie 前置**：机器人账号须持登录态 `SESSDATA`、`bili_jct`、`DedeUserID`、`buvid3/4`（二维码登录获取，见 bilibili-api.md §5.1）

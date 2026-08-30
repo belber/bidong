@@ -1,0 +1,60 @@
+.page {
+  padding: 32rpx 28rpx 60rpx;
+  background: #FFFFFF;
+  min-height: 100vh;
+}
+
+.bind {
+  background: #FFF4F7;
+  border: 1rpx solid #FBDDE6;
+}
+
+.bind-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.bind-t {
+  font-size: 34rpx;
+  font-weight: 750;
+  color: #2B1E23;
+}
+
+.steps {
+  font-size: 28rpx;
+  color: #7A6A70;
+  line-height: 1.8;
+}
+
+.bind-btn {
+  margin-top: 28rpx;
+  border-radius: 20rpx;
+}
+
+.menu {
+  margin-top: 32rpx;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 34rpx 28rpx;
+  font-size: 32rpx;
+  color: #2B1E23;
+  font-weight: 550;
+  border-bottom: 1rpx solid #FBF0F3;
+}
+
+.mi:last-child {
+  border-bottom: none;
+}
+
+.arr {
+  font-size: 34rpx;
+  color: #C9A6B1;
+}

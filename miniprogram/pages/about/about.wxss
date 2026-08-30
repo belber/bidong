@@ -1,0 +1,48 @@
+.page {
+  padding: 48rpx 28rpx 60rpx;
+  background: #FFFFFF;
+  min-height: 100vh;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40rpx 0 48rpx;
+}
+
+.logo {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 32rpx;
+  background: #FB7299;
+  color: #FFFFFF;
+  font-size: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.name {
+  margin-top: 24rpx;
+  font-size: 38rpx;
+  font-weight: 750;
+  color: #2B1E23;
+}
+
+.ver {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #B28B97;
+}
+
+.card {
+  padding: 32rpx;
+}
+
+.txt {
+  font-size: 30rpx;
+  color: #7A6A70;
+  line-height: 1.8;
+  margin-top: 16rpx;
+}

@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="intro">粘贴 B站私信里收到的激活码，即可完成绑定。</view>
+
+  <view class="input-box">
+    <input
+      class="input"
+      placeholder="粘贴激活码"
+      placeholder-class="ph"
+      value="{{code}}"
+      bindinput="onInput"
+    />
+    <text class="paste" bindtap="onPaste">粘贴</text>
+  </view>
+
+  <button class="btn-primary bind-btn" bindtap="onBind">绑定</button>
+</view>

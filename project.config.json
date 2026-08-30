@@ -1,0 +1,19 @@
+{
+  "description": "B站视频收藏助手 · 壁咚",
+  "packOptions": {
+    "ignore": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "compileHotReLoad": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.17.2",
+  "appid": "touristappid",
+  "projectname": "bili-collector",
+  "miniprogramRoot": "miniprogram/"
+}

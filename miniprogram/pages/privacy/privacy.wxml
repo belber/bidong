@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="card">
+    <view class="doc-title">用户协议</view>
+    <view class="doc-date">更新日期：2026-08-30</view>
+
+    <view class="sec-label">一、服务内容</view>
+    <view class="txt">壁咚视频助手（下称「本服务」）为 B站视频收藏工具：粘贴链接解析视频元数据、自动收藏、按标签与月份整理、跳转 B站查看原视频。</view>
+
+    <view class="sec-label">二、用户行为规范</view>
+    <view class="txt">你应合理使用本服务，不得利用本服务批量抓取、刷量、干扰 B站正常运营，或用于任何违法用途。</view>
+
+    <view class="sec-label">三、版权与免责</view>
+    <view class="txt">视频内容、封面、标题等版权归原作者或 B站所有，本服务仅保存元数据用于个人收藏整理。B站接口可能变更导致解析失败，我们尽力兼容但不作保证。</view>
+
+    <view class="sec-label">四、服务变更与终止</view>
+    <view class="txt">我们可能调整或终止部分功能，重大变更将通过小程序公告告知。</view>
+
+    <view class="doc-title doc-margin">隐私政策</view>
+    <view class="doc-date">更新日期：2026-08-30</view>
+
+    <view class="sec-label">一、我们收集的信息</view>
+    <view class="txt">微信登录后的 openid（用于识别你的账号）；你主动粘贴的 B站链接；你保存的收藏数据（标题/封面/UP主/分区/标签/收藏时间）；剪贴板内容仅在你点击「从剪贴板粘贴」时读取，用于填入链接。</view>
+
+    <view class="sec-label">二、信息的使用与共享</view>
+    <view class="txt">信息仅用于提供收藏服务。视频元数据解析依赖 B站公开接口；封面转存至腾讯云 COS 存储。除法律要求外，我们不会向第三方出售或披露你的个人信息。</view>
+
+    <view class="sec-label">三、存储与你的权利</view>
+    <view class="txt">数据存储于腾讯云服务器。你可在收藏夹删除任意收藏，删除后不可恢复；如要注销账号或删除全部数据，可通过「帮助与反馈 → 联系我」提出。</view>
+
+    <view class="sec-label">四、联系方式</view>
+    <view class="txt">隐私相关问题：我的 → 帮助与反馈 → 联系我。</view>
+  </view>
+</view>

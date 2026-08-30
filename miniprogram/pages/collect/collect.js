@@ -1,0 +1,110 @@
+const { MOCK_CARDS } = require('../../utils/mock.js');
+const { groupByMonth } = require('../../utils/group.js');
+const { filterCards } = require('../../utils/filter.js');
+const { formatDuration } = require('../../utils/format.js');
+
+Page({
+  data: {
+    cards: [],
+    sourceFilter: 'all',
+    tagFilter: '全部',
+    allTags: ['全部'],
+    groups: [],
+    // TODO: 后端就绪后从接口读取用户绑定状态
+    isBound: false,
+    hasRobotRecords: false,
+    showRobotGuide: false
+  },
+
+  onShow() {
+    if (this.getTabBar) {
+      this.getTabBar().setData({ selected: 1 });
+    }
+    this.loadCards();
+  },
+
+  onPullDownRefresh() {
+    this.loadCards();
+    wx.stopPullDownRefresh();
+  },
+
+  loadCards() {
+    // TODO: 后端就绪后改为 api.getCards() 拉取真实数据
+    const cards = MOCK_CARDS.map((c) => Object.assign({}, c, {
+      dur: formatDuration(c.duration)
+    }));
+    this.setData({ cards }, () => this.rebuild());
+  },
+
+  rebuild() {
+    const filtered = filterCards(this.data.cards, {
+      source: this.data.sourceFilter,
+      tag: this.data.tagFilter
+    });
+
+    const tags = ['全部'];
+    this.data.cards.forEach((c) => {
+      (c.tags || []).forEach((t) => {
+        if (!tags.includes(t)) {
+          tags.push(t);
+        }
+      });
+    });
+
+    const hasRobotRecords = this.data.cards.some((c) => c.source === 'robot');
+    const showRobotGuide =
+      this.data.sourceFilter === 'robot' &&
+      (!this.data.isBound || !hasRobotRecords);
+
+    this.setData({
+      groups: groupByMonth(filtered),
+      allTags: tags,
+      hasRobotRecords,
+      showRobotGuide
+    });
+  },
+
+  onSourceTap(e) {
+    this.setData({ sourceFilter: e.currentTarget.dataset.source }, () => this.rebuild());
+  },
+
+  onTagTap(e) {
+    this.setData({ tagFilter: e.currentTarget.dataset.tag }, () => this.rebuild());
+  },
+
+  onCardTap(e) {
+    const card = this.data.cards.find((c) => c.id === e.currentTarget.dataset.id);
+    if (!card) {
+      return;
+    }
+    const appId = getApp().globalData.biliMiniProgramAppId;
+    if (!appId) {
+      wx.showToast({ title: 'B站小程序 appId 尚未配置', icon: 'none' });
+      return;
+    }
+    wx.navigateToMiniProgram({
+      appId,
+      path: '/pages/video/video?bvid=' + card.bvid
+    });
+  },
+
+  onDelete(e) {
+    const id = e.currentTarget.dataset.id;
+    wx.showModal({
+      title: '删除收藏',
+      content: '删除后不可恢复，确定删除？',
+      success: (res) => {
+        if (!res.confirm) {
+          return;
+        }
+        const cards = this.data.cards.filter((c) => c.id !== id);
+        this.setData({ cards }, () => this.rebuild());
+        wx.showToast({ title: '已删除', icon: 'success' });
+      }
+    });
+  },
+
+  onGotoParse() {
+    wx.switchTab({ url: '/pages/home/home' });
+  }
+});

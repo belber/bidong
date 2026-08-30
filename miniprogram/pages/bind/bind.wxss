@@ -1,0 +1,45 @@
+.page {
+  padding: 40rpx 28rpx;
+  background: #FFFFFF;
+  min-height: 100vh;
+}
+
+.intro {
+  font-size: 26rpx;
+  color: #7A6A70;
+  line-height: 1.6;
+  margin-bottom: 28rpx;
+}
+
+.input-box {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  background: #FFFFFF;
+  border: 2rpx solid #F0C9D4;
+  border-radius: 20rpx;
+  padding: 26rpx 28rpx;
+}
+
+.input {
+  flex: 1;
+  font-size: 32rpx;
+  color: #2B1E23;
+}
+
+.ph {
+  color: #C9A6B1;
+}
+
+.paste {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #FB7299;
+  flex: none;
+}
+
+.bind-btn {
+  margin-top: 32rpx;
+  font-size: 32rpx;
+  padding: 22rpx 0;
+}

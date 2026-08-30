@@ -1,0 +1,29 @@
+<custom-navbar />
+
+<view class="page">
+  <view class="bind card">
+    <view class="bind-head">
+      <text class="bind-t">@壁咚收藏 绑定</text>
+      <text class="chip chip-on">未绑定</text>
+    </view>
+    <view class="steps">① 关注 @壁咚收藏</view>
+    <view class="steps">② 查看私信，收到激活码</view>
+    <view class="steps">③ 回小程序粘贴激活码 → 绑定成功</view>
+    <button class="btn-primary bind-btn" bindtap="onBind">去绑定</button>
+  </view>
+
+  <view class="menu card">
+    <view class="mi" bindtap="onGoHelp">
+      <text>帮助与反馈</text>
+      <text class="arr">›</text>
+    </view>
+    <view class="mi" bindtap="onGoPrivacy">
+      <text>隐私政策与用户协议</text>
+      <text class="arr">›</text>
+    </view>
+    <view class="mi" bindtap="onGoAbout">
+      <text>关于 壁咚视频助手</text>
+      <text class="arr">›</text>
+    </view>
+  </view>
+</view>

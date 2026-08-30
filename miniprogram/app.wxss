@@ -1,0 +1,78 @@
+page {
+  background: #F6F4F2;
+  color: #211F1C;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+  font-size: 30rpx;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+
+view, text, button, input, image {
+  box-sizing: border-box;
+}
+
+button::after {
+  border: none;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(251, 114, 153, 0.06);
+}
+
+.chip {
+  display: inline-block;
+  font-size: 24rpx;
+  color: #B28B97;
+  background: #FCEAF0;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  line-height: 1.5;
+}
+
+.chip-on {
+  background: #FB7299;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.chip-tag {
+  color: #FB7299;
+  background: #FFF4F7;
+  border: 1rpx solid #FBDDE6;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: #FB7299;
+  color: #FFFFFF;
+  border-radius: 24rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  text-align: center;
+  padding: 22rpx 0;
+  line-height: 1.5;
+  box-shadow: 0 12rpx 28rpx rgba(251, 114, 153, 0.25);
+}
+
+.btn-ghost {
+  background: #FFFFFF;
+  color: #FB7299;
+  border: 2rpx solid #FB7299;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  text-align: center;
+  padding: 14rpx 32rpx;
+  line-height: 1.5;
+}
+
+.sec-label {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 22rpx;
+  letter-spacing: 0.12em;
+  color: #B28B97;
+  text-transform: uppercase;
+}

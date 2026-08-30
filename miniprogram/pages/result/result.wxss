@@ -1,0 +1,168 @@
+.page {
+  padding: 24rpx 28rpx 60rpx;
+  background: #FFFFFF;
+  min-height: 100vh;
+}
+
+.cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 28rpx;
+  overflow: hidden;
+}
+
+.cover-bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #1b2440, #4a3f8f);
+}
+
+.ply {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 44rpx;
+}
+
+.dur {
+  position: absolute;
+  left: 16rpx;
+  bottom: 16rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.68);
+  color: #FFFFFF;
+  padding: 4rpx 16rpx;
+  border-radius: 10rpx;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.open-bili {
+  position: absolute;
+  right: 16rpx;
+  bottom: 16rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  background: #FB7299;
+  color: #FFFFFF;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+}
+
+.title {
+  margin-top: 24rpx;
+  font-size: 34rpx;
+  font-weight: 750;
+  color: #2B1E23;
+  line-height: 1.4;
+}
+
+.up-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-top: 20rpx;
+}
+
+.ava {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FB7299, #ff9db9);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.uname {
+  flex: 1;
+  font-size: 26rpx;
+  font-weight: 650;
+  color: #2B1E23;
+}
+
+.meta-line {
+  margin-top: 14rpx;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 22rpx;
+  color: #7A6A70;
+}
+
+.sec-label {
+  margin-top: 28rpx;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.desc {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #7A6A70;
+  line-height: 1.6;
+}
+
+.subtitle {
+  margin-top: 32rpx;
+  background: #FFF4F7;
+  border: 1rpx solid #FBDDE6;
+}
+
+.sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.sub-title {
+  font-size: 28rpx;
+  font-weight: 750;
+  color: #2B1E23;
+}
+
+.sub-it {
+  font-size: 24rpx;
+  color: #5A4A50;
+  line-height: 1.6;
+  padding: 10rpx 0;
+  border-top: 1rpx dashed #FBDDE6;
+}
+
+.sub-it:first-of-type {
+  border-top: none;
+}
+
+.sub-t {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 20rpx;
+  color: #B28B97;
+  margin-right: 14rpx;
+}
+
+.sub-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.sub-btn {
+  flex: 1;
+}

@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="cover">
+    <view class="cover-bg"></view>
+    <view class="ply">▶</view>
+    <view class="dur">{{dur}}</view>
+    <view class="open-bili" bindtap="onOpenBili">↗ 去查看</view>
+  </view>
+
+  <view class="title">{{video.title}}</view>
+
+  <view class="up-row">
+    <view class="ava">{{upInitial}}</view>
+    <text class="uname">{{video.up_name}}</text>
+    <text class="chip">{{video.partition}}</text>
+  </view>
+
+  <view class="meta-line">{{video.bvid}} · {{pubText}}</view>
+
+  <view class="sec-label">标签</view>
+  <view class="tag-row">
+    <text class="chip chip-tag" wx:for="{{video.tags}}" wx:key="*this">＃{{item}}</text>
+  </view>
+
+  <view class="sec-label">简介</view>
+  <view class="desc">{{video.desc}}</view>
+
+  <view class="subtitle card" wx:if="{{video.subtitles.length}}">
+    <view class="sub-head">
+      <text class="sub-title">📄 字幕</text>
+      <text class="chip chip-on">{{video.subtitles.length}} 条金句</text>
+    </view>
+    <view class="sub-it" wx:for="{{video.subtitles}}" wx:key="t">
+      <text class="sub-t">{{item.timeText}}</text>
+      <text>{{item.text}}</text>
+    </view>
+    <view class="sub-actions">
+      <button class="btn-ghost sub-btn" bindtap="onMoreSub">查看更多</button>
+      <button class="btn-primary sub-btn" bindtap="onDownloadSub">下载字幕</button>
+    </view>
+  </view>
+</view>

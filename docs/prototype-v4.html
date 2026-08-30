@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>壁咚 · 解析结果页 v4</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --page-bg:#F6F4F2; --page-ink:#211F1C; --page-muted:#8D8A83; --page-line:#E6E2DC;
+    --bili:#FB7299; --bili-soft:#FFF4F7; --bili-line:#FBDDE6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);color:var(--page-ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.6}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 28px 80px}
+
+  header{padding:54px 0 28px;border-bottom:1px solid var(--page-line)}
+  .eyebrow{display:flex;align-items:center;gap:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--page-muted)}
+  .eyebrow::before{content:"";width:34px;height:1px;background:var(--page-muted)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;margin:16px 0 12px;font-weight:750;text-wrap:balance}
+  h1 em{font-style:normal;color:var(--page-muted)}
+  .lede{max-width:72ch;color:var(--page-muted);font-size:15px;margin:0}
+  .lede b{color:var(--page-ink);font-weight:650}
+  .badge-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .badge{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;padding:6px 13px;border-radius:99px;border:1px solid var(--page-line);color:var(--page-muted)}
+  .badge.hot{border-color:var(--bili);background:var(--bili);color:#fff}
+
+  section{padding:42px 0 6px;border-top:1px solid var(--page-line)}
+  .scheme-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  .scheme-tag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--bili)}
+  .scheme-name{font-size:26px;font-weight:750;letter-spacing:-.01em}
+  .scheme-mood{color:var(--page-muted);font-size:13.5px}
+  .scheme-grid{display:flex;gap:26px;flex-wrap:wrap;margin-top:22px}
+  .phone-wrap{flex:1 1 300px;display:flex;flex-direction:column;gap:10px;align-items:center}
+  .phone-cap{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--page-muted)}
+
+  .phone{width:280px;background:#0d0d0f;border-radius:42px;padding:9px;box-shadow:0 24px 60px rgba(0,0,0,.26),0 2px 8px rgba(0,0,0,.1);flex:none}
+  .ph{background:#fff;border-radius:33px;overflow:hidden;display:flex;flex-direction:column;min-height:600px}
+  .stbar{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 2px;font-size:12px;font-weight:650;color:#2B1E23}
+  .stbar .r{display:flex;gap:5px;align-items:center;font-size:10px;letter-spacing:.02em;color:#B28B97}
+  .nav{display:flex;align-items:center;gap:9px;padding:10px 16px 12px}
+  .nav .back{font-size:22px;color:#2B1E23;line-height:1}
+  .nav .title{font-size:16px;font-weight:750;color:#2B1E23;letter-spacing:-.01em}
+  .logo{width:26px;height:26px;flex:none}
+  .nav .sp{flex:1}
+  .content{padding:0 15px 18px;display:flex;flex-direction:column;gap:12px;flex:1}
+
+  .cover{position:relative;width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#222}
+  .cover .ply{position:absolute;inset:0;display:grid;place-items:center}
+  .cover .ply span{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.5);display:grid;place-items:center;font-size:15px;color:#fff;backdrop-filter:blur(2px)}
+  .cover .dur{position:absolute;left:8px;bottom:8px;font-size:10px;font-weight:600;background:rgba(0,0,0,.68);color:#fff;padding:2px 8px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .cover .open-bili{position:absolute;right:8px;bottom:8px;font-size:11px;font-weight:700;background:var(--bili);color:#fff;padding:4px 10px;border-radius:99px;line-height:1.4;cursor:pointer;backdrop-filter:blur(2px)}
+
+  .vtitle{font-size:16px;font-weight:750;color:#2B1E23;line-height:1.4;letter-spacing:-.01em}
+  .up{display:flex;align-items:center;gap:8px}
+  .ava{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700}
+  .uname{font-size:12.5px;font-weight:650;color:#2B1E23}
+  .chip{font-size:11px;color:#B28B97;background:#FCEAF0;padding:4px 10px;border-radius:99px;line-height:1.5;font-weight:500}
+  .chip.on{background:var(--bili);color:#fff;font-weight:650}
+  .chip.tag{color:var(--bili);background:var(--bili-soft);border:1px solid var(--bili-line);font-weight:650}
+  .up .chip{margin-left:auto}
+
+  .meta-line{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#7A6A70;letter-spacing:.01em}
+  .tagrow{display:flex;gap:6px;flex-wrap:wrap}
+
+  .sec-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#B28B97;margin-top:2px}
+  .desc{font-size:13px;color:#7A6A70;line-height:1.6}
+
+  .subtitle{background:var(--bili-soft);border:1px solid var(--bili-line);border-radius:16px;padding:12px}
+  .sub-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .sub-head b{font-size:13px;font-weight:750;color:#2B1E23}
+  .sub-head .chip{margin-left:auto}
+  .sub-it{font-size:12.5px;color:#5A4A50;line-height:1.6;padding:3px 0;border-top:1px dashed var(--bili-line)}
+  .sub-it:first-child{border-top:none}
+  .sub-it .t{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#B28B97;margin-right:6px}
+  .sub-actions{display:flex;gap:8px;margin-top:10px}
+  .btn{flex:1;text-align:center;padding:8px 0;border-radius:99px;font-size:12px;font-weight:700;cursor:pointer;border:none}
+  .btn.pri{background:var(--bili);color:#fff}
+  .btn.ghost{background:#fff;color:var(--bili);border:1.5px solid var(--bili)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">壁咚视频助手 · 解析结果页 v4</div>
+    <h1>贴链接后，解析结果<em>长这样</em></h1>
+    <p class="lede">聚焦「解析结果」这一页：<b>封面右上角时长、右下角即点跳 B站小程序</b>；下方依次是标题 / UP主+分区 / BV+时间 / <b>解析出的固有标签</b> / 简介；最底下预留<b>字幕区</b>（预览几条 + 查看更多 + 下载按钮）。无字幕则不出现。其余页面沿用方案 A 纯白底。</p>
+    <div class="badge-row">
+      <span class="badge hot">方案 A · 纯白底</span>
+      <span class="badge">解析即自动收藏</span>
+      <span class="badge">跳转：封面右下角</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="scheme-head">
+      <span class="scheme-tag">解析结果页</span>
+      <span class="scheme-name">新版式</span>
+      <span class="scheme-mood">简洁 · 只放解析出的信息</span>
+    </div>
+    <div class="scheme-grid">
+      <div class="phone-wrap">
+        <div class="phone-cap">视频解析结果</div>
+        <div class="slot" data-tpl="result"></div>
+      </div>
+      <div class="phone-wrap">
+        <div class="phone-cap">贴链接（首页）· 前置状态</div>
+        <div class="slot" data-tpl="home"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ 页面模板 ============ -->
+<template id="t-result">
+<div class="phone"><div class="ph">
+  <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+  <div class="nav"><span class="back">‹</span><span class="title">解析结果</span><span class="sp"></span></div>
+  <div class="content">
+    <div class="cover" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)">
+      <div class="ply"><span>▶</span></div>
+      <div class="dur">00:13</div>
+      <div class="open-bili">↗ 去查看</div>
+    </div>
+    <div class="vtitle">【小视频】092-宝藏男孩</div>
+    <div class="up">
+      <span class="ava" style="background:linear-gradient(135deg,#FB7299,#ff9db9)">帅</span>
+      <span class="uname">帅哥录屏</span>
+      <span class="chip">小视频</span>
+    </div>
+    <div class="meta-line">BV1BE4U6BEg8 · 2026-08-30 00:55</div>
+    <div class="sec-label">标签</div>
+    <div class="tagrow">
+      <span class="chip tag">＃宝藏男孩</span>
+      <span class="chip tag">＃帅哥</span>
+      <span class="chip tag">＃宝藏</span>
+    </div>
+    <div class="sec-label">简介</div>
+    <div class="desc">一个关于宝藏男孩的小视频，轻松有趣，适合#宝藏男孩 话题下观看。</div>
+    <div class="subtitle">
+      <div class="sub-head"><b>📄 字幕</b><span class="chip on">3 条金句</span></div>
+      <div class="sub-it"><span class="t">00:05</span>这里是第一条字幕金句</div>
+      <div class="sub-it"><span class="t">00:09</span>这里是第二条字幕金句</div>
+      <div class="sub-it"><span class="t">00:12</span>这里是第三条字幕金句</div>
+      <div class="sub-actions">
+        <button class="btn ghost">查看更多</button>
+        <button class="btn pri">下载字幕</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+</template>
+
+<template id="t-home">
+<div class="phone"><div class="ph">
+  <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+  <div class="nav">
+    <svg class="logo" viewBox="0 0 100 100" aria-label="壁咚 logo">
+      <g stroke="#FB7299" stroke-width="7" stroke-linecap="round"><path d="M35 30 V19"/><path d="M65 30 V19"/></g>
+      <circle cx="35" cy="15" r="4.5" fill="#FB7299"/><circle cx="65" cy="15" r="4.5" fill="#FB7299"/>
+      <rect x="13" y="30" width="74" height="58" rx="16" fill="#FB7299"/>
+      <rect x="21" y="38" width="58" height="42" rx="10" fill="#fff"/>
+      <path transform="translate(38,50)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#FB7299"/>
+    </svg>
+    <span class="title">壁咚</span><span class="sp"></span><div class="goto" style="font-size:12px;font-weight:700;color:#FB7299">＋ 去解析</div>
+  </div>
+  <div class="content" style="justify-content:center">
+    <div class="hint" style="text-align:center;font-size:11px;color:#C9A6B1">粘贴 B站视频链接</div>
+    <div class="input" style="display:flex;align-items:center;gap:9px;background:#fff;border:1.5px solid #F0C9D4;border-radius:16px;padding:12px 14px"><span class="lk">🔗</span><input placeholder="粘贴 B站视频链接" style="border:none;outline:none;background:transparent;font-size:14px;color:#2B1E23;font-family:inherit;flex:1"></div>
+    <div class="btn" style="text-align:center;padding:12px 0;border-radius:16px;background:#FB7299;color:#fff;font-size:14px;font-weight:700">解析视频</div>
+    <div class="hint" style="text-align:center;font-size:10.5px;color:#C9A6B1">解析后自动收藏</div>
+  </div>
+  <div class="tabbar" style="display:flex;justify-content:space-around;align-items:flex-end;padding:8px 14px 12px;border-top:1px solid #F7E4EA;background:#fff">
+    <div class="tab" style="display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:#FB7299;font-weight:650"><div class="glyph" style="width:17px;height:17px;border-radius:5px;border:1.7px solid currentColor"></div>贴链接</div>
+    <div class="tab" style="display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:#B28B97"><div class="glyph" style="width:17px;height:17px;border-radius:5px;border:1.7px solid currentColor"></div>收藏夹</div>
+    <div class="tab" style="display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:#B28B97"><div class="glyph" style="width:17px;height:17px;border-radius:5px;border:1.7px solid currentColor"></div>我的</div>
+  </div>
+</div></div>
+</template>
+
+<script>
+document.querySelectorAll('.slot[data-tpl]').forEach(function(slot){
+  var tpl = document.getElementById('t-' + slot.getAttribute('data-tpl'));
+  slot.appendChild(tpl.content.firstElementChild.cloneNode(true));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>壁咚 · 界面风格原型 v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --page-bg:#F6F4F2; --page-ink:#211F1C; --page-muted:#8D8A83; --page-line:#E6E2DC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);color:var(--page-ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.6}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px 80px}
+
+  header{padding:54px 0 28px;border-bottom:1px solid var(--page-line)}
+  .eyebrow{display:flex;align-items:center;gap:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--page-muted)}
+  .eyebrow::before{content:"";width:34px;height:1px;background:var(--page-muted)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;margin:16px 0 12px;font-weight:750;text-wrap:balance}
+  h1 em{font-style:normal;color:var(--page-muted)}
+  .lede{max-width:68ch;color:var(--page-muted);font-size:15px;margin:0}
+  .lede b{color:var(--page-ink);font-weight:650}
+  .badge-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .badge{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;padding:6px 13px;border-radius:99px;border:1px solid var(--page-line);color:var(--page-muted)}
+  .badge.hot{border-color:#FB7299;background:#FB7299;color:#fff}
+
+  section.scheme{padding:42px 0 6px;border-top:1px solid var(--page-line)}
+  .scheme-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  .scheme-tag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:700;letter-spacing:.05em}
+  .scheme-name{font-size:26px;font-weight:750;letter-spacing:-.01em}
+  .scheme-mood{color:var(--page-muted);font-size:13.5px}
+  .rec-note{font-size:12.5px;color:#FB7299;font-weight:650;margin-left:2px}
+  .scheme-grid{display:flex;gap:32px;flex-wrap:wrap;margin-top:24px}
+  .phone-wrap{flex:1 1 300px;display:flex;flex-direction:column;gap:10px;align-items:center}
+  .phone-cap{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--page-muted)}
+  .rationale{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
+  .rb{background:var(--page-ink);color:var(--page-bg);border-radius:10px;padding:8px 13px;font-size:13px}
+  .rb b{font-weight:650}
+
+  /* phone shell */
+  .phone{width:272px;background:#0d0d0f;border-radius:42px;padding:9px;box-shadow:0 24px 60px rgba(0,0,0,.26),0 2px 8px rgba(0,0,0,.1);flex:none}
+  .ph{background:var(--ph-bg);border-radius:33px;overflow:hidden;display:flex;flex-direction:column;min-height:588px}
+  .stbar{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 2px;font-size:12px;font-weight:650;color:var(--ph-text)}
+  .stbar .r{display:flex;gap:5px;align-items:center;font-size:10px;letter-spacing:.02em;color:var(--ph-muted)}
+  .nav{display:flex;align-items:center;gap:9px;padding:10px 16px 12px}
+  .logo{width:26px;height:26px;flex:none}
+  .nav .title{font-size:18px;font-weight:750;color:var(--ph-text);letter-spacing:-.01em}
+  .nav .sp{flex:1}
+  .nav .ic{width:21px;height:21px;border:1.6px solid var(--ph-muted);border-radius:6px;position:relative;opacity:.8}
+  .nav .ic.plus{border-radius:50%;border-color:var(--ph-accent);opacity:1}
+  .nav .ic.plus::before{content:"+";position:absolute;inset:0;display:grid;place-items:center;font-size:13px;color:var(--ph-accent);font-weight:650}
+  .content{padding:0 15px 14px;display:flex;flex-direction:column;gap:13px;flex:1}
+  .month{display:flex;align-items:baseline;gap:8px;padding:2px 2px 0}
+  .month .y{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ph-muted)}
+  .month .c{font-size:10.5px;color:var(--ph-muted);margin-left:auto}
+  .thumb{position:relative;overflow:hidden;flex:none;background:#222}
+  .thumb .ply{position:absolute;inset:0;display:grid;place-items:center}
+  .thumb .ply span{width:25px;height:25px;border-radius:50%;background:rgba(0,0,0,.45);display:grid;place-items:center;backdrop-filter:blur(2px)}
+  .thumb .dur{position:absolute;right:5px;bottom:5px;font-size:9px;font-weight:600;background:rgba(0,0,0,.68);color:#fff;padding:1px 6px;border-radius:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .chip{font-size:9.5px;color:var(--ph-muted);background:var(--ph-chip);padding:2px 8px;border-radius:99px;line-height:1.5}
+
+  .tabbar{display:flex;justify-content:space-around;align-items:flex-end;padding:8px 14px 12px;border-top:1px solid var(--ph-line);background:var(--ph-surface)}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:var(--ph-muted)}
+  .tab.on{color:var(--ph-accent);font-weight:650}
+  .tab .glyph{width:17px;height:17px;border-radius:5px;border:1.7px solid currentColor;opacity:.85}
+  .tab.add .glyph{width:38px;height:38px;border-radius:13px;background:var(--ph-accent);border:none;color:#fff;display:grid;place-items:center;font-size:21px;font-weight:400;margin-top:-20px;box-shadow:0 8px 18px var(--ph-shadow)}
+
+  /* ---- scheme tokens ---- */
+  .scheme-a{--ph-bg:#FFFFFF;--ph-surface:#FFFFFF;--ph-text:#2B1E23;--ph-muted:#B28B97;--ph-accent:#FB7299;--ph-line:#F7E4EA;--ph-chip:#FCEAF0;--ph-shadow:rgba(251,114,153,.30)}
+  .scheme-b{--ph-bg:#12121A;--ph-surface:#1C1C26;--ph-text:#F3F2F7;--ph-muted:#8D8B9C;--ph-accent:#FB7299;--ph-line:rgba(255,255,255,.07);--ph-chip:#282833;--ph-shadow:rgba(0,0,0,.45)}
+  .scheme-c{--ph-bg:#F8F7F4;--ph-surface:#FFFFFF;--ph-text:#23211E;--ph-muted:#97938B;--ph-accent:#FB7299;--ph-line:#EBE8E2;--ph-chip:#F0EEE9;--ph-shadow:rgba(0,0,0,.12)}
+
+  /* ---- scheme A: 粉白手帐 ---- */
+  .s-a .card{display:flex;gap:11px;background:var(--ph-surface);border-radius:18px;padding:10px;border:1px solid var(--ph-line);box-shadow:0 8px 20px rgba(251,114,153,.06)}
+  .s-a .card .thumb{width:106px;height:68px;border-radius:12px}
+  .s-a .meta{min-width:0;display:flex;flex-direction:column;gap:4px;flex:1}
+  .s-a .meta .t{font-size:12px;font-weight:650;color:var(--ph-text);line-height:1.34;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .s-a .meta .sub{font-size:10px;color:var(--ph-muted)}
+  .s-a .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:1px}
+  .s-a .heart{position:absolute;right:8px;bottom:8px;font-size:11px;color:#FB7299}
+  .s-a .month .y::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#FB7299;margin-right:6px;vertical-align:1px}
+  .s-a .btn{width:100%;text-align:center;padding:12px;border-radius:15px;background:var(--ph-accent);color:#fff;font-size:14px;font-weight:700;letter-spacing:.04em;border:none}
+  .s-a .input{display:flex;align-items:center;gap:9px;background:var(--ph-surface);border:1.5px solid var(--ph-line);border-radius:16px;padding:12px 13px}
+  .s-a .input input{border:none;outline:none;background:transparent;font-size:13px;color:var(--ph-text);font-family:inherit;flex:1}
+  .s-a .input input::placeholder{color:var(--ph-muted)}
+  .s-a .input .lk{font-size:15px;color:var(--ph-muted)}
+  .s-a .preview{display:flex;gap:11px;background:var(--ph-surface);border:1px solid var(--ph-line);border-radius:18px;padding:10px;box-shadow:0 8px 20px rgba(251,114,153,.06)}
+  .s-a .preview .thumb{width:94px;height:62px;border-radius:12px}
+  .s-a .ok{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:#FB7299;font-weight:700}
+  .s-a .ok::before{content:"";width:6px;height:6px;border-radius:50%;background:#FB7299}
+  .s-a .sec-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ph-muted)}
+  .s-a .tag-new{border:1px dashed #FB7299;color:#FB7299;background:transparent}
+
+  /* ---- scheme B: 深色放映厅 ---- */
+  .s-b .grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .s-b .poster{display:flex;flex-direction:column;gap:6px}
+  .s-b .poster .thumb{width:100%;aspect-ratio:16/10.5;border-radius:13px}
+  .s-b .poster .t{font-size:11.5px;font-weight:640;color:var(--ph-text);line-height:1.34;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .s-b .poster .sub{font-size:9.5px;color:var(--ph-muted)}
+  .s-b .month .y::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#FB7299;margin-right:6px;vertical-align:1px;box-shadow:0 0 8px rgba(251,114,153,.8)}
+  .s-b .input{display:flex;align-items:center;gap:9px;background:var(--ph-surface);border:1px solid var(--ph-line);border-radius:14px;padding:12px 13px}
+  .s-b .input input{border:none;outline:none;background:transparent;font-size:13px;color:var(--ph-text);font-family:inherit;flex:1}
+  .s-b .input input::placeholder{color:var(--ph-muted)}
+  .s-b .input .lk{font-size:15px;color:var(--ph-muted)}
+  .s-b .btn{width:100%;text-align:center;padding:12px;border-radius:14px;background:var(--ph-accent);color:#fff;font-size:14px;font-weight:700;letter-spacing:.04em;border:none;box-shadow:0 8px 22px rgba(251,114,153,.25)}
+  .s-b .preview{display:flex;gap:11px;background:var(--ph-surface);border:1px solid var(--ph-line);border-radius:14px;padding:10px}
+  .s-b .preview .thumb{width:94px;height:62px;border-radius:10px}
+  .s-b .ok{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:#FB7299;font-weight:700}
+  .s-b .ok::before{content:"";width:6px;height:6px;border-radius:50%;background:#FB7299}
+  .s-b .sec-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ph-muted)}
+  .s-b .tag-new{border:1px dashed #FB7299;color:#FB7299;background:transparent}
+
+  /* ---- scheme C: 素净档案 ---- */
+  .s-c .list{display:flex;flex-direction:column}
+  .s-c .row{display:flex;gap:11px;padding:11px 2px;border-bottom:1px solid var(--ph-line)}
+  .s-c .row .thumb{width:100px;height:64px;border-radius:8px}
+  .s-c .meta{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1}
+  .s-c .meta .t{font-size:12.5px;font-weight:620;color:var(--ph-text);line-height:1.34;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .s-c .meta .sub{font-size:10px;color:var(--ph-muted)}
+  .s-c .tags{font-size:9.5px;color:#B89BA3;margin-top:1px}
+  .s-c .month .y{color:var(--ph-text);font-weight:700}
+  .s-c .month .c{color:var(--ph-muted)}
+  .s-c .btn{width:100%;text-align:center;padding:12px;border-radius:10px;background:#23211E;color:#fff;font-size:13.5px;font-weight:650;letter-spacing:.06em;border:none}
+  .s-c .input{display:flex;align-items:center;gap:9px;border:1px solid var(--ph-line);border-radius:10px;background:var(--ph-surface);padding:11px 13px}
+  .s-c .input input{border:none;outline:none;background:transparent;font-size:13px;color:var(--ph-text);font-family:inherit;flex:1}
+  .s-c .input input::placeholder{color:var(--ph-muted)}
+  .s-c .input .lk{font-size:15px;color:var(--ph-muted)}
+  .s-c .preview{display:flex;gap:11px;padding:12px 2px;border-bottom:1px solid var(--ph-line)}
+  .s-c .preview .thumb{width:94px;height:62px;border-radius:8px}
+  .s-c .ok{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:#FB7299;font-weight:700}
+  .s-c .ok::before{content:"";width:6px;height:6px;border-radius:50%;background:#FB7299}
+  .s-c .sec-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ph-muted)}
+  .s-c .tag-text{font-size:9.5px;color:var(--ph-muted);background:var(--ph-chip);padding:2px 8px;border-radius:4px}
+  .s-c .tag-new{border:1px dashed var(--ph-muted);color:var(--ph-muted);background:transparent}
+
+  footer{padding:40px 0 10px;border-top:1px solid var(--page-line);color:var(--page-muted);font-size:14px}
+  footer b{color:var(--page-ink)}
+
+  @media(max-width:760px){
+    h1{font-size:30px}
+    .wrap{padding:0 18px 60px}
+    .phone{width:250px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">壁咚视频助手 · 风格原型 v2</div>
+    <h1>三个风格方向，<em>同两个核心页面</em></h1>
+    <p class="lede">信息架构固定（贴链接 → 解析 → 打标签收藏 → 按月/标签回顾），下面三套只换「视觉语言」，
+    都接入了已确认的 <b>logo 01 爱心屏小电视</b>。每套画了「首页收藏列表」+「贴链接解析」两个页面，选一个方向后我再细化全部页面。</p>
+    <div class="badge-row">
+      <span class="badge hot">logo 01 已确认</span>
+      <span class="badge">首页 · 收藏列表</span>
+      <span class="badge">贴链接 · 解析</span>
+    </div>
+  </header>
+
+  <!-- ============ 方案 A ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <span class="scheme-tag" style="color:#FB7299">方案 A</span>
+      <span class="scheme-name">粉白「收藏手帐」</span>
+      <span class="scheme-mood">明亮亲切 · 像一本随手翻的收藏贴纸册</span>
+      <span class="rec-note">★ 与 logo 01 气质最搭</span>
+    </div>
+    <div class="scheme-grid">
+
+      <div class="phone-wrap">
+        <div class="phone-cap">首页 · 收藏列表</div>
+        <div class="phone"><div class="ph scheme-a s-a">
+          <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+          <div class="nav">
+            <svg class="logo" viewBox="0 0 100 100" aria-label="壁咚 logo">
+              <g stroke="#FB7299" stroke-width="7" stroke-linecap="round"><path d="M35 30 V19"/><path d="M65 30 V19"/></g>
+              <circle cx="35" cy="15" r="4.5" fill="#FB7299"/><circle cx="65" cy="15" r="4.5" fill="#FB7299"/>
+              <rect x="13" y="30" width="74" height="58" rx="16" fill="#FB7299"/>
+              <rect x="21" y="38" width="58" height="42" rx="10" fill="#fff"/>
+              <path transform="translate(38,50)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#FB7299"/>
+            </svg>
+            <span class="title">壁咚</span><span class="sp"></span><div class="ic"></div><div class="ic plus"></div>
+          </div>
+          <div class="content">
+            <div class="month"><span class="y">2025 · 08</span><span class="c">2 个视频</span></div>
+            <div class="card">
+              <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span><svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">45:12</div><span class="heart">♥</span></div>
+              <div class="meta">
+                <div class="t">一口气看懂《三体》黑暗森林</div>
+                <div class="sub">木鱼水心 · 影视</div>
+                <div class="chips"><span class="chip">科幻</span><span class="chip">深度</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="thumb" style="background:linear-gradient(135deg,#0b3d3a,#1f7a6d,#4ad2b5)"><div class="ply"><span><svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">12:08</div><span class="heart">♥</span></div>
+              <div class="meta">
+                <div class="t">影视飓风：8K 拍下极光</div>
+                <div class="sub">影视飓风 · 科技</div>
+                <div class="chips"><span class="chip">4K</span><span class="chip">实拍</span></div>
+              </div>
+            </div>
+            <div class="month"><span class="y">2025 · 07</span><span class="c">1 个视频</span></div>
+            <div class="card">
+              <div class="thumb" style="background:linear-gradient(135deg,#3a1f5d,#c0502e)"><div class="ply"><span><svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">23:40</div><span class="heart">♥</span></div>
+              <div class="meta">
+                <div class="t">硬核讲透 Transformer</div>
+                <div class="sub">3Blue1Brown · 知识</div>
+                <div class="chips"><span class="chip">AI</span><span class="chip">长视频</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab on"><div class="glyph"></div>收藏</div>
+            <div class="tab add"><div class="glyph">+</div></div>
+            <div class="tab"><div class="glyph"></div>我的</div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone-cap">贴链接 · 解析</div>
+        <div class="phone"><div class="ph scheme-a s-a">
+          <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+          <div class="nav"><span class="title" style="font-size:16px">‹ 贴链接</span><span class="sp"></span></div>
+          <div class="content">
+            <div class="input"><span class="lk">🔗</span><input placeholder="粘贴 B 站视频链接"></div>
+            <button class="btn">解析视频</button>
+            <div class="sec-label">解析结果</div>
+            <div class="preview">
+              <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span><svg viewBox="0 0 24 24" width="10" height="10"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div></div>
+              <div class="meta">
+                <div class="ok">已解析成功</div>
+                <div class="t">一口气看懂《三体》黑暗森林</div>
+                <div class="sub">木鱼水心 · 影视 · 45:12</div>
+              </div>
+            </div>
+            <div class="sec-label">打标签</div>
+            <div class="chips"><span class="chip">科幻</span><span class="chip">深度</span><span class="chip tag-new">＋ 新建</span></div>
+            <button class="btn">收藏</button>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="rationale">
+      <div class="rb"><b>粉白底 + 圆角卡片</b> — 贴纸册般的亲和感</div>
+      <div class="rb"><b>B 站粉全链路</b> — 与 logo 01 同色系，品牌一致</div>
+      <div class="rb"><b>心形点缀</b> — 收藏即喜欢，语义直给</div>
+      <div class="rb"><b>横向卡片</b> — 信息扫读最舒服</div>
+    </div>
+  </section>
+
+  <!-- ============ 方案 B ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <span class="scheme-tag" style="color:#FB7299">方案 B</span>
+      <span class="scheme-name">深色「私人放映厅」</span>
+      <span class="scheme-mood">深夜片库 · 收藏是私人的想看重看清单</span>
+    </div>
+    <div class="scheme-grid">
+
+      <div class="phone-wrap">
+        <div class="phone-cap">首页 · 收藏列表</div>
+        <div class="phone"><div class="ph scheme-b s-b">
+          <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+          <div class="nav">
+            <svg class="logo" viewBox="0 0 100 100" aria-label="壁咚 logo">
+              <g stroke="#FB7299" stroke-width="7" stroke-linecap="round"><path d="M35 30 V19"/><path d="M65 30 V19"/></g>
+              <circle cx="35" cy="15" r="4.5" fill="#FB7299"/><circle cx="65" cy="15" r="4.5" fill="#FB7299"/>
+              <rect x="13" y="30" width="74" height="58" rx="16" fill="#FB7299"/>
+              <rect x="21" y="38" width="58" height="42" rx="10" fill="#fff"/>
+              <path transform="translate(38,50)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#FB7299"/>
+            </svg>
+            <span class="title">壁咚</span><span class="sp"></span><div class="ic"></div><div class="ic plus"></div>
+          </div>
+          <div class="content">
+            <div class="month"><span class="y">2025 · 08</span><span class="c">2 个视频</span></div>
+            <div class="grid">
+              <div class="poster">
+                <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span><svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">45:12</div></div>
+                <div class="t">一口气看懂《三体》黑暗森林</div>
+                <div class="sub">木鱼水心 · 影视</div>
+              </div>
+              <div class="poster">
+                <div class="thumb" style="background:linear-gradient(135deg,#0b3d3a,#1f7a6d,#4ad2b5)"><div class="ply"><span><svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">12:08</div></div>
+                <div class="t">影视飓风：8K 拍下极光</div>
+                <div class="sub">影视飓风 · 科技</div>
+              </div>
+            </div>
+            <div class="month"><span class="y">2025 · 07</span><span class="c">1 个视频</span></div>
+            <div class="grid">
+              <div class="poster">
+                <div class="thumb" style="background:linear-gradient(135deg,#3a1f5d,#c0502e)"><div class="ply"><span><svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">23:40</div></div>
+                <div class="t">硬核讲透 Transformer</div>
+                <div class="sub">3Blue1Brown · 知识</div>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab on"><div class="glyph"></div>收藏</div>
+            <div class="tab add"><div class="glyph">+</div></div>
+            <div class="tab"><div class="glyph"></div>我的</div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone-cap">贴链接 · 解析</div>
+        <div class="phone"><div class="ph scheme-b s-b">
+          <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+          <div class="nav"><span class="title" style="font-size:16px">‹ 贴链接</span><span class="sp"></span></div>
+          <div class="content">
+            <div class="input"><span class="lk">🔗</span><input placeholder="粘贴 B 站视频链接"></div>
+            <button class="btn">解析视频</button>
+            <div class="sec-label">解析结果</div>
+            <div class="preview">
+              <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span><svg viewBox="0 0 24 24" width="10" height="10"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div></div>
+              <div class="meta">
+                <div class="ok">已解析成功</div>
+                <div class="t">一口气看懂《三体》黑暗森林</div>
+                <div class="sub">木鱼水心 · 影视 · 45:12</div>
+              </div>
+            </div>
+            <div class="sec-label">打标签</div>
+            <div class="chips"><span class="chip">科幻</span><span class="chip">深度</span><span class="chip tag-new">＋ 新建</span></div>
+            <button class="btn">收藏</button>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="rationale">
+      <div class="rb"><b>海报双列网格</b> — 封面即主角，片库质感</div>
+      <div class="rb"><b>深色沉浸</b> — 深夜刷收藏的影院感</div>
+      <div class="rb"><b>粉色呼吸光</b> — 只有品牌色发光，克制一色</div>
+      <div class="rb"><b>差异化最强</b> — 一眼区别于常见白底工具</div>
+    </div>
+  </section>
+
+  <!-- ============ 方案 C ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <span class="scheme-tag" style="color:#FB7299">方案 C</span>
+      <span class="scheme-name">素净「档案册」</span>
+      <span class="scheme-mood">克制高级 · 像分类整齐的私人档案</span>
+    </div>
+    <div class="scheme-grid">
+
+      <div class="phone-wrap">
+        <div class="phone-cap">首页 · 收藏列表</div>
+        <div class="phone"><div class="ph scheme-c s-c">
+          <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+          <div class="nav">
+            <svg class="logo" viewBox="0 0 100 100" aria-label="壁咚 logo">
+              <g stroke="#FB7299" stroke-width="7" stroke-linecap="round"><path d="M35 30 V19"/><path d="M65 30 V19"/></g>
+              <circle cx="35" cy="15" r="4.5" fill="#FB7299"/><circle cx="65" cy="15" r="4.5" fill="#FB7299"/>
+              <rect x="13" y="30" width="74" height="58" rx="16" fill="#FB7299"/>
+              <rect x="21" y="38" width="58" height="42" rx="10" fill="#fff"/>
+              <path transform="translate(38,50)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#FB7299"/>
+            </svg>
+            <span class="title">壁咚</span><span class="sp"></span><div class="ic"></div><div class="ic plus"></div>
+          </div>
+          <div class="content">
+            <div class="month"><span class="y">2025 年 8 月</span><span class="c">2 个视频</span></div>
+            <div class="list">
+              <div class="row">
+                <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span><svg viewBox="0 0 24 24" width="10" height="10"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">45:12</div></div>
+                <div class="meta">
+                  <div class="t">一口气看懂《三体》黑暗森林</div>
+                  <div class="sub">木鱼水心 · 影视</div>
+                  <div class="tags">#科幻 #深度</div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="thumb" style="background:linear-gradient(135deg,#0b3d3a,#1f7a6d,#4ad2b5)"><div class="ply"><span><svg viewBox="0 0 24 24" width="10" height="10"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">12:08</div></div>
+                <div class="meta">
+                  <div class="t">影视飓风：8K 拍下极光</div>
+                  <div class="sub">影视飓风 · 科技</div>
+                  <div class="tags">#4K #实拍</div>
+                </div>
+              </div>
+            </div>
+            <div class="month"><span class="y">2025 年 7 月</span><span class="c">1 个视频</span></div>
+            <div class="list">
+              <div class="row">
+                <div class="thumb" style="background:linear-gradient(135deg,#3a1f5d,#c0502e)"><div class="ply"><span><svg viewBox="0 0 24 24" width="10" height="10"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div><div class="dur">23:40</div></div>
+                <div class="meta">
+                  <div class="t">硬核讲透 Transformer</div>
+                  <div class="sub">3Blue1Brown · 知识</div>
+                  <div class="tags">#AI</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab on"><div class="glyph"></div>收藏</div>
+            <div class="tab add"><div class="glyph">+</div></div>
+            <div class="tab"><div class="glyph"></div>我的</div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone-cap">贴链接 · 解析</div>
+        <div class="phone"><div class="ph scheme-c s-c">
+          <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+          <div class="nav"><span class="title" style="font-size:16px">‹ 贴链接</span><span class="sp"></span></div>
+          <div class="content">
+            <div class="input"><span class="lk">🔗</span><input placeholder="粘贴 B 站视频链接"></div>
+            <button class="btn">解析视频</button>
+            <div class="sec-label">解析结果</div>
+            <div class="preview">
+              <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span><svg viewBox="0 0 24 24" width="10" height="10"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span></div></div>
+              <div class="meta">
+                <div class="ok">已解析成功</div>
+                <div class="t">一口气看懂《三体》黑暗森林</div>
+                <div class="sub">木鱼水心 · 影视 · 45:12</div>
+              </div>
+            </div>
+            <div class="sec-label">打标签</div>
+            <div class="chips"><span class="chip">#科幻</span><span class="chip">#深度</span><span class="chip tag-new">＋ 新建</span></div>
+            <button class="btn">收藏</button>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="rationale">
+      <div class="rb"><b>细线分隔列表</b> — 档案感，密度高不吵</div>
+      <div class="rb"><b>黑白灰为主</b> — 粉色只留给收藏动作与 logo</div>
+      <div class="rb"><b>标签用 # 文本</b> — 比贴纸更安静</div>
+      <div class="rb"><b>最耐看、最不像营销工具</b></div>
+    </div>
+  </section>
+
+  <footer>
+    三个方向都可以继续往下走：A 最贴合 logo 01 的可爱气质，B 最有个性、差异化强，C 最克制耐看。
+    选一个（也可以说「A 但列表改成 B 的双列」这种混搭），我再把 <b>全部页面</b>按选定风格画出来。
+  </footer>
+
+</div>
+</body>
+</html>

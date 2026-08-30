@@ -1,0 +1,38 @@
+<view class="page">
+  <view class="section card">
+    <view class="sec-title">使用指引</view>
+    <view class="step">① 首页粘贴 B站链接，点「解析视频」自动收藏</view>
+    <view class="step">② 在 B站评论区 @壁咚收藏，视频自动进收藏夹</view>
+    <view class="step">③ 点收藏夹卡片，跳 B站查看原视频</view>
+    <view class="step">④ 关注 @壁咚收藏，私信收激活码后绑定</view>
+  </view>
+
+  <view class="section card">
+    <view class="sec-title">常见问题</view>
+    <view class="faq">
+      <view class="q">支持哪些链接？</view>
+      <view class="a">B站视频链接、BV 号、b23.tv 短链。</view>
+    </view>
+    <view class="faq">
+      <view class="q">会下载视频吗？</view>
+      <view class="a">不会，只保存标题 / 封面 / UP主等元数据，不下载视频本体。</view>
+    </view>
+    <view class="faq">
+      <view class="q">怎么删除收藏？</view>
+      <view class="a">收藏夹卡片右上角「⋯」→ 删除。</view>
+    </view>
+    <view class="faq">
+      <view class="q">@壁咚收藏 没反应？</view>
+      <view class="a">确认已关注，并在评论区正确 @它，稍等后台解析。</view>
+    </view>
+  </view>
+
+  <view class="section card group">
+    <view class="sec-title">QQ 群</view>
+    <view class="group-row">
+      <text class="group-no">{{groupNo}}</text>
+      <text class="copy" bindtap="onCopyGroup">复制群号</text>
+    </view>
+    <view class="group-tip">复制后去 QQ 搜索群号申请加入</view>
+  </view>
+</view>

@@ -1,0 +1,32 @@
+.page {
+  padding: 28rpx;
+  background: #FFFFFF;
+  min-height: 100vh;
+}
+
+.card {
+  padding: 36rpx 32rpx;
+}
+
+.doc-title {
+  font-size: 34rpx;
+  font-weight: 750;
+  color: #2B1E23;
+}
+
+.doc-margin {
+  margin-top: 48rpx;
+}
+
+.doc-date {
+  font-size: 22rpx;
+  color: #B28B97;
+  margin: 8rpx 0 24rpx;
+}
+
+.txt {
+  font-size: 26rpx;
+  color: #7A6A70;
+  line-height: 1.7;
+  margin-bottom: 20rpx;
+}

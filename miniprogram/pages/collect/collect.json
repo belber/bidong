@@ -1,0 +1,8 @@
+{
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "收藏夹",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "custom-navbar": "/components/navbar/navbar"
+  }
+}

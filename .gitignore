@@ -13,6 +13,7 @@ node_modules/
 
 # 微信开发者工具 / 构建产物
 miniprogram/miniprogram_npm/
+miniprogram/project.private.config.json
 
 # IDE
 .idea/

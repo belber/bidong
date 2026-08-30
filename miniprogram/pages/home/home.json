@@ -1,0 +1,7 @@
+{
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "壁咚视频助手",
+  "usingComponents": {
+    "custom-navbar": "/components/navbar/navbar"
+  }
+}

@@ -1,0 +1,18 @@
+<view class="navbar" style="padding-top: {{statusBarHeight}}px">
+  <view class="navbar-row">
+    <view class="brand">
+      <view class="brand-logo">
+        <view class="tv-antenna a-l"></view>
+        <view class="tv-antenna a-r"></view>
+        <view class="tv-dot d-l"></view>
+        <view class="tv-dot d-r"></view>
+        <view class="tv-body">
+          <view class="tv-screen">
+            <text class="tv-heart">♥</text>
+          </view>
+        </view>
+      </view>
+      <text class="brand-name">壁咚视频助手</text>
+    </view>
+  </view>
+</view>

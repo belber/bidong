@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>壁咚 · 排版对比原型 v3</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --page-bg:#F6F4F2; --page-ink:#211F1C; --page-muted:#8D8A83; --page-line:#E6E2DC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);color:var(--page-ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.6}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 28px 80px}
+
+  header{padding:54px 0 28px;border-bottom:1px solid var(--page-line)}
+  .eyebrow{display:flex;align-items:center;gap:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--page-muted)}
+  .eyebrow::before{content:"";width:34px;height:1px;background:var(--page-muted)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;margin:16px 0 12px;font-weight:750;text-wrap:balance}
+  h1 em{font-style:normal;color:var(--page-muted)}
+  .lede{max-width:70ch;color:var(--page-muted);font-size:15px;margin:0}
+  .lede b{color:var(--page-ink);font-weight:650}
+  .badge-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .badge{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;padding:6px 13px;border-radius:99px;border:1px solid var(--page-line);color:var(--page-muted)}
+  .badge.hot{border-color:#FB7299;background:#FB7299;color:#fff}
+
+  section.scheme{padding:42px 0 6px;border-top:1px solid var(--page-line)}
+  .scheme-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  .scheme-tag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:700;letter-spacing:.05em;color:#FB7299}
+  .scheme-name{font-size:26px;font-weight:750;letter-spacing:-.01em}
+  .scheme-mood{color:var(--page-muted);font-size:13.5px}
+  .scheme-grid{display:flex;gap:26px;flex-wrap:wrap;margin-top:22px}
+  .phone-wrap{flex:1 1 300px;display:flex;flex-direction:column;gap:10px;align-items:center}
+  .phone-cap{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--page-muted)}
+  .rationale{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
+  .rb{background:var(--page-ink);color:var(--page-bg);border-radius:10px;padding:8px 13px;font-size:13px}
+  .rb b{font-weight:650}
+
+  /* phone shell */
+  .phone{width:268px;background:#0d0d0f;border-radius:42px;padding:9px;box-shadow:0 24px 60px rgba(0,0,0,.26),0 2px 8px rgba(0,0,0,.1);flex:none}
+  .ph{background:#FFFFFF;border-radius:33px;overflow:hidden;display:flex;flex-direction:column;min-height:592px;font-family:var(--font)}
+  .stbar{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 2px;font-size:12px;font-weight:650;color:#2B1E23}
+  .stbar .r{display:flex;gap:5px;align-items:center;font-size:10px;letter-spacing:.02em;color:#B28B97}
+  .nav{display:flex;align-items:center;gap:9px;padding:10px 16px 12px}
+  .logo{width:26px;height:26px;flex:none}
+  .nav .title{font-size:var(--nav-size);font-weight:var(--nav-w);color:#2B1E23;letter-spacing:-.01em}
+  .nav .back{font-size:var(--nav-size);color:#2B1E23;line-height:1}
+  .nav .sp{flex:1}
+  .nav .ic{width:21px;height:21px;border:1.6px solid #B28B97;border-radius:6px;position:relative;opacity:.75}
+  .goto{font-size:11px;font-weight:700;color:#FB7299;border:1.5px solid #FB7299;border-radius:99px;padding:5px 11px}
+  .content{padding:0 15px 14px;display:flex;flex-direction:column;gap:var(--gap);flex:1}
+  .chip{font-size:var(--chip-size);color:#B28B97;background:#FCEAF0;padding:var(--chip-pad);border-radius:99px;line-height:1.5;font-weight:500}
+  .chip.on{background:#FB7299;color:#fff;font-weight:650}
+  .chip.tag-new{border:1px dashed #FB7299;color:#FB7299;background:transparent}
+
+  .tabbar{display:flex;justify-content:space-around;align-items:flex-end;padding:8px 14px 12px;border-top:1px solid #F7E4EA;background:#fff}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:#B28B97}
+  .tab.on{color:#FB7299;font-weight:650}
+  .tab .glyph{width:17px;height:17px;border-radius:5px;border:1.7px solid currentColor;opacity:.85}
+
+  .thumb{position:relative;overflow:hidden;flex:none;background:#222}
+  .thumb .ply{position:absolute;inset:0;display:grid;place-items:center}
+  .thumb .ply span{width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.45);display:grid;place-items:center;font-size:10px;color:#fff;backdrop-filter:blur(2px)}
+  .thumb .dur{position:absolute;right:5px;bottom:5px;font-size:9px;font-weight:600;background:rgba(0,0,0,.68);color:#fff;padding:1px 6px;border-radius:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .thumb .src{position:absolute;left:5px;top:5px;font-size:8.5px;font-weight:700;color:#fff;background:#FB7299;padding:2px 7px;border-radius:99px}
+  .thumb .src.bot{background:#3A3A45}
+
+  .month{display:flex;align-items:baseline;gap:8px;padding:2px 2px 0}
+  .month .y{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--month-size);letter-spacing:.1em;text-transform:uppercase;color:#2B1E23;font-weight:700}
+  .month .y::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#FB7299;margin-right:6px;vertical-align:1px}
+  .month .c{font-size:10px;color:#B28B97;margin-left:auto}
+
+  .input{display:flex;align-items:center;gap:9px;background:#fff;border:1.5px solid #F0C9D4;border-radius:var(--card-r);padding:var(--input-pad)}
+  .input .lk{font-size:15px;color:#B28B97}
+  .input input{border:none;outline:none;background:transparent;font-size:var(--input-size);color:#2B1E23;font-family:inherit;flex:1}
+  .input input::placeholder{color:#C9A6B1}
+  .btn{width:100%;text-align:center;padding:var(--btn-pad);border-radius:var(--card-r);background:#FB7299;color:#fff;font-size:var(--btn-size);font-weight:700;letter-spacing:.04em;border:none;box-shadow:0 8px 20px rgba(251,114,153,.25)}
+  .btn.sm{width:auto;padding:8px 20px;font-size:12px;border-radius:99px}
+  .clip{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#FFF4F7;border:1.5px dashed #FB7299;border-radius:var(--card-r);padding:var(--btn-pad);font-size:var(--btn-size);font-weight:650;color:#FB7299}
+  .hint{text-align:center;font-size:10.5px;color:#C9A6B1}
+
+  .cover{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--card-r);overflow:hidden}
+  .cover .ply{position:absolute;inset:0;display:grid;place-items:center}
+  .cover .ply span{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.5);display:grid;place-items:center;font-size:15px;color:#fff;backdrop-filter:blur(2px)}
+  .cover .dur{position:absolute;right:8px;bottom:8px;font-size:10px;font-weight:600;background:rgba(0,0,0,.68);color:#fff;padding:2px 8px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .vtitle{font-size:var(--vtitle);font-weight:750;color:#2B1E23;line-height:1.35;letter-spacing:-.01em}
+  .up{display:flex;align-items:center;gap:8px}
+  .ava{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700}
+  .uname{font-size:12.5px;font-weight:650;color:#2B1E23}
+  .stats{display:flex;justify-content:space-between;background:#FFF7F9;border-radius:var(--card-r);padding:10px 6px}
+  .st{display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
+  .st b{font-size:var(--stat-num);color:#2B1E23;font-weight:750}
+  .st span{font-size:var(--stat-label);color:#B28B97}
+  .saved{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:650;color:#FB7299;background:#FFF4F7;border-radius:var(--card-r);padding:9px 12px}
+  .sec-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--sec-size);letter-spacing:.12em;text-transform:uppercase;color:#B28B97}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .desc{font-size:var(--sub-size);color:#7A6A70;line-height:1.6}
+
+  .banner{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:650;color:#FB7299;background:#FFF4F7;border:1px solid #FBDDE6;border-radius:var(--banner-r);padding:var(--banner-pad)}
+  .banner .arr{margin-left:auto;font-size:16px;color:#FB7299}
+  .seg{display:flex;background:#FFF4F7;border-radius:99px;padding:3px}
+  .seg-it{flex:1;text-align:center;font-size:11px;color:#B28B97;padding:6px 0;border-radius:99px;font-weight:600}
+  .seg-it.on{background:#FB7299;color:#fff;font-weight:700}
+  .tagrow{display:flex;gap:6px;flex-wrap:wrap}
+  .card{display:flex;gap:10px;background:#fff;border:1px solid #F7E4EA;border-radius:var(--card-r);padding:var(--card-pad);box-shadow:0 8px 20px rgba(251,114,153,.05);position:relative}
+  .card .thumb{width:var(--thumb-w);height:var(--thumb-h);border-radius:10px}
+  .card .meta{min-width:0;display:flex;flex-direction:column;gap:4px;flex:1}
+  .card .meta .t{font-size:var(--t-size);font-weight:650;color:#2B1E23;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .meta .sub{font-size:var(--sub-size);color:#B28B97}
+  .card .meta .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:1px}
+  .card .del{position:absolute;top:6px;right:8px;font-size:14px;color:#C9A6B1;letter-spacing:1px}
+
+  .bind{background:#FFF4F7;border:1px solid #FBDDE6;border-radius:var(--card-r);padding:14px}
+  .bind-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .bind-t{font-size:var(--t-size);font-weight:750;color:#2B1E23}
+  .bind .chip{margin-left:auto}
+  .steps{font-size:var(--sub-size);color:#7A6A70;line-height:1.65;margin-bottom:12px}
+  .bind .btn.sm{width:100%;border-radius:var(--card-r)}
+  .menu{background:#fff;border:1px solid #F7E4EA;border-radius:var(--card-r);overflow:hidden}
+  .mi{display:flex;align-items:center;gap:8px;padding:13px 14px;font-size:var(--t-size);color:#2B1E23;font-weight:550;border-bottom:1px solid #FBF0F3}
+  .mi:last-child{border-bottom:none}
+  .mi span{margin-left:auto;font-size:13px;color:#C9A6B1}
+  .mi .ver{font-size:var(--sub-size);color:#C9A6B1;font-weight:400}
+
+  footer{padding:40px 0 10px;border-top:1px solid var(--page-line);color:var(--page-muted);font-size:14px}
+  footer b{color:var(--page-ink)}
+
+  /* typography variants */
+  .v1{
+    --font:"Yuanti SC","YouYuan","PingFang SC",sans-serif;
+    --nav-size:20px; --nav-w:750;
+    --btn-size:15px; --btn-pad:14px;
+    --input-size:15px; --input-pad:14px 14px;
+    --card-pad:12px; --card-r:18px;
+    --t-size:14px; --sub-size:10.5px;
+    --chip-size:10.5px; --chip-pad:4px 11px;
+    --month-size:12px;
+    --gap:15px;
+    --banner-r:16px; --banner-pad:12px 14px;
+    --vtitle:18px; --sec-size:11px;
+    --stat-num:13px; --stat-label:9.5px;
+    --thumb-w:106px; --thumb-h:68px;
+  }
+  .v2{
+    --font:"PingFang SC","Helvetica Neue",sans-serif;
+    --nav-size:17px; --nav-w:650;
+    --btn-size:13px; --btn-pad:11px;
+    --input-size:13.5px; --input-pad:11px 13px;
+    --card-pad:9px; --card-r:12px;
+    --t-size:12.5px; --sub-size:10px;
+    --chip-size:9.5px; --chip-pad:3px 8px;
+    --month-size:10.5px;
+    --gap:11px;
+    --banner-r:12px; --banner-pad:10px 12px;
+    --vtitle:16px; --sec-size:10px;
+    --stat-num:12px; --stat-label:9px;
+    --thumb-w:98px; --thumb-h:62px;
+  }
+
+  @media(max-width:760px){
+    h1{font-size:30px}
+    .wrap{padding:0 18px 60px}
+    .phone{width:250px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">壁咚视频助手 · 排版对比 v3</div>
+    <h1>同一个方案 A，<em>两种排版气质</em></h1>
+    <p class="lede">交互已按确认版固化：<b>Tab1 贴链接（首页）→ 视频详情（解析即自动收藏）→ Tab2 收藏夹（双来源混排 + 角标过滤）→ Tab3 我的（绑定/解绑）</b>。
+    下面是纯白底方案 A 的两个排版版本，只改字体、字号与留白密度，页面结构完全一致。</p>
+    <div class="badge-row">
+      <span class="badge hot">方案 A · 纯白底</span>
+      <span class="badge">字体 / 字号对比</span>
+      <span class="badge">交互已确认</span>
+    </div>
+  </header>
+
+  <!-- ============ 版本 1 ============ -->
+  <section class="scheme v1">
+    <div class="scheme-head">
+      <span class="scheme-tag">版本 1</span>
+      <span class="scheme-name">大字 · 圆体</span>
+      <span class="scheme-mood">圆润亲切 · 大字号宽松留白 · 标题粗</span>
+    </div>
+    <div class="scheme-grid">
+      <div class="phone-wrap"><div class="phone-cap">Tab 1 · 贴链接（首页）</div><div class="slot" data-tpl="home"></div></div>
+      <div class="phone-wrap"><div class="phone-cap">视频详情 · 解析结果</div><div class="slot" data-tpl="detail"></div></div>
+      <div class="phone-wrap"><div class="phone-cap">Tab 2 · 收藏夹</div><div class="slot" data-tpl="collect"></div></div>
+      <div class="phone-wrap"><div class="phone-cap">Tab 3 · 我的</div><div class="slot" data-tpl="mine"></div></div>
+    </div>
+    <div class="rationale">
+      <div class="rb"><b>圆体（Yuanti）</b> — 和爱心 logo 同款可爱气质</div>
+      <div class="rb"><b>正文 14–15px</b> — 长辈/碎片场景都易读</div>
+      <div class="rb"><b>大圆角 18px</b> — 柔和贴纸感</div>
+      <div class="rb"><b>字重偏粗</b> — 一眼亲和、有温度</div>
+    </div>
+  </section>
+
+  <!-- ============ 版本 2 ============ -->
+  <section class="scheme v2">
+    <div class="scheme-head">
+      <span class="scheme-tag">版本 2</span>
+      <span class="scheme-name">小字 · 黑体</span>
+      <span class="scheme-mood">精致利落 · 小字号高密度 · 信息扫读快</span>
+    </div>
+    <div class="scheme-grid">
+      <div class="phone-wrap"><div class="phone-cap">Tab 1 · 贴链接（首页）</div><div class="slot" data-tpl="home"></div></div>
+      <div class="phone-wrap"><div class="phone-cap">视频详情 · 解析结果</div><div class="slot" data-tpl="detail"></div></div>
+      <div class="phone-wrap"><div class="phone-cap">Tab 2 · 收藏夹</div><div class="slot" data-tpl="collect"></div></div>
+      <div class="phone-wrap"><div class="phone-cap">Tab 3 · 我的</div><div class="slot" data-tpl="mine"></div></div>
+    </div>
+    <div class="rationale">
+      <div class="rb"><b>系统黑体（PingFang）</b> — 微信生态最稳，零加载成本</div>
+      <div class="rb"><b>正文 12.5–13.5px</b> — 一屏装更多收藏</div>
+      <div class="rb"><b>小圆角 12px</b> — 克制、工具感</div>
+      <div class="rb"><b>字重偏细</b> — 安静耐看</div>
+    </div>
+  </section>
+
+  <footer>
+    两个版本页面结构一模一样，只有排版不同。选一个方向（或混搭，比如「版本 1 的字号 + 版本 2 的黑体」），
+    我就按选定排版把全部页面正式画完并转成小程序页面。
+  </footer>
+</div>
+
+<!-- ============ 页面模板 ============ -->
+<template id="t-home">
+<div class="phone"><div class="ph">
+  <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+  <div class="nav">
+    <svg class="logo" viewBox="0 0 100 100" aria-label="壁咚 logo">
+      <g stroke="#FB7299" stroke-width="7" stroke-linecap="round"><path d="M35 30 V19"/><path d="M65 30 V19"/></g>
+      <circle cx="35" cy="15" r="4.5" fill="#FB7299"/><circle cx="65" cy="15" r="4.5" fill="#FB7299"/>
+      <rect x="13" y="30" width="74" height="58" rx="16" fill="#FB7299"/>
+      <rect x="21" y="38" width="58" height="42" rx="10" fill="#fff"/>
+      <path transform="translate(38,50)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#FB7299"/>
+    </svg>
+    <span class="title">壁咚</span><span class="sp"></span><div class="ic"></div>
+  </div>
+  <div class="content">
+    <button class="clip">📋 从剪贴板粘贴</button>
+    <div class="input"><span class="lk">🔗</span><input placeholder="粘贴 B站视频链接"></div>
+    <button class="btn">解析视频</button>
+    <div class="hint">支持 B站视频链接 · 解析后自动收藏</div>
+  </div>
+  <div class="tabbar">
+    <div class="tab on"><div class="glyph"></div>贴链接</div>
+    <div class="tab"><div class="glyph"></div>收藏夹</div>
+    <div class="tab"><div class="glyph"></div>我的</div>
+  </div>
+</div></div>
+</template>
+
+<template id="t-detail">
+<div class="phone"><div class="ph">
+  <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+  <div class="nav"><span class="back">‹</span><span class="title">视频详情</span><span class="sp"></span></div>
+  <div class="content">
+    <div class="cover" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><div class="ply"><span>▶</span></div><div class="dur">45:12</div></div>
+    <div class="vtitle">一口气看懂《三体》黑暗森林</div>
+    <div class="up"><span class="ava" style="background:linear-gradient(135deg,#FB7299,#ff9db9)">木</span><span class="uname">木鱼水心</span><span class="chip">影视</span></div>
+    <div class="stats">
+      <div class="st"><b>45.2万</b><span>播放</span></div>
+      <div class="st"><b>3.1万</b><span>点赞</span></div>
+      <div class="st"><b>1.2万</b><span>投币</span></div>
+      <div class="st"><b>2.0万</b><span>收藏</span></div>
+      <div class="st"><b>3210</b><span>分享</span></div>
+    </div>
+    <div class="saved">♥ 已自动收藏 · 来源 本机</div>
+    <div class="sec-label">打标签</div>
+    <div class="chips"><span class="chip on">科幻</span><span class="chip on">深度</span><span class="chip">AI</span><span class="chip tag-new">＋ 新建</span></div>
+    <div class="sec-label">简介</div>
+    <div class="desc">从黑暗森林法则到面壁计划，一口气讲透《三体》第二部的世界观设定与核心剧情脉络，适合入坑前先看。</div>
+    <button class="btn">完成，去收藏夹</button>
+  </div>
+</div></div>
+</template>
+
+<template id="t-collect">
+<div class="phone"><div class="ph">
+  <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+  <div class="nav">
+    <svg class="logo" viewBox="0 0 100 100" aria-label="壁咚 logo">
+      <g stroke="#FB7299" stroke-width="7" stroke-linecap="round"><path d="M35 30 V19"/><path d="M65 30 V19"/></g>
+      <circle cx="35" cy="15" r="4.5" fill="#FB7299"/><circle cx="65" cy="15" r="4.5" fill="#FB7299"/>
+      <rect x="13" y="30" width="74" height="58" rx="16" fill="#FB7299"/>
+      <rect x="21" y="38" width="58" height="42" rx="10" fill="#fff"/>
+      <path transform="translate(38,50)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#FB7299"/>
+    </svg>
+    <span class="title">壁咚</span><span class="sp"></span><div class="goto">＋ 去解析</div>
+  </div>
+  <div class="content">
+    <div class="banner">关注 @壁咚收藏 → 领激活码<span class="arr">›</span></div>
+    <div class="seg"><span class="seg-it on">全部</span><span class="seg-it">本机</span><span class="seg-it">@壁咚</span></div>
+    <div class="tagrow"><span class="chip on">全部</span><span class="chip">科幻</span><span class="chip">深度</span><span class="chip">4K</span><span class="chip">AI</span></div>
+    <div class="month"><span class="y">2025 · 08</span><span class="c">2 个视频</span></div>
+    <div class="card">
+      <div class="thumb" style="background:linear-gradient(135deg,#1b2440,#4a3f8f)"><span class="src">本机</span><div class="ply"><span>▶</span></div><div class="dur">45:12</div></div>
+      <div class="meta">
+        <div class="t">一口气看懂《三体》黑暗森林</div>
+        <div class="sub">木鱼水心 · 影视</div>
+        <div class="chips"><span class="chip">科幻</span><span class="chip">深度</span></div>
+      </div>
+      <div class="del">⋯</div>
+    </div>
+    <div class="card">
+      <div class="thumb" style="background:linear-gradient(135deg,#0b3d3a,#1f7a6d,#4ad2b5)"><span class="src bot">@壁咚</span><div class="ply"><span>▶</span></div><div class="dur">12:08</div></div>
+      <div class="meta">
+        <div class="t">影视飓风：8K 拍下极光</div>
+        <div class="sub">影视飓风 · 科技</div>
+        <div class="chips"><span class="chip">4K</span><span class="chip">实拍</span></div>
+      </div>
+      <div class="del">⋯</div>
+    </div>
+    <div class="month"><span class="y">2025 · 07</span><span class="c">1 个视频</span></div>
+    <div class="card">
+      <div class="thumb" style="background:linear-gradient(135deg,#3a1f5d,#c0502e)"><span class="src bot">@壁咚</span><div class="ply"><span>▶</span></div><div class="dur">23:40</div></div>
+      <div class="meta">
+        <div class="t">硬核讲透 Transformer</div>
+        <div class="sub">3Blue1Brown · 知识</div>
+        <div class="chips"><span class="chip">AI</span><span class="chip">长视频</span></div>
+      </div>
+      <div class="del">⋯</div>
+    </div>
+  </div>
+  <div class="tabbar">
+    <div class="tab"><div class="glyph"></div>贴链接</div>
+    <div class="tab on"><div class="glyph"></div>收藏夹</div>
+    <div class="tab"><div class="glyph"></div>我的</div>
+  </div>
+</div></div>
+</template>
+
+<template id="t-mine">
+<div class="phone"><div class="ph">
+  <div class="stbar"><span>9:41</span><span class="r">▂▄▆ ●▵ ▪</span></div>
+  <div class="nav"><span class="title">我的</span><span class="sp"></span></div>
+  <div class="content">
+    <div class="bind">
+      <div class="bind-head"><span class="bind-t">@壁咚收藏 绑定</span><span class="chip">未绑定</span></div>
+      <div class="steps">1 关注 @壁咚收藏 → 机器人私信激活码<br>2 输入激活码 + B站 UID → 绑定成功</div>
+      <button class="btn sm">去绑定</button>
+    </div>
+    <div class="menu">
+      <div class="mi">联系我<span>›</span></div>
+      <div class="mi">进讨论群<span>›</span></div>
+      <div class="mi">意见反馈<span>›</span></div>
+      <div class="mi">清除缓存<span>›</span></div>
+      <div class="mi">隐私政策<span>›</span></div>
+      <div class="mi">用户协议<span>›</span></div>
+      <div class="mi">关于 壁咚<span class="ver">版本 1.0.0</span></div>
+    </div>
+  </div>
+  <div class="tabbar">
+    <div class="tab"><div class="glyph"></div>贴链接</div>
+    <div class="tab"><div class="glyph"></div>收藏夹</div>
+    <div class="tab on"><div class="glyph"></div>我的</div>
+  </div>
+</div></div>
+</template>
+
+<script>
+document.querySelectorAll('.slot[data-tpl]').forEach(function(slot){
+  var tpl = document.getElementById('t-' + slot.getAttribute('data-tpl'));
+  slot.appendChild(tpl.content.firstElementChild.cloneNode(true));
+});
+</script>
+</body>
+</html>
