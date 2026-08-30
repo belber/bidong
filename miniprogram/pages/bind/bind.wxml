@@ -1,5 +1,5 @@
 <view class="page">
-  <view class="intro">粘贴 B站私信里收到的激活码，即可完成绑定。</view>
+  <view class="intro">关注B站 @壁咚收藏 会私信激活码，粘贴到此可绑定</view>
 
   <view class="input-box">
     <input

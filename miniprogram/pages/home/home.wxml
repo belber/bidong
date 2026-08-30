@@ -3,20 +3,18 @@
 <view class="page">
   <view class="input-box">
     <image class="lk-icon" src="/images/icon-link.png" mode="aspectFit" />
-    <input
+    <textarea
       class="input"
-      placeholder="https://www.bilibili.com/video/BV1BE4U6BEg8"
+      placeholder="https://www.bilibili.com/video/&#10;BV1BE4U6BEg8"
       placeholder-class="ph"
       value="{{input}}"
       bindinput="onInput"
-      confirm-type="done"
+      maxlength="200"
     />
+    <text class="paste" bindtap="onPaste">粘贴</text>
   </view>
 
-  <view class="action-row">
-    <button class="paste-btn" bindtap="onPaste">📋 粘贴</button>
-    <button class="btn-primary parse-btn" bindtap="onParse">解析视频</button>
-  </view>
+  <button class="btn-primary parse-btn" bindtap="onParse">解析视频</button>
 
   <view class="guide-card">
     <view class="guide-title">如何获取链接</view>

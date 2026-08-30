@@ -12,8 +12,8 @@
   background: #FFFFFF;
   border: 2rpx solid #FB7299;
   border-radius: 20rpx;
-  padding: 26rpx 24rpx;
-  min-height: 116rpx;
+  padding: 22rpx 24rpx;
+  min-height: 132rpx;
   box-shadow: 0 8rpx 24rpx rgba(251, 114, 153, 0.10);
 }
 
@@ -27,24 +27,27 @@
   flex: 1;
   font-size: 32rpx;
   color: #2B1E23;
-  line-height: 1.4;
+  line-height: 1.5;
+  height: 88rpx;
+  min-height: 88rpx;
+  background: transparent;
 }
 
 .ph {
   color: #B9B3AC;
   font-size: 30rpx;
+  line-height: 1.5;
 }
 
-.action-row {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin-top: 20rpx;
+.paste {
+  flex: none;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #FB7299;
 }
 
 .parse-btn {
-  flex: 2;
-  margin: 0;
+  margin-top: 20rpx;
   font-size: 32rpx;
   padding: 20rpx 0;
   border-radius: 22rpx;
@@ -180,28 +183,6 @@
 .demo-ctext.highlight {
   color: #FB7299;
   font-weight: 700;
-}
-
-.paste-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  margin: 0;
-  padding: 20rpx 0;
-  background: #FFF4F7;
-  border: 2rpx solid #FB7299;
-  border-radius: 22rpx;
-  text-align: center;
-  line-height: 1.5;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #2B1E23;
-}
-
-.paste-btn::after {
-  border: none;
 }
 
 .way {
