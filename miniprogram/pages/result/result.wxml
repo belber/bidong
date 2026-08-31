@@ -1,12 +1,19 @@
 <view class="page">
-  <view class="cover">
-    <view class="cover-bg"></view>
-    <view class="ply">▶</view>
-    <view class="dur">{{dur}}</view>
-    <view class="open-bili" bindtap="onOpenBili">↗ 去查看</view>
+  <view class="actions">
+    <button class="copy-all" bindtap="onCopyAll">复制全部信息</button>
   </view>
 
-  <view class="title">{{video.title}}</view>
+  <view class="cover" bindtap="onPreviewCover">
+    <view class="cover-bg"></view>
+    <image class="cover-img" src="{{video.cover_url}}" mode="aspectFill" />
+    <view class="open-bili" catchtap="onOpenBili">↗ 去查看</view>
+  </view>
+  <view class="dur-field">时长 {{dur}}</view>
+
+  <view class="title-row">
+    <view class="title">{{video.title}}</view>
+    <text class="copy-btn" bindtap="onCopyTitle">复制</text>
+  </view>
 
   <view class="up-row">
     <view class="ava">{{upInitial}}</view>
@@ -14,28 +21,45 @@
     <text class="chip">{{video.partition}}</text>
   </view>
 
-  <view class="meta-line">{{video.bvid}} · {{pubText}}</view>
+  <view class="meta-line">
+    <text>{{video.bvid}} · {{pubText}}</text>
+    <text class="copy-btn" bindtap="onCopyLink">复制链接</text>
+  </view>
 
-  <view class="sec-label">标签</view>
+  <view class="sec-head">
+    <text class="sec-label">标签</text>
+    <text class="copy-btn" bindtap="onCopyTags">复制</text>
+  </view>
   <view class="tag-row">
     <text class="chip chip-tag" wx:for="{{video.tags}}" wx:key="*this">＃{{item}}</text>
   </view>
 
-  <view class="sec-label">简介</view>
-  <view class="desc">{{video.desc}}</view>
+  <view class="sec-head">
+    <text class="sec-label">简介</text>
+    <text class="copy-btn" bindtap="onCopyDesc">复制</text>
+  </view>
+  <view class="desc" selectable>{{video.desc}}</view>
 
   <view class="subtitle card" wx:if="{{video.subtitles.length}}">
     <view class="sub-head">
       <text class="sub-title">📄 字幕</text>
-      <text class="chip chip-on">{{video.subtitles.length}} 条金句</text>
+      <text class="chip chip-on">{{video.subtitles.length}} 条</text>
     </view>
-    <view class="sub-it" wx:for="{{video.subtitles}}" wx:key="t">
-      <text class="sub-t">{{item.timeText}}</text>
-      <text>{{item.text}}</text>
-    </view>
+    <block wx:if="{{!showAllSub}}">
+      <view class="sub-it" wx:for="{{subPreview}}" wx:key="t">
+        <text class="sub-t">{{item.timeText}}</text>
+        <text selectable>{{item.text}}</text>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="sub-it" wx:for="{{video.subtitles}}" wx:key="t">
+        <text class="sub-t">{{item.timeText}}</text>
+        <text selectable>{{item.text}}</text>
+      </view>
+    </block>
     <view class="sub-actions">
-      <button class="btn-ghost sub-btn" bindtap="onMoreSub">查看更多</button>
-      <button class="btn-primary sub-btn" bindtap="onDownloadSub">下载字幕</button>
+      <button class="btn-ghost sub-btn" bindtap="onToggleSub">{{showAllSub ? '收起' : '查看更多'}}</button>
+      <button class="btn-primary sub-btn" bindtap="onCopySub">复制字幕</button>
     </view>
   </view>
 </view>

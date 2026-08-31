@@ -6,7 +6,8 @@
 
 .cover {
   position: relative;
-  width: 100%;
+  width: 420rpx;
+  margin: 0 auto;
   aspect-ratio: 16 / 9;
   border-radius: 28rpx;
   overflow: hidden;
@@ -21,30 +22,14 @@
   background: linear-gradient(135deg, #1b2440, #4a3f8f);
 }
 
-.ply {
+.cover-img {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-  font-size: 44rpx;
-}
-
-.dur {
-  position: absolute;
-  left: 16rpx;
-  bottom: 16rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  background: rgba(0, 0, 0, 0.68);
-  color: #FFFFFF;
-  padding: 4rpx 16rpx;
-  border-radius: 10rpx;
-  font-family: ui-monospace, Menlo, monospace;
+  width: 100%;
+  height: 100%;
 }
 
 .open-bili {
@@ -60,7 +45,8 @@
 }
 
 .title {
-  margin-top: 24rpx;
+  flex: 1;
+  min-width: 0;
   font-size: 34rpx;
   font-weight: 750;
   color: #2B1E23;
@@ -96,13 +82,18 @@
 
 .meta-line {
   margin-top: 14rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
   font-family: ui-monospace, Menlo, monospace;
   font-size: 22rpx;
   color: #7A6A70;
 }
 
 .sec-label {
-  margin-top: 28rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #2B1E23;
 }
 
 .tag-row {
@@ -165,4 +156,49 @@
 
 .sub-btn {
   flex: 1;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16rpx;
+}
+
+.copy-all {
+  margin: 0;
+  padding: 10rpx 26rpx;
+  font-size: 26rpx;
+  line-height: 1.4;
+  color: #FB7299;
+  background: #FFF4F7;
+  border-radius: 999rpx;
+}
+
+.dur-field {
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #7A6A70;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 28rpx;
+}
+
+.copy-btn {
+  flex: none;
+  font-size: 24rpx;
+  color: #FB7299;
+  padding: 2rpx 4rpx;
 }

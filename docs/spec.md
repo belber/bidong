@@ -92,13 +92,16 @@ user (
 video_card (
   id            PK,
   user_id       FK -> user,
-  bvid          text,        -- B站视频ID
+  bvid          text,        -- B站视频ID（唯一业务键）
   title         text,
   cover_url     text,        -- 转存到自己 COS 后的 URL
   up_name       text,        -- UP主昵称
   partition     text,        -- B站自带分区（view?bvid 的 tname）
   desc          text,        -- 简介（截断）
   source_url    text,        -- 原始 B站链接（跳转用）
+  duration      int,         -- 时长（秒），用于卡片角标
+  pubdate       int,         -- B站发布时间（unix 秒）
+  source        text,        -- 收藏来源：local（本机）| robot（@壁咚）
   collected_at  timestamp,   -- 收藏时间
   month         text         -- 冗余 'YYYY-MM'，分组索引
 )
@@ -127,6 +130,9 @@ binding (                      -- Phase 1：激活码绑定 B站账号
 - **固有标签落库**：解析时，B站视频自带的标签（`x/tag/archive/tags`，匿名可读）自动作为**默认标签**写入 `card_tag` 预填，成为该卡片的一个默认分组；用户可在收藏夹/卡片上再增删。与用户手动标签共用一套 `tag/card_tag`，不单独建表。
 - **月份分组**：由 `collected_at` 派生，`month` 冗余存储便于查询，**与标签正交**。
 - **B站分区**（tname）是视频元数据，存 `partition`，与用户自定义标签分开。
+- **幂等**：`video_card` 以 `(user_id, bvid)` 建唯一约束，同一用户重复解析同一视频不重复建卡。
+- **来源**：`source` 只有 `local` / `robot` 两个值，对应前端「本机 / @壁咚」来源筛选；Phase 0 全部为 `local`。
+- **B站 ID 决策**：库表用 `bvid` 作为 `(user_id, bvid)` 唯一键，不存 `aid`。B站小程序跳转直接用 `bvid`；若未来某接口要求数字 ID，按 BV→AV 算法在本地换算，不额外请求 B站接口。
 
 ---
 
@@ -137,7 +143,7 @@ Phase 0：贴链接
 1. 用户粘贴 B站链接 → POST /api/parse
 2. 后端提取 bvid → view?bvid= 拿 title/cover/up/partition
 3. 下载 cover → 转存 COS
-4. 存库（可选打标签）→ 返回卡片
+4. 存库（解析即自动收藏，固有标签落为默认标签）→ 返回卡片；重复解析同一视频幂等返回原卡片
 5. 前端按 month 分组 + 标签过滤渲染
 
 Phase 1：机器人触发
@@ -153,15 +159,24 @@ Phase 1：机器人触发
 
 | 方法 | 路径 | 说明 |
 |:--|:--|:--|
-| POST | `/api/login` | code → openid 登录 |
-| POST | `/api/parse` | `{url}` → 解析后的视频信息（含转存封面） |
-| POST | `/api/cards` | 保存卡片 |
-| GET  | `/api/cards?month=YYYY-MM&tag=xxx` | 按月份 / 标签查卡片 |
+| POST | `/api/login` | `{code}` → 换 openid 建用户，返回 JWT token |
+| POST | `/api/parse` | `{url}` → 解析并自动收藏，返回卡片（幂等） |
+| GET  | `/api/cards?month=YYYY-MM&tag=xxx&source=local\|robot` | 按月份 / 标签 / 来源查卡片 |
 | GET  | `/api/cards/:id` | 单卡片 |
 | DELETE | `/api/cards/:id` | 删除卡片 |
 | POST | `/api/tags` | 新建标签 |
+| GET  | `/api/tags` | 用户标签列表（前端筛选用） |
 | POST | `/api/cards/:id/tags` | 给卡片打标签 |
-| POST | `/api/binding` | Phase 1：粘贴激活码绑定（后端反查 UID） |
+
+> Phase 0 不提供 `POST /api/cards`；解析即收藏。Phase 1 机器人由 worker 直接写库，也不走该接口。
+> `POST /api/binding`（粘贴激活码绑定）延后到 Phase 1 实现。
+
+### 6.1 跳转 B站小程序
+
+- B站官方小程序 AppID：`wx7564fd5313d24844`。
+- 视频页路径：`pages/video/video?bvid={bvid}`（B站小程序支持直接接收 `bvid`，不需要先转成 `avid`）。
+- 小程序需在 `app.json` 配置 `navigateToMiniProgramAppIdList: ["wx7564fd5313d24844"]`。
+- 前端使用 `wx.navigateToMiniProgram({ appId, path })` 拉起 B站小程序；本地开发若未配 AppID，则提示用户复制链接。
 
 ---
 

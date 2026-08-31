@@ -6,7 +6,7 @@
 
 .input-box {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16rpx;
   margin-top: 16rpx;
   background: #FFFFFF;
@@ -28,8 +28,8 @@
   font-size: 32rpx;
   color: #2B1E23;
   line-height: 1.5;
-  height: 88rpx;
-  min-height: 88rpx;
+  height: 192rpx;
+  min-height: 192rpx;
   background: transparent;
 }
 

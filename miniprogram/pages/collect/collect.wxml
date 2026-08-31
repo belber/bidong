@@ -17,9 +17,8 @@
     <view class="guide-card">
       <view class="guide-title">你还未绑定或未 @过，可以按下面的方式操作</view>
       <view class="guide-steps">
-        <view class="guide-step">① 关注 @壁咚收藏</view>
-        <view class="guide-step">② 评论区 @壁咚收藏</view>
-        <view class="guide-step">③ 视频自动解析进收藏夹查看</view>
+        <view class="guide-step">① B站评论区 @壁咚收藏</view>
+        <view class="guide-step">② 进收藏夹查看视频</view>
       </view>
       <view class="demo">
         <view class="demo-video">
@@ -59,7 +58,8 @@
           bindtap="onCardTap"
           data-id="{{card.id}}"
         >
-          <view class="thumb" style="background: {{card.cover_gradient}}">
+          <view class="thumb">
+            <image class="thumb-img" src="{{card.cover_url}}" mode="aspectFill" />
             <text class="src {{card.source === 'robot' ? 'bot' : ''}}">{{card.source === 'robot' ? '@壁咚' : '本机'}}</text>
             <text class="dur">{{card.dur}}</text>
           </view>

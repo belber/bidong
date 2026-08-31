@@ -1,5 +1,5 @@
 const { extractBiliLink } = require('../../utils/parse.js');
-const { buildMockVideo } = require('../../utils/mock.js');
+const api = require('../../utils/api.js');
 
 Page({
   data: {
@@ -32,12 +32,20 @@ Page({
 
   onParse() {
     const link = extractBiliLink(this.data.input);
-    // TODO: 后端就绪后改为调 api.parseVideo(link.url)，无效链接 toast 提示。
-    // 当前为演示模式：不管输入内容都进入解析结果页，用 mock 数据展示。
-    const video = buildMockVideo(link || {
-      url: 'https://www.bilibili.com/video/BV1BE4U6BEg8'
-    });
-    getApp().globalData.pendingResult = video;
-    wx.navigateTo({ url: '/pages/result/result' });
+    if (!link) {
+      wx.showToast({ title: '请输入 B站视频链接或 BV 号', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '解析中' });
+    api.parse(link.url)
+      .then((card) => {
+        wx.hideLoading();
+        getApp().globalData.pendingResult = card;
+        wx.navigateTo({ url: '/pages/result/result' });
+      })
+      .catch((err) => {
+        wx.hideLoading();
+        wx.showToast({ title: err.message || '解析失败', icon: 'none' });
+      });
   }
 });

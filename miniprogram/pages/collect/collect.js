@@ -1,7 +1,7 @@
-const { MOCK_CARDS } = require('../../utils/mock.js');
 const { groupByMonth } = require('../../utils/group.js');
 const { filterCards } = require('../../utils/filter.js');
 const { formatDuration } = require('../../utils/format.js');
+const api = require('../../utils/api.js');
 
 Page({
   data: {
@@ -29,11 +29,16 @@ Page({
   },
 
   loadCards() {
-    // TODO: 后端就绪后改为 api.getCards() 拉取真实数据
-    const cards = MOCK_CARDS.map((c) => Object.assign({}, c, {
-      dur: formatDuration(c.duration)
-    }));
-    this.setData({ cards }, () => this.rebuild());
+    api.getCards()
+      .then((cards) => {
+        const mapped = cards.map((c) => Object.assign({}, c, {
+          dur: formatDuration(c.duration)
+        }));
+        this.setData({ cards: mapped }, () => this.rebuild());
+      })
+      .catch((err) => {
+        wx.showToast({ title: err.message || '加载失败', icon: 'none' });
+      });
   },
 
   rebuild() {
@@ -73,7 +78,8 @@ Page({
   },
 
   onCardTap(e) {
-    const card = this.data.cards.find((c) => c.id === e.currentTarget.dataset.id);
+    const id = e.currentTarget.dataset.id;
+    const card = this.data.cards.find((c) => String(c.id) === String(id));
     if (!card) {
       return;
     }
@@ -97,9 +103,14 @@ Page({
         if (!res.confirm) {
           return;
         }
-        const cards = this.data.cards.filter((c) => c.id !== id);
-        this.setData({ cards }, () => this.rebuild());
-        wx.showToast({ title: '已删除', icon: 'success' });
+        api.deleteCard(id)
+          .then(() => {
+            wx.showToast({ title: '已删除', icon: 'success' });
+            this.loadCards();
+          })
+          .catch((err) => {
+            wx.showToast({ title: err.message || '删除失败', icon: 'none' });
+          });
       }
     });
   },

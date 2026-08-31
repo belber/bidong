@@ -12,7 +12,9 @@ Page({
     },
     dur: '00:00',
     pubText: '',
-    upInitial: ''
+    upInitial: '',
+    subPreview: [],
+    showAllSub: false
   },
 
   onLoad() {
@@ -30,6 +32,7 @@ Page({
 
     this.setData({
       video: Object.assign({}, video, { subtitles }),
+      subPreview: subtitles.slice(0, 5),
       dur: formatDuration(video.duration),
       pubText: formatDateTime(video.pubdate),
       upInitial: (video.up_name || '?').slice(0, 1)
@@ -48,13 +51,75 @@ Page({
     });
   },
 
-  onMoreSub() {
-    // TODO: 后端字幕接口就绪后加载完整字幕
-    wx.showToast({ title: '完整字幕将在后端接入后提供', icon: 'none' });
+  copyText(text) {
+    if (!text) {
+      wx.showToast({ title: '没有可复制的内容', icon: 'none' });
+      return;
+    }
+    wx.setClipboardData({
+      data: text,
+      success() {
+        wx.showToast({ title: '已复制', icon: 'success' });
+      }
+    });
   },
 
-  onDownloadSub() {
-    // TODO: 下载字幕（后端返回 subtitle_url 后调用下载）
-    wx.showToast({ title: '字幕下载将在后端接入后提供', icon: 'none' });
+  onPreviewCover() {
+    const url = this.data.video.cover_url;
+    if (!url) {
+      return;
+    }
+    wx.previewImage({ urls: [url] });
+  },
+
+  onToggleSub() {
+    this.setData({ showAllSub: !this.data.showAllSub });
+  },
+
+  onCopyTitle() {
+    this.copyText(this.data.video.title);
+  },
+
+  onCopyTags() {
+    this.copyText((this.data.video.tags || []).map((t) => '#' + t).join(' '));
+  },
+
+  onCopyDesc() {
+    this.copyText(this.data.video.desc);
+  },
+
+  onCopyLink() {
+    this.copyText(this.data.video.source_url || this.data.video.bvid);
+  },
+
+  onCopySub() {
+    const lines = (this.data.video.subtitles || []).map((s) => s.timeText + ' ' + s.text);
+    this.copyText(lines.join('\n'));
+  },
+
+  onCopyAll() {
+    const v = this.data.video;
+    const lines = [];
+    if (v.title) {
+      lines.push('标题：' + v.title);
+    }
+    const meta = [v.up_name, v.partition, v.bvid].filter(Boolean).join(' · ');
+    if (meta) {
+      lines.push('来源：' + meta);
+    }
+    if (v.source_url) {
+      lines.push('链接：' + v.source_url);
+    }
+    if ((v.tags || []).length) {
+      lines.push('标签：' + (v.tags || []).map((t) => '#' + t).join(' '));
+    }
+    if (v.desc) {
+      lines.push('简介：' + v.desc);
+    }
+    if ((v.subtitles || []).length) {
+      lines.push('字幕：');
+      (v.subtitles || []).forEach((s) => lines.push(s.timeText + ' ' + s.text));
+    }
+    this.copyText(lines.join('\n'));
   }
 });
