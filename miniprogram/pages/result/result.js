@@ -147,8 +147,12 @@ Page({
         if (res.statusCode !== 200) { toast('下载失败'); return; }
         const filename = coverFilename(url, title);
         copyToNamed(res.tempFilePath, filename).then((filePath) => {
-          saveToAlbum(wx.saveImageToPhotosAlbum, filePath);
-        }).catch(() => saveToAlbum(wx.saveImageToPhotosAlbum, res.tempFilePath));
+          wx.shareFileMessage({
+            filePath,
+            fileName: filename,
+            fail(err) { toast((err && err.errMsg) || '分享失败'); }
+          });
+        }).catch(() => toast('保存失败'));
       },
       fail() { wx.hideLoading(); toast('下载失败'); }
     });
