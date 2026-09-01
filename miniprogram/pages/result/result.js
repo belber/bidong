@@ -1,125 +1,202 @@
+const api = require('../../utils/api.js');
 const { formatDuration, formatDateTime } = require('../../utils/format.js');
+
+function toast(title) {
+  wx.showToast({ title: title, icon: 'none' });
+}
 
 Page({
   data: {
-    video: {
-      title: '',
-      up_name: '',
-      partition: '',
-      tags: [],
-      desc: '',
-      subtitles: []
-    },
-    dur: '00:00',
+    cardId: 0,
+    bvid: '',
+    sourceUrl: '',
+    title: '',
+    upName: '',
     pubText: '',
-    upInitial: '',
+    tags: [],
+    desc: '',
+    stats: { like: 0, reply: 0, favorite: 0, coin: 0 },
+    coverUrl: '',
+    media: { watermarked: false, clean: false, audio: false },
+    subtitles: [],
     subPreview: [],
-    showAllSub: false
+    showAllSub: false,
+    danmakuCount: 0
   },
 
   onLoad() {
-    const video = getApp().globalData.pendingResult;
-    if (!video) {
-      wx.showToast({ title: '暂无解析数据', icon: 'none' });
+    const r = getApp().globalData.pendingResult;
+    if (!r) {
+      toast('暂无解析数据');
       return;
     }
-
-    const subtitles = (video.subtitles || []).map((s) => ({
+    const subtitles = (r.subtitles || []).map((s) => ({
       t: s.t,
       text: s.text,
       timeText: formatDuration(s.t)
     }));
-
     this.setData({
-      video: Object.assign({}, video, { subtitles }),
-      subPreview: subtitles.slice(0, 5),
-      dur: formatDuration(video.duration),
-      pubText: formatDateTime(video.pubdate),
-      upInitial: (video.up_name || '?').slice(0, 1)
+      cardId: r.id,
+      bvid: r.bvid,
+      sourceUrl: r.source_url,
+      title: r.title,
+      upName: r.up_name,
+      pubText: formatDateTime(r.pubdate),
+      tags: r.tags || [],
+      desc: r.desc,
+      stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0 },
+      coverUrl: r.cover_url,
+      media: r.media || { watermarked: false, clean: false, audio: false },
+      danmakuCount: r.danmaku_count || 0,
+      subtitles,
+      subPreview: subtitles.slice(0, 5)
     });
   },
 
-  onOpenBili() {
-    const appId = getApp().globalData.biliMiniProgramAppId;
-    if (!appId) {
-      wx.showToast({ title: 'B站小程序 appId 尚未配置', icon: 'none' });
+  copy(field) {
+    const v = this.data[field];
+    if (!v) {
+      toast('没有可复制的内容');
       return;
     }
-    wx.navigateToMiniProgram({
-      appId,
-      path: '/pages/video/video?bvid=' + this.data.video.bvid
-    });
+    const text = Array.isArray(v) ? v.map((t) => '#' + t).join(' ') : String(v);
+    wx.setClipboardData({ data: text, success() { toast('已复制'); } });
   },
 
-  copyText(text) {
-    if (!text) {
-      wx.showToast({ title: '没有可复制的内容', icon: 'none' });
-      return;
-    }
-    wx.setClipboardData({
-      data: text,
-      success() {
-        wx.showToast({ title: '已复制', icon: 'success' });
-      }
-    });
+  onCopyTag(e) {
+    this.copy(e.currentTarget.dataset.field);
   },
 
   onPreviewCover() {
-    const url = this.data.video.cover_url;
-    if (!url) {
-      return;
+    if (this.data.coverUrl) {
+      wx.previewImage({ urls: [this.data.coverUrl] });
     }
-    wx.previewImage({ urls: [url] });
+  },
+
+  onSaveCover() {
+    const url = this.data.coverUrl;
+    if (!url) { return; }
+    wx.downloadFile({
+      url,
+      success(res) {
+        if (res.statusCode !== 200) { toast('下载失败'); return; }
+        wx.saveImageToPhotosAlbum({
+          filePath: res.tempFilePath,
+          success() { toast('已保存到相册'); },
+          fail() { toast('保存失败'); }
+        });
+      },
+      fail() { toast('下载失败'); }
+    });
+  },
+
+  onDownloadVideo(e) {
+    const kind = e.currentTarget.dataset.kind;
+    api.mediaOptions(this.data.cardId, kind).then((options) => {
+      if (!options.length) {
+        toast('无可用清晰度');
+        return;
+      }
+      wx.showActionSheet({
+        itemList: options.map((o) => o.label),
+        success: (res) => {
+          const chosen = options[res.tapIndex];
+          api.download(this.data.cardId, kind, chosen.qn).then(({ url, header }) => {
+            this.downloadToAlbum(url, header);
+          }).catch(() => toast('下载失败'));
+        }
+      });
+    }).catch(() => toast('获取清晰度失败'));
+  },
+
+  downloadToAlbum(url, header) {
+    wx.downloadFile({
+      url,
+      header,
+      success(res) {
+        if (res.statusCode !== 200) { toast('下载失败'); return; }
+        wx.saveVideoToPhotosAlbum({
+          filePath: res.tempFilePath,
+          success() { toast('已保存到相册'); },
+          fail() { toast('保存失败'); }
+        });
+      },
+      fail() { toast('下载失败'); }
+    });
+  },
+
+  onDownloadAudio() {
+    api.download(this.data.cardId, 'audio').then(({ url, header }) => {
+      wx.downloadFile({
+        url,
+        header,
+        success(res) {
+          if (res.statusCode !== 200) { toast('下载失败'); return; }
+          wx.shareFileMessage({ filePath: res.tempFilePath });
+        },
+        fail() { toast('下载失败'); }
+      });
+    }).catch(() => toast('下载失败'));
+  },
+
+  onExport() {
+    api.exportFile(this.data.cardId, 'txt').then(({ url, header }) => {
+      wx.downloadFile({
+        url,
+        header,
+        success(res) {
+          if (res.statusCode !== 200) { toast('导出失败'); return; }
+          wx.openDocument({ filePath: res.tempFilePath, fileType: 'txt' });
+        },
+        fail() { toast('导出失败'); }
+      });
+    }).catch(() => toast('导出失败'));
   },
 
   onToggleSub() {
     this.setData({ showAllSub: !this.data.showAllSub });
   },
 
-  onCopyTitle() {
-    this.copyText(this.data.video.title);
-  },
-
-  onCopyTags() {
-    this.copyText((this.data.video.tags || []).map((t) => '#' + t).join(' '));
-  },
-
-  onCopyDesc() {
-    this.copyText(this.data.video.desc);
-  },
-
-  onCopyLink() {
-    this.copyText(this.data.video.source_url || this.data.video.bvid);
-  },
-
   onCopySub() {
-    const lines = (this.data.video.subtitles || []).map((s) => s.timeText + ' ' + s.text);
-    this.copyText(lines.join('\n'));
+    const lines = this.data.subtitles.map((s) => s.timeText + ' ' + s.text);
+    if (!lines.length) { toast('无字幕'); return; }
+    wx.setClipboardData({ data: lines.join('\n'), success() { toast('已复制'); } });
   },
 
-  onCopyAll() {
-    const v = this.data.video;
-    const lines = [];
-    if (v.title) {
-      lines.push('标题：' + v.title);
+  onDownloadSrt() {
+    api.exportFile(this.data.cardId, 'srt').then(({ url, header }) => {
+      wx.downloadFile({
+        url,
+        header,
+        success(res) {
+          if (res.statusCode !== 200) { toast('导出失败'); return; }
+          wx.openDocument({ filePath: res.tempFilePath, fileType: 'txt' });
+        },
+        fail() { toast('导出失败'); }
+      });
+    }).catch(() => toast('导出失败'));
+  },
+
+  onDownloadDanmaku() {
+    api.danmaku(this.data.cardId).then(({ url, header }) => {
+      wx.downloadFile({
+        url,
+        header,
+        success(res) {
+          if (res.statusCode !== 200) { toast('下载失败'); return; }
+          wx.openDocument({ filePath: res.tempFilePath, fileType: 'txt' });
+        },
+        fail() { toast('下载失败'); }
+      });
+    }).catch(() => toast('下载失败'));
+  },
+
+  onOpenBili() {
+    const appId = getApp().globalData.biliMiniProgramAppId;
+    if (!appId) {
+      toast('B站小程序 appId 尚未配置');
+      return;
     }
-    const meta = [v.up_name, v.partition, v.bvid].filter(Boolean).join(' · ');
-    if (meta) {
-      lines.push('来源：' + meta);
-    }
-    if (v.source_url) {
-      lines.push('链接：' + v.source_url);
-    }
-    if ((v.tags || []).length) {
-      lines.push('标签：' + (v.tags || []).map((t) => '#' + t).join(' '));
-    }
-    if (v.desc) {
-      lines.push('简介：' + v.desc);
-    }
-    if ((v.subtitles || []).length) {
-      lines.push('字幕：');
-      (v.subtitles || []).forEach((s) => lines.push(s.timeText + ' ' + s.text));
-    }
-    this.copyText(lines.join('\n'));
+    wx.navigateToMiniProgram({ appId, path: '/pages/video/video?bvid=' + this.data.bvid });
   }
 });
