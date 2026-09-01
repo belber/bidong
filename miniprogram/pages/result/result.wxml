@@ -110,7 +110,7 @@
 
   <view wx:if="{{previewing}}" class="preview-mask" bindtap="onClosePreview">
     <image class="preview-img" src="{{coverUrl}}" mode="aspectFit" />
-    <view class="preview-save" catchtap="onSaveCover">保存</view>
+    <view class="preview-save" catchtap="onSaveCover">保存到相册</view>
     <view class="preview-hint">点空白处关闭</view>
   </view>
 </view>

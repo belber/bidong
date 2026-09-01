@@ -19,11 +19,6 @@ function textFilename(title, bvid, suffix) {
   return sanitizeName(title || bvid) + suffix;
 }
 
-function coverFilename(url, title) {
-  const m = String(url || '').split('?')[0].match(/\.(jpg|jpeg|png|webp|gif)$/i);
-  return sanitizeName(title) + '.' + (m ? m[1].toLowerCase() : 'jpg');
-}
-
 function copyToNamed(tempFilePath, filename) {
   return new Promise((resolve, reject) => {
     const dest = wx.env.USER_DATA_PATH + '/' + filename;
@@ -88,8 +83,7 @@ Page({
     subPreview: [],
     showAllSub: false,
     danmakuCount: 0,
-    previewing: false,
-    coverLocalPath: ''
+    previewing: false
   },
 
   onLoad() {
@@ -121,7 +115,6 @@ Page({
       subtitles,
       subPreview: subtitles.slice(0, 5)
     });
-    this.prepareCover();
   },
 
   copy(field) {
@@ -144,59 +137,22 @@ Page({
     }
   },
 
-  prepareCover() {
-    const url = this.data.coverUrl;
-    const title = this.data.title;
-    if (!url) { return; }
-    const filename = coverFilename(url, title);
-    wx.downloadFile({
-      url,
-      success: (res) => {
-        if (res.statusCode !== 200) { return; }
-        copyToNamed(res.tempFilePath, filename).then((filePath) => {
-          this.setData({ coverLocalPath: filePath });
-        }).catch(() => {});
-      }
-    });
-  },
-
   onClosePreview() {
     this.setData({ previewing: false });
   },
 
   onSaveCover() {
     const url = this.data.coverUrl;
-    const title = this.data.title;
     if (!url) { return; }
-    const filename = coverFilename(url, title);
-    const local = this.data.coverLocalPath;
-    if (local) {
-      this.shareCover(local, filename);
-      return;
-    }
     wx.showLoading({ title: '下载中' });
     wx.downloadFile({
       url,
       success(res) {
         wx.hideLoading();
         if (res.statusCode !== 200) { toast('下载失败'); return; }
-        copyToNamed(res.tempFilePath, filename).then((filePath) => {
-          this.shareCover(filePath, filename);
-        }).catch(() => toast('保存失败'));
+        saveToAlbum(wx.saveImageToPhotosAlbum, res.tempFilePath);
       },
       fail() { wx.hideLoading(); toast('下载失败'); }
-    });
-  },
-
-  shareCover(filePath, filename) {
-    if (!wx.shareFileMessage) {
-      toast('当前微信版本不支持文件分享');
-      return;
-    }
-    wx.shareFileMessage({
-      filePath,
-      fileName: filename,
-      fail(err) { toast((err && err.errMsg) || '分享失败'); }
     });
   },
 
