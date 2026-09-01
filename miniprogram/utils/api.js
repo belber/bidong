@@ -85,6 +85,13 @@ function buildQuery(params) {
   return parts.length ? '?' + parts.join('&') : '';
 }
 
+function fileDownload(path) {
+  return ensureToken().then((token) => ({
+    url: baseUrl() + path,
+    header: token ? { Authorization: 'Bearer ' + token } : {}
+  }));
+}
+
 module.exports = {
   parse(url) {
     return request('POST', '/api/parse', { url });
@@ -106,6 +113,18 @@ module.exports = {
   },
   addCardTags(id, tags) {
     return request('POST', '/api/cards/' + id + '/tags', { tags });
+  },
+  mediaOptions(id, kind) {
+    return request('GET', '/api/cards/' + id + '/media-options?kind=' + encodeURIComponent(kind));
+  },
+  download(id, kind, qn) {
+    const suffix = qn ? '&qn=' + qn : '';
+    return fileDownload('/api/cards/' + id + '/download?kind=' + kind + suffix);
+  },
+  danmaku(id) {
+    return fileDownload('/api/cards/' + id + '/danmaku');
+  },
+  exportFile(id, kind) {
+    return fileDownload('/api/cards/' + id + '/export?kind=' + kind);
   }
 };
-
