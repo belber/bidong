@@ -53,6 +53,90 @@
   border-radius: 22rpx;
 }
 
+.parse-btn.parsing {
+  position: relative;
+  overflow: hidden;
+  opacity: 0.88;
+}
+
+.parse-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  font-size: 30rpx;
+}
+
+.spinner {
+  width: 28rpx;
+  height: 28rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.45);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0));
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -60%;
+  }
+  100% {
+    left: 120%;
+  }
+}
+
+.input-box.scanning {
+  position: relative;
+  overflow: hidden;
+}
+
+.input-box.scanning::before {
+  content: '';
+  position: absolute;
+  left: 10rpx;
+  right: 10rpx;
+  top: -60%;
+  height: 60%;
+  background: linear-gradient(180deg, rgba(251, 114, 153, 0), rgba(251, 114, 153, 0.2), rgba(251, 114, 153, 0));
+  animation: scan 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes scan {
+  0% {
+    top: -60%;
+  }
+  100% {
+    top: 120%;
+  }
+}
+
 .guide-card {
   margin-top: 24rpx;
   padding: 20rpx;

@@ -3,7 +3,8 @@ const api = require('../../utils/api.js');
 
 Page({
   data: {
-    input: ''
+    input: '',
+    parsing: false
   },
 
   onShow() {
@@ -31,21 +32,24 @@ Page({
   },
 
   onParse() {
+    if (this.data.parsing) {
+      return;
+    }
     const link = extractBiliLink(this.data.input);
     if (!link) {
       wx.showToast({ title: '请输入 B站视频链接或 BV 号', icon: 'none' });
       return;
     }
-    wx.showLoading({ title: '解析中' });
+    this.setData({ parsing: true });
     api.parse(link.url)
       .then((card) => {
-        wx.hideLoading();
+        this.setData({ parsing: false });
         getApp().globalData.pendingResult = card;
         wx.setStorageSync('pending_result', card);
         wx.navigateTo({ url: '/pages/result/result' });
       })
       .catch((err) => {
-        wx.hideLoading();
+        this.setData({ parsing: false });
         wx.showToast({ title: err.message || '解析失败', icon: 'none' });
       });
   }
