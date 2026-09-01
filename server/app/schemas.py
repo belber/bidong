@@ -28,6 +28,24 @@ class CardTagsRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class VideoStats(BaseModel):
+    like: int = 0
+    reply: int = 0
+    favorite: int = 0
+    coin: int = 0
+
+
+class MediaAvailability(BaseModel):
+    watermarked: bool = False
+    clean: bool = False
+    audio: bool = False
+
+
+class MediaOption(BaseModel):
+    qn: int
+    label: str
+
+
 class CardOut(BaseModel):
     id: int
     bvid: str
@@ -52,3 +70,6 @@ class SubtitleLine(BaseModel):
 
 class ParseResult(CardOut):
     subtitles: list[SubtitleLine] = Field(default_factory=list)
+    stats: VideoStats = Field(default_factory=VideoStats)
+    danmaku_count: int = 0
+    media: MediaAvailability = Field(default_factory=MediaAvailability)
