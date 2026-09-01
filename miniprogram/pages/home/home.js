@@ -41,6 +41,7 @@ Page({
       .then((card) => {
         wx.hideLoading();
         getApp().globalData.pendingResult = card;
+        wx.setStorageSync('pending_result', card);
         wx.navigateTo({ url: '/pages/result/result' });
       })
       .catch((err) => {

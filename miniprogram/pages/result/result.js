@@ -5,6 +5,16 @@ function toast(title) {
   wx.showToast({ title: title, icon: 'none' });
 }
 
+function sanitizeName(name) {
+  const cleaned = (name || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+  return (cleaned || 'bilibili').slice(0, 60);
+}
+
+function mediaFilename(title, bvid, kind) {
+  const suffix = kind === 'audio' ? '.m4a' : '.mp4';
+  return sanitizeName(title || bvid) + suffix;
+}
+
 Page({
   data: {
     cardId: 0,
@@ -25,7 +35,7 @@ Page({
   },
 
   onLoad() {
-    const r = getApp().globalData.pendingResult;
+    const r = getApp().globalData.pendingResult || wx.getStorageSync('pending_result');
     if (!r) {
       toast('暂无解析数据');
       return;
@@ -90,6 +100,27 @@ Page({
     });
   },
 
+  saveMedia(url, header, kind) {
+    const filename = mediaFilename(this.data.title, this.data.bvid, kind);
+    wx.downloadFile({
+      url,
+      header,
+      success(res) {
+        if (res.statusCode !== 200) { toast('下载失败'); return; }
+        if (kind === 'audio') {
+          wx.shareFileMessage({ filePath: res.tempFilePath, fileName: filename });
+        } else {
+          wx.saveVideoToPhotosAlbum({
+            filePath: res.tempFilePath,
+            success() { toast('已保存到相册'); },
+            fail() { toast('保存失败'); }
+          });
+        }
+      },
+      fail() { toast('下载失败'); }
+    });
+  },
+
   onDownloadVideo(e) {
     const kind = e.currentTarget.dataset.kind;
     api.mediaOptions(this.data.cardId, kind).then((options) => {
@@ -102,40 +133,16 @@ Page({
         success: (res) => {
           const chosen = options[res.tapIndex];
           api.download(this.data.cardId, kind, chosen.qn).then(({ url, header }) => {
-            this.downloadToAlbum(url, header);
+            this.saveMedia(url, header, kind);
           }).catch(() => toast('下载失败'));
         }
       });
     }).catch(() => toast('获取清晰度失败'));
   },
 
-  downloadToAlbum(url, header) {
-    wx.downloadFile({
-      url,
-      header,
-      success(res) {
-        if (res.statusCode !== 200) { toast('下载失败'); return; }
-        wx.saveVideoToPhotosAlbum({
-          filePath: res.tempFilePath,
-          success() { toast('已保存到相册'); },
-          fail() { toast('保存失败'); }
-        });
-      },
-      fail() { toast('下载失败'); }
-    });
-  },
-
   onDownloadAudio() {
     api.download(this.data.cardId, 'audio').then(({ url, header }) => {
-      wx.downloadFile({
-        url,
-        header,
-        success(res) {
-          if (res.statusCode !== 200) { toast('下载失败'); return; }
-          wx.shareFileMessage({ filePath: res.tempFilePath });
-        },
-        fail() { toast('下载失败'); }
-      });
+      this.saveMedia(url, header, 'audio');
     }).catch(() => toast('下载失败'));
   },
 
