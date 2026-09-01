@@ -55,6 +55,21 @@ function saveToAlbum(saveFn, filePath) {
   });
 }
 
+function shareNamedFile(tempFilePath, filename) {
+  if (!wx.shareFileMessage) {
+    toast('当前微信版本不支持文件分享');
+    return;
+  }
+  const doShare = (filePath) => {
+    wx.shareFileMessage({
+      filePath,
+      fileName: filename,
+      fail(err) { toast((err && err.errMsg) || '分享失败'); }
+    });
+  };
+  copyToNamed(tempFilePath, filename).then(doShare).catch(() => doShare(tempFilePath));
+}
+
 Page({
   data: {
     cardId: 0,
@@ -168,6 +183,10 @@ Page({
         wx.hideLoading();
         if (res.statusCode !== 200) { toast('下载失败'); return; }
         if (kind === 'audio') {
+          if (!wx.shareFileMessage) {
+            toast('当前微信版本不支持文件分享');
+            return;
+          }
           wx.shareFileMessage({
             filePath: res.tempFilePath,
             fileName: filename,
@@ -221,10 +240,7 @@ Page({
             filePath: res.tempFilePath,
             fileType: 'txt',
             fail() {
-              wx.shareFileMessage({
-                filePath: res.tempFilePath,
-                fileName: textFilename(title, bvid, '_解析结果.txt')
-              });
+              shareNamedFile(res.tempFilePath, textFilename(title, bvid, '_解析结果.txt'));
             }
           });
         },
@@ -254,10 +270,7 @@ Page({
         success(res) {
           wx.hideLoading();
           if (res.statusCode !== 200) { toast('导出失败'); return; }
-          wx.shareFileMessage({
-            filePath: res.tempFilePath,
-            fileName: textFilename(title, bvid, '.srt')
-          });
+          shareNamedFile(res.tempFilePath, textFilename(title, bvid, '.srt'));
         },
         fail() { wx.hideLoading(); toast('导出失败'); }
       });
@@ -275,10 +288,7 @@ Page({
         success(res) {
           wx.hideLoading();
           if (res.statusCode !== 200) { toast('下载失败'); return; }
-          wx.shareFileMessage({
-            filePath: res.tempFilePath,
-            fileName: textFilename(title, bvid, '_弹幕.txt')
-          });
+          shareNamedFile(res.tempFilePath, textFilename(title, bvid, '_弹幕.txt'));
         },
         fail() { wx.hideLoading(); toast('下载失败'); }
       });
