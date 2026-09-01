@@ -301,9 +301,12 @@
   position: absolute;
   top: 14rpx;
   right: 18rpx;
-  font-size: 32rpx;
-  color: #C9A6B1;
-  padding: 4rpx;
+  font-size: 22rpx;
+  color: #FB7299;
+  padding: 4rpx 12rpx;
+  border: 1rpx solid #FBDDE6;
+  border-radius: 999rpx;
+  background: #FFF4F7;
 }
 
 .empty {

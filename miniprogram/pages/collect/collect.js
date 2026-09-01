@@ -83,15 +83,7 @@ Page({
     if (!card) {
       return;
     }
-    const appId = getApp().globalData.biliMiniProgramAppId;
-    if (!appId) {
-      wx.showToast({ title: 'B站小程序 appId 尚未配置', icon: 'none' });
-      return;
-    }
-    wx.navigateToMiniProgram({
-      appId,
-      path: '/pages/video/video?bvid=' + card.bvid
-    });
+    wx.navigateTo({ url: '/pages/result/result?bvid=' + card.bvid });
   },
 
   onDelete(e) {

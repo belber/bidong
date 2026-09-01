@@ -70,7 +70,7 @@
               <text class="chip chip-tag" wx:for="{{card.tags}}" wx:key="*this">＃{{item}}</text>
             </view>
           </view>
-          <view class="del" catchtap="onDelete" data-id="{{card.id}}">⋯</view>
+          <view class="del" catchtap="onDelete" data-id="{{card.id}}">删除</view>
         </view>
       </view>
     </block>
