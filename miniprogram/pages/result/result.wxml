@@ -10,8 +10,13 @@
 
     <view class="field">
       <text class="label">up主</text>
-      <view class="content">{{upName || '未知'}}<text wx:if="{{partition}}" class="muted"> · {{partition}}</text></view>
+      <view class="content">{{upName || '未知'}}</view>
       <text class="action" bindtap="onCopyTag" data-field="upName">复制</text>
+    </view>
+
+    <view class="field">
+      <text class="label">分区</text>
+      <view class="content">{{partition || '未知'}}</view>
     </view>
 
     <view class="field">
