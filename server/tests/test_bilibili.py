@@ -136,3 +136,76 @@ def test_get_subtitles():
     subs = client.get_subtitles("BV1xx411c7mD", 987654)
     assert subs == [{"t": 3, "text": "你好"}, {"t": 7, "text": "世界"}]
     client.close()
+
+
+@respx.mock
+def test_get_playurl_dash_and_durl():
+    respx.get("https://api.bilibili.com/x/web-interface/nav").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "wbi_img": {
+                        "img_url": "https://i0.hdslb.com/bfs/wbi/0123456789abcdef0123456789abcdef.png",
+                        "sub_url": "https://i0.hdslb.com/bfs/wbi/fedcba9876543210fedcba9876543210.png",
+                    }
+                },
+            },
+        )
+    )
+    respx.get(url__regex=r"https://api\.bilibili\.com/x/player/wbi/playurl.*fnval=16.*").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "dash": {
+                        "video": [
+                            {
+                                "id": 64,
+                                "baseUrl": "https://v.example.com/v.m4s",
+                                "backupUrl": ["https://v.example.com/v2.m4s"],
+                            }
+                        ],
+                        "audio": [
+                            {
+                                "id": 30280,
+                                "baseUrl": "https://a.example.com/a.m4s",
+                                "backupUrl": [],
+                            }
+                        ],
+                    }
+                },
+            },
+        )
+    )
+    respx.get(url__regex=r"https://api\.bilibili\.com/x/player/wbi/playurl.*fnval=1(?![0-9]).*").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "quality": 32,
+                    "durl": [
+                        {
+                            "url": "https://d.example.com/d.mp4",
+                            "backup_url": ["https://d.example.com/d2.mp4"],
+                        }
+                    ],
+                },
+            },
+        )
+    )
+
+    client = BiliClient()
+    dash = client.get_playurl("BV1xx411c7mD", 987654, fnval=16)
+    assert dash["video"][0]["qn"] == 64
+    assert dash["video"][0]["label"] == "720P"
+    assert dash["video"][0]["url"] == "https://v.example.com/v.m4s"
+    assert dash["audio"][0]["qn"] == 30280
+
+    durl = client.get_playurl("BV1xx411c7mD", 987654, fnval=1)
+    assert durl["durl"][0]["qn"] == 32
+    assert durl["durl"][0]["url"] == "https://d.example.com/d.mp4"
+    client.close()

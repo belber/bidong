@@ -13,6 +13,17 @@ UA = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
+_QN_LABELS = {
+    16: "360P", 32: "480P", 64: "720P", 80: "1080P",
+    112: "1080P+", 116: "1080P60", 120: "4K", 125: "HDR",
+    126: "杜比视界", 127: "8K",
+    30216: "64K", 30232: "132K", 30280: "192K", 30250: "杜比", 30251: "Hi-Res",
+}
+
+
+def _qn_label(qn: int) -> str:
+    return _QN_LABELS.get(qn, str(qn))
+
 
 @dataclass
 class VideoMeta:
@@ -179,3 +190,60 @@ class BiliClient:
                 continue
             out.append({"t": int(float(t)), "text": str(text)})
         return out
+
+    def _normalize_stream(self, item: dict) -> dict:
+        url = item.get("baseUrl") or item.get("base_url") or ""
+        backups = item.get("backupUrl") or item.get("backup_url") or []
+        if isinstance(backups, str):
+            backups = [backups]
+        qn = int(item.get("id") or 0)
+        return {
+            "qn": qn,
+            "label": _qn_label(qn),
+            "url": url,
+            "backup_urls": [u for u in backups if u],
+        }
+
+    def get_playurl(self, bvid: str, cid: int, fnval: int = 16) -> dict:
+        if not cid:
+            return {"durl": [], "video": [], "audio": []}
+        try:
+            params = WbiSigner(self.client).sign(
+                {"bvid": bvid, "cid": str(cid), "fnval": str(fnval), "fourk": "1"}
+            )
+            resp = self.client.get(
+                "https://api.bilibili.com/x/player/wbi/playurl", params=params
+            )
+            data = resp.json()
+        except Exception as exc:
+            raise AppError(502, "获取播放地址失败") from exc
+        if data.get("code") != 0 or not data.get("data"):
+            raise AppError(502, "获取播放地址失败")
+
+        d = data["data"]
+        dash = d.get("dash") or {}
+        durl = d.get("durl") or []
+        durl_streams = []
+        if durl:
+            first = durl[0] or {}
+            qn = int(d.get("quality") or 0)
+            durl_streams = [{
+                "qn": qn,
+                "label": _qn_label(qn),
+                "url": first.get("url") or "",
+                "backup_urls": [u for u in (first.get("backup_url") or []) if u],
+            }]
+        return {
+            "durl": durl_streams,
+            "video": [self._normalize_stream(i) for i in (dash.get("video") or [])],
+            "audio": [self._normalize_stream(i) for i in (dash.get("audio") or [])],
+        }
+
+    def get_durl(self, bvid: str, cid: int) -> list[dict]:
+        return self.get_playurl(bvid, cid, fnval=1)["durl"]
+
+    def get_dash_video(self, bvid: str, cid: int) -> list[dict]:
+        return self.get_playurl(bvid, cid, fnval=16)["video"]
+
+    def get_dash_audio(self, bvid: str, cid: int) -> list[dict]:
+        return self.get_playurl(bvid, cid, fnval=16)["audio"]
