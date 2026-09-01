@@ -22,7 +22,7 @@
 
     <view class="field">
       <text class="label">标签</text>
-      <view class="content"><text wx:if="{{tags && tags.length}}">{{tags.join(' ')}}</text><text wx:else class="muted">无标签</text></view>
+      <view class="content"><text wx:if="{{tagsText}}">{{tagsText}}</text><text wx:else class="muted">无标签</text></view>
       <text class="icon-btn" bindtap="onCopyTag" data-field="tags">📋</text>
     </view>
 

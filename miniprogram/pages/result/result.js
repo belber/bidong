@@ -62,6 +62,7 @@ Page({
     upName: '',
     pubText: '',
     tags: [],
+    tagsText: '',
     desc: '',
     stats: { like: 0, reply: 0, favorite: 0, coin: 0 },
     coverUrl: '',
@@ -83,6 +84,7 @@ Page({
       text: s.text,
       timeText: formatDuration(s.t)
     }));
+    const tags = Array.isArray(r.tags) ? r.tags : [];
     this.setData({
       cardId: r.id,
       bvid: r.bvid,
@@ -90,7 +92,8 @@ Page({
       title: r.title,
       upName: r.up_name,
       pubText: formatDateTime(r.pubdate),
-      tags: Array.isArray(r.tags) ? r.tags : [],
+      tags,
+      tagsText: tags.join(' '),
       desc: r.desc,
       stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0 },
       coverUrl: r.cover_url,
