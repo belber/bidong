@@ -177,10 +177,23 @@
 
 .preview-hint {
   position: absolute;
-  bottom: 80rpx;
+  bottom: 200rpx;
   left: 0;
   right: 0;
   text-align: center;
   color: rgba(255, 255, 255, 0.8);
   font-size: 26rpx;
+}
+
+.preview-save {
+  position: absolute;
+  bottom: 110rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 18rpx 70rpx;
+  color: #fff;
+  background: #fb7299;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  box-shadow: 0 8rpx 24rpx rgba(251, 114, 153, 0.4);
 }

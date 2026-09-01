@@ -109,7 +109,8 @@
   </view>
 
   <view wx:if="{{previewing}}" class="preview-mask" bindtap="onClosePreview">
-    <image class="preview-img" src="{{coverUrl}}" mode="aspectFit" catchtap="onPreviewTap" bindlongpress="onSaveCover" />
-    <view class="preview-hint">长按保存到相册</view>
+    <image class="preview-img" src="{{coverUrl}}" mode="aspectFit" />
+    <view class="preview-save" catchtap="onSaveCover">保存</view>
+    <view class="preview-hint">点空白处关闭</view>
   </view>
 </view>

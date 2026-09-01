@@ -88,7 +88,8 @@ Page({
     subPreview: [],
     showAllSub: false,
     danmakuCount: 0,
-    previewing: false
+    previewing: false,
+    coverLocalPath: ''
   },
 
   onLoad() {
@@ -120,6 +121,7 @@ Page({
       subtitles,
       subPreview: subtitles.slice(0, 5)
     });
+    this.prepareCover();
   },
 
   copy(field) {
@@ -142,8 +144,20 @@ Page({
     }
   },
 
-  onPreviewTap() {
-    // 阻止点击大图关闭预览
+  prepareCover() {
+    const url = this.data.coverUrl;
+    const title = this.data.title;
+    if (!url) { return; }
+    const filename = coverFilename(url, title);
+    wx.downloadFile({
+      url,
+      success: (res) => {
+        if (res.statusCode !== 200) { return; }
+        copyToNamed(res.tempFilePath, filename).then((filePath) => {
+          this.setData({ coverLocalPath: filePath });
+        }).catch(() => {});
+      }
+    });
   },
 
   onClosePreview() {
@@ -154,22 +168,35 @@ Page({
     const url = this.data.coverUrl;
     const title = this.data.title;
     if (!url) { return; }
+    const filename = coverFilename(url, title);
+    const local = this.data.coverLocalPath;
+    if (local) {
+      this.shareCover(local, filename);
+      return;
+    }
     wx.showLoading({ title: '下载中' });
     wx.downloadFile({
       url,
       success(res) {
         wx.hideLoading();
         if (res.statusCode !== 200) { toast('下载失败'); return; }
-        const filename = coverFilename(url, title);
         copyToNamed(res.tempFilePath, filename).then((filePath) => {
-          wx.shareFileMessage({
-            filePath,
-            fileName: filename,
-            fail(err) { toast((err && err.errMsg) || '分享失败'); }
-          });
+          this.shareCover(filePath, filename);
         }).catch(() => toast('保存失败'));
       },
       fail() { wx.hideLoading(); toast('下载失败'); }
+    });
+  },
+
+  shareCover(filePath, filename) {
+    if (!wx.shareFileMessage) {
+      toast('当前微信版本不支持文件分享');
+      return;
+    }
+    wx.shareFileMessage({
+      filePath,
+      fileName: filename,
+      fail(err) { toast((err && err.errMsg) || '分享失败'); }
     });
   },
 
