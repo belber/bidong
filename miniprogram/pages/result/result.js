@@ -15,6 +15,23 @@ function mediaFilename(title, bvid, kind) {
   return sanitizeName(title || bvid) + suffix;
 }
 
+function coverFilename(url, title) {
+  const m = String(url || '').split('?')[0].match(/\.(jpg|jpeg|png|webp|gif)$/i);
+  return sanitizeName(title) + '.' + (m ? m[1].toLowerCase() : 'jpg');
+}
+
+function copyToNamed(tempFilePath, filename) {
+  return new Promise((resolve, reject) => {
+    const dest = wx.env.USER_DATA_PATH + '/' + filename;
+    wx.getFileSystemManager().copyFile({
+      srcPath: tempFilePath,
+      destPath: dest,
+      success: () => resolve(dest),
+      fail: reject
+    });
+  });
+}
+
 function saveToAlbum(saveFn, filePath) {
   saveFn({
     filePath,
@@ -69,7 +86,7 @@ Page({
       title: r.title,
       upName: r.up_name,
       pubText: formatDateTime(r.pubdate),
-      tags: r.tags || [],
+      tags: Array.isArray(r.tags) ? r.tags : [],
       desc: r.desc,
       stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0 },
       coverUrl: r.cover_url,
@@ -82,7 +99,7 @@ Page({
 
   copy(field) {
     const v = this.data[field];
-    if (!v) {
+    if (!v || (Array.isArray(v) && !v.length)) {
       toast('没有可复制的内容');
       return;
     }
@@ -102,31 +119,43 @@ Page({
 
   onSaveCover() {
     const url = this.data.coverUrl;
+    const title = this.data.title;
     if (!url) { return; }
+    wx.showLoading({ title: '下载中' });
     wx.downloadFile({
       url,
       success(res) {
+        wx.hideLoading();
         if (res.statusCode !== 200) { toast('下载失败'); return; }
-        saveToAlbum(wx.saveImageToPhotosAlbum, res.tempFilePath);
+        const filename = coverFilename(url, title);
+        copyToNamed(res.tempFilePath, filename).then((filePath) => {
+          saveToAlbum(wx.saveImageToPhotosAlbum, filePath);
+        }).catch(() => saveToAlbum(wx.saveImageToPhotosAlbum, res.tempFilePath));
       },
-      fail() { toast('下载失败'); }
+      fail() { wx.hideLoading(); toast('下载失败'); }
     });
   },
 
   saveMedia(url, header, kind) {
     const filename = mediaFilename(this.data.title, this.data.bvid, kind);
+    wx.showLoading({ title: kind === 'audio' ? '准备分享' : '下载中' });
     wx.downloadFile({
       url,
       header,
       success(res) {
+        wx.hideLoading();
         if (res.statusCode !== 200) { toast('下载失败'); return; }
         if (kind === 'audio') {
-          wx.shareFileMessage({ filePath: res.tempFilePath, fileName: filename });
+          wx.shareFileMessage({
+            filePath: res.tempFilePath,
+            fileName: filename,
+            fail(err) { toast((err && err.errMsg) || '分享失败'); }
+          });
         } else {
           saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
         }
       },
-      fail() { toast('下载失败'); }
+      fail() { wx.hideLoading(); toast('下载失败'); }
     });
   },
 
@@ -156,17 +185,23 @@ Page({
   },
 
   onExport() {
+    wx.showLoading({ title: '导出中' });
     api.exportFile(this.data.cardId, 'txt').then(({ url, header }) => {
       wx.downloadFile({
         url,
         header,
         success(res) {
+          wx.hideLoading();
           if (res.statusCode !== 200) { toast('导出失败'); return; }
-          wx.openDocument({ filePath: res.tempFilePath, fileType: 'txt' });
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            fileType: 'txt',
+            fail(err) { toast((err && err.errMsg) || '打开失败'); }
+          });
         },
-        fail() { toast('导出失败'); }
+        fail() { wx.hideLoading(); toast('导出失败'); }
       });
-    }).catch(() => toast('导出失败'));
+    }).catch(() => { wx.hideLoading(); toast('导出失败'); });
   },
 
   onToggleSub() {
@@ -180,31 +215,43 @@ Page({
   },
 
   onDownloadSrt() {
+    wx.showLoading({ title: '导出中' });
     api.exportFile(this.data.cardId, 'srt').then(({ url, header }) => {
       wx.downloadFile({
         url,
         header,
         success(res) {
+          wx.hideLoading();
           if (res.statusCode !== 200) { toast('导出失败'); return; }
-          wx.openDocument({ filePath: res.tempFilePath, fileType: 'txt' });
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            fileType: 'txt',
+            fail(err) { toast((err && err.errMsg) || '打开失败'); }
+          });
         },
-        fail() { toast('导出失败'); }
+        fail() { wx.hideLoading(); toast('导出失败'); }
       });
-    }).catch(() => toast('导出失败'));
+    }).catch(() => { wx.hideLoading(); toast('导出失败'); });
   },
 
   onDownloadDanmaku() {
+    wx.showLoading({ title: '下载中' });
     api.danmaku(this.data.cardId).then(({ url, header }) => {
       wx.downloadFile({
         url,
         header,
         success(res) {
+          wx.hideLoading();
           if (res.statusCode !== 200) { toast('下载失败'); return; }
-          wx.openDocument({ filePath: res.tempFilePath, fileType: 'txt' });
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            fileType: 'txt',
+            fail(err) { toast((err && err.errMsg) || '打开失败'); }
+          });
         },
-        fail() { toast('下载失败'); }
+        fail() { wx.hideLoading(); toast('下载失败'); }
       });
-    }).catch(() => toast('下载失败'));
+    }).catch(() => { wx.hideLoading(); toast('下载失败'); });
   },
 
   onOpenBili() {
