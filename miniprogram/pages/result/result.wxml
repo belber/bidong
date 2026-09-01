@@ -104,7 +104,7 @@
   </view>
 
   <view class="bottom-bar">
-    <button class="btn-ghost" bindtap="onExport">下载结果 .txt</button>
+    <button class="btn-ghost" bindtap="onExport">下载结果txt</button>
     <button class="btn-primary" bindtap="onOpenBili">去 B站查看</button>
   </view>
 </view>

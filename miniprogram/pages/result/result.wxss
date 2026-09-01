@@ -129,6 +129,12 @@
 .btn-ghost {
   flex: 1;
   margin: 0;
+  height: 88rpx;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   font-size: 28rpx;
   color: #fb7299;
   background: #fff;
@@ -139,6 +145,12 @@
 .btn-primary {
   flex: 1;
   margin: 0;
+  height: 88rpx;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   font-size: 28rpx;
   color: #fff;
   background: #fb7299;
