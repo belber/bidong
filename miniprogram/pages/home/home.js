@@ -8,6 +8,9 @@ Page({
   },
 
   onShow() {
+    if (this.data.parsing) {
+      this.setData({ parsing: false });
+    }
     if (this.getTabBar) {
       this.getTabBar().setData({ selected: 0 });
     }
@@ -41,9 +44,10 @@ Page({
       return;
     }
     this.setData({ parsing: true });
-    api.parse(link.url)
-      .then((card) => {
-        this.setData({ parsing: false });
+    const minWait = new Promise((resolve) => setTimeout(resolve, 700));
+    const parseReq = api.parse(link.url);
+    Promise.all([parseReq, minWait])
+      .then(([card]) => {
         getApp().globalData.pendingResult = card;
         wx.setStorageSync('pending_result', card);
         wx.navigateTo({ url: '/pages/result/result' });
