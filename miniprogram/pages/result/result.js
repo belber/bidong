@@ -15,6 +15,23 @@ function mediaFilename(title, bvid, kind) {
   return sanitizeName(title || bvid) + suffix;
 }
 
+function saveToAlbum(saveFn, filePath) {
+  saveFn({
+    filePath,
+    success() { toast('已保存到相册'); },
+    fail() {
+      wx.showModal({
+        title: '保存失败',
+        content: '需要在设置中允许保存到相册',
+        confirmText: '去设置',
+        success(res) {
+          if (res.confirm) { wx.openSetting(); }
+        }
+      });
+    }
+  });
+}
+
 Page({
   data: {
     cardId: 0,
@@ -90,11 +107,7 @@ Page({
       url,
       success(res) {
         if (res.statusCode !== 200) { toast('下载失败'); return; }
-        wx.saveImageToPhotosAlbum({
-          filePath: res.tempFilePath,
-          success() { toast('已保存到相册'); },
-          fail() { toast('保存失败'); }
-        });
+        saveToAlbum(wx.saveImageToPhotosAlbum, res.tempFilePath);
       },
       fail() { toast('下载失败'); }
     });
@@ -110,11 +123,7 @@ Page({
         if (kind === 'audio') {
           wx.shareFileMessage({ filePath: res.tempFilePath, fileName: filename });
         } else {
-          wx.saveVideoToPhotosAlbum({
-            filePath: res.tempFilePath,
-            success() { toast('已保存到相册'); },
-            fail() { toast('保存失败'); }
-          });
+          saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
         }
       },
       fail() { toast('下载失败'); }
