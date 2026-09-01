@@ -1,15 +1,28 @@
 <custom-navbar />
 
 <view class="page {{editing ? 'editing' : ''}}">
+  <view class="search-box">
+    <text class="search-icon">🔍</text>
+    <input
+      class="search-input"
+      value="{{keyword}}"
+      placeholder="搜索标题 / UP主 / 分区 / 标签"
+      placeholder-class="search-ph"
+      confirm-type="search"
+      bindinput="onKeywordInput"
+    />
+    <text class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword">×</text>
+  </view>
+
   <view class="seg">
     <view class="seg-it {{sourceFilter === 'all' ? 'on' : ''}}" data-source="all" bindtap="onSourceTap">全部</view>
     <view class="seg-it {{sourceFilter === 'local' ? 'on' : ''}}" data-source="local" bindtap="onSourceTap">本机</view>
     <view class="seg-it {{sourceFilter === 'robot' ? 'on' : ''}}" data-source="robot" bindtap="onSourceTap">@壁咚</view>
   </view>
 
-  <scroll-view class="tag-scroll" wx:if="{{!showRobotGuide}}" scroll-x enhanced show-scrollbar="{{false}}">
-    <view class="tag-inner">
-      <text class="chip {{tagFilter === item ? 'chip-on' : ''}}" wx:for="{{allTags}}" wx:key="*this" data-tag="{{item}}" bindtap="onTagTap">{{item}}</text>
+  <scroll-view class="filter-scroll" wx:if="{{!showRobotGuide}}" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="filter-inner">
+      <text class="chip {{partitionFilter === item ? 'chip-on' : ''}}" wx:for="{{allPartitions}}" wx:key="*this" data-partition="{{item}}" bindtap="onPartitionTap">{{item}}</text>
     </view>
   </scroll-view>
 
@@ -78,7 +91,7 @@
 
     <view class="empty" wx:else>
       <view class="empty-icon">🗂</view>
-      <view class="empty-text">还没有符合条件的收藏</view>
+      <view class="empty-text">{{keyword ? '没有找到相关收藏' : '还没有符合条件的收藏'}}</view>
       <button class="btn-primary empty-btn" bindtap="onGotoParse">＋ 去解析</button>
     </view>
   </block>

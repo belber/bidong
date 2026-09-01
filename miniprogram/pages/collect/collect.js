@@ -7,8 +7,9 @@ Page({
   data: {
     cards: [],
     sourceFilter: 'all',
-    tagFilter: '全部',
-    allTags: ['全部'],
+    keyword: '',
+    partitionFilter: '全部',
+    allPartitions: ['全部'],
     groups: [],
     isBound: false,
     hasRobotRecords: false,
@@ -46,16 +47,15 @@ Page({
   rebuild() {
     const filtered = filterCards(this.data.cards, {
       source: this.data.sourceFilter,
-      tag: this.data.tagFilter
+      partition: this.data.partitionFilter,
+      keyword: this.data.keyword
     });
 
-    const tags = ['全部'];
+    const partitions = ['全部'];
     this.data.cards.forEach((c) => {
-      (c.tags || []).forEach((t) => {
-        if (!tags.includes(t)) {
-          tags.push(t);
-        }
-      });
+      if (c.partition && !partitions.includes(c.partition)) {
+        partitions.push(c.partition);
+      }
     });
 
     const hasRobotRecords = this.data.cards.some((c) => c.source === 'robot');
@@ -66,7 +66,7 @@ Page({
 
     this.setData({
       groups: groupByMonth(filtered),
-      allTags: tags,
+      allPartitions: partitions,
       hasRobotRecords,
       showRobotGuide,
       selectedCount
@@ -77,8 +77,16 @@ Page({
     this.setData({ sourceFilter: e.currentTarget.dataset.source }, () => this.rebuild());
   },
 
-  onTagTap(e) {
-    this.setData({ tagFilter: e.currentTarget.dataset.tag }, () => this.rebuild());
+  onPartitionTap(e) {
+    this.setData({ partitionFilter: e.currentTarget.dataset.partition }, () => this.rebuild());
+  },
+
+  onKeywordInput(e) {
+    this.setData({ keyword: e.detail.value }, () => this.rebuild());
+  },
+
+  onClearKeyword() {
+    this.setData({ keyword: '' }, () => this.rebuild());
   },
 
   visibleIds() {

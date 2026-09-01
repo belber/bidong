@@ -10,6 +10,7 @@
 
 .seg {
   display: flex;
+  margin-top: 20rpx;
   background: #FFF4F7;
   border-radius: 999rpx;
   padding: 6rpx;
@@ -31,12 +32,51 @@
   font-weight: 700;
 }
 
-.tag-scroll {
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  height: 84rpx;
+  padding: 0 24rpx;
+  background: #FFF4F7;
+  border-radius: 999rpx;
+}
+
+.search-icon {
+  font-size: 28rpx;
+  color: #B28B97;
+  flex: none;
+}
+
+.search-input {
+  flex: 1;
+  height: 100%;
+  font-size: 28rpx;
+  color: #2B1E23;
+}
+
+.search-ph {
+  color: #C4A6AF;
+}
+
+.search-clear {
+  flex: none;
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 38rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #E5D7DB;
+  color: #FFFFFF;
+  font-size: 28rpx;
+}
+
+.filter-scroll {
   margin-top: 20rpx;
   white-space: nowrap;
 }
 
-.tag-inner {
+.filter-inner {
   display: inline-flex;
   gap: 12rpx;
   padding-right: 20rpx;
