@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     wechat_appid: str = ""
     wechat_secret: str = ""
 
+    enable_watermarked_video: bool = False
+    enable_clean_video: bool = False
+    enable_audio: bool = False
+
     storage_backend: str = "local"
     local_storage_dir: str = "./var/covers"
     public_base_url: str = "http://127.0.0.1:8000"
