@@ -51,6 +51,13 @@ def test_get_video_maps_fields():
                     "desc": "简介",
                     "duration": 123,
                     "pubdate": 1700000000,
+                    "stat": {
+                        "like": 100,
+                        "reply": 20,
+                        "favorite": 300,
+                        "coin": 40,
+                        "danmaku": 500,
+                    },
                 },
             },
         )
@@ -63,6 +70,11 @@ def test_get_video_maps_fields():
     assert meta.partition == "知识"
     assert meta.duration == 123
     assert meta.pubdate == 1700000000
+    assert meta.like == 100
+    assert meta.reply == 20
+    assert meta.favorite == 300
+    assert meta.coin == 40
+    assert meta.danmaku == 500
     client.close()
 
 

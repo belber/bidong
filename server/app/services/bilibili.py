@@ -25,6 +25,11 @@ class VideoMeta:
     duration: int
     pubdate: int
     cid: int
+    like: int = 0
+    reply: int = 0
+    favorite: int = 0
+    coin: int = 0
+    danmaku: int = 0
 
 
 class BiliClient:
@@ -80,6 +85,7 @@ class BiliClient:
         if pic.startswith("//"):
             pic = "https:" + pic
         owner = d.get("owner") or {}
+        stat = d.get("stat") or {}
         return VideoMeta(
             bvid=bvid,
             title=d.get("title") or "",
@@ -90,6 +96,11 @@ class BiliClient:
             duration=int(d.get("duration") or 0),
             pubdate=int(d.get("pubdate") or 0),
             cid=int(d.get("cid") or 0),
+            like=int(stat.get("like") or 0),
+            reply=int(stat.get("reply") or 0),
+            favorite=int(stat.get("favorite") or 0),
+            coin=int(stat.get("coin") or 0),
+            danmaku=int(stat.get("danmaku") or 0),
         )
 
     def get_tags(self, bvid: str) -> list[str]:
