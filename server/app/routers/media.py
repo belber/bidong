@@ -1,4 +1,5 @@
 import httpx
+import xml.etree.ElementTree as ET
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
@@ -132,22 +133,50 @@ def _to_txt(card: VideoCard, subs: list[dict], danmaku: str) -> str:
     return "\n".join(lines)
 
 
+def _format_danmaku(xml_text: str) -> str:
+    if not xml_text:
+        return ""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return xml_text
+    lines = []
+    for node in root.iter("d"):
+        text = "".join(node.itertext()).strip()
+        if not text:
+            continue
+        p = node.get("p") or ""
+        t = float(p.split(",")[0]) if p else 0.0
+        seconds = int(t)
+        lines.append(f"{seconds // 60:02d}:{seconds % 60:02d} {text}")
+    return "\n".join(lines)
+
+
 @router.get("/api/cards/{card_id}/danmaku")
 def danmaku(
     card_id: int,
+    format: str = "txt",
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     card = _get_owned_card(db, user, card_id)
     client = BiliClient()
     try:
-        text = client.get_danmaku(card.cid)
+        raw = client.get_danmaku(card.cid)
     finally:
         client.close()
+    if format == "xml":
+        content = raw or ""
+        media_type = "application/xml; charset=utf-8"
+        filename = f"{card.bvid}.xml"
+    else:
+        content = _format_danmaku(raw)
+        media_type = "text/plain; charset=utf-8"
+        filename = f"{card.bvid}_danmaku.txt"
     return Response(
-        content=text or "",
-        media_type="application/xml; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{card.bvid}.xml"'},
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -167,7 +196,7 @@ def export(
             filename = f"{card.bvid}.srt"
             media_type = "text/plain; charset=utf-8"
         else:
-            danmaku_text = client.get_danmaku(card.cid)
+            danmaku_text = _format_danmaku(client.get_danmaku(card.cid))
             content = _to_txt(card, subs, danmaku_text)
             filename = f"{card.bvid}.txt"
             media_type = "text/plain; charset=utf-8"

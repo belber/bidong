@@ -84,13 +84,17 @@ def test_media_options_and_download(client, auth_headers, monkeypatch):
 @respx.mock
 def test_danmaku_and_export(client, auth_headers):
     respx.get("https://comment.bilibili.com/987654.xml").mock(
-        return_value=httpx.Response(200, text="<i><d>哈哈</d></i>")
+        return_value=httpx.Response(
+            200,
+            text="<i><d p='65.0,1,25,16777215'>哈哈</d><d p='120.0,1,25,16777215'>嘿嘿</d></i>",
+        )
     )
     card = _make_card(client, auth_headers)
 
     dm = client.get(f"/api/cards/{card['id']}/danmaku", headers=auth_headers)
     assert dm.status_code == 200
-    assert "哈哈" in dm.text
+    assert "01:05 哈哈" in dm.text
+    assert "02:00 嘿嘿" in dm.text
 
     txt = client.get(
         f"/api/cards/{card['id']}/export",
@@ -100,7 +104,7 @@ def test_danmaku_and_export(client, auth_headers):
     assert txt.status_code == 200
     assert "测试标题" in txt.text
     assert "第一句" in txt.text
-    assert "哈哈" in txt.text
+    assert "01:05 哈哈" in txt.text
 
     srt = client.get(
         f"/api/cards/{card['id']}/export",
