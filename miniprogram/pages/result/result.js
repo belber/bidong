@@ -15,6 +15,10 @@ function mediaFilename(title, bvid, kind) {
   return sanitizeName(title || bvid) + suffix;
 }
 
+function textFilename(title, bvid, suffix) {
+  return sanitizeName(title || bvid) + suffix;
+}
+
 function coverFilename(url, title) {
   const m = String(url || '').split('?')[0].match(/\.(jpg|jpeg|png|webp|gif)$/i);
   return sanitizeName(title) + '.' + (m ? m[1].toLowerCase() : 'jpg');
@@ -187,6 +191,8 @@ Page({
   onExport() {
     wx.showLoading({ title: '导出中' });
     api.exportFile(this.data.cardId, 'txt').then(({ url, header }) => {
+      const title = this.data.title;
+      const bvid = this.data.bvid;
       wx.downloadFile({
         url,
         header,
@@ -196,7 +202,12 @@ Page({
           wx.openDocument({
             filePath: res.tempFilePath,
             fileType: 'txt',
-            fail(err) { toast((err && err.errMsg) || '打开失败'); }
+            fail() {
+              wx.shareFileMessage({
+                filePath: res.tempFilePath,
+                fileName: textFilename(title, bvid, '_解析结果.txt')
+              });
+            }
           });
         },
         fail() { wx.hideLoading(); toast('导出失败'); }
@@ -217,16 +228,17 @@ Page({
   onDownloadSrt() {
     wx.showLoading({ title: '导出中' });
     api.exportFile(this.data.cardId, 'srt').then(({ url, header }) => {
+      const title = this.data.title;
+      const bvid = this.data.bvid;
       wx.downloadFile({
         url,
         header,
         success(res) {
           wx.hideLoading();
           if (res.statusCode !== 200) { toast('导出失败'); return; }
-          wx.openDocument({
+          wx.shareFileMessage({
             filePath: res.tempFilePath,
-            fileType: 'txt',
-            fail(err) { toast((err && err.errMsg) || '打开失败'); }
+            fileName: textFilename(title, bvid, '.srt')
           });
         },
         fail() { wx.hideLoading(); toast('导出失败'); }
@@ -237,16 +249,17 @@ Page({
   onDownloadDanmaku() {
     wx.showLoading({ title: '下载中' });
     api.danmaku(this.data.cardId).then(({ url, header }) => {
+      const title = this.data.title;
+      const bvid = this.data.bvid;
       wx.downloadFile({
         url,
         header,
         success(res) {
           wx.hideLoading();
           if (res.statusCode !== 200) { toast('下载失败'); return; }
-          wx.openDocument({
+          wx.shareFileMessage({
             filePath: res.tempFilePath,
-            fileType: 'txt',
-            fail(err) { toast((err && err.errMsg) || '打开失败'); }
+            fileName: textFilename(title, bvid, '_弹幕.txt')
           });
         },
         fail() { wx.hideLoading(); toast('下载失败'); }
