@@ -79,12 +79,12 @@
 
 | 方法 | 路径 | 说明 |
 |:--|:--|:--|
-| GET | `/api/cards/{card_id}/media-options?type=watermarked\|clean\|audio` | 返回可选清晰度列表（`qn + label`），不返回 B站原始 URL |
-| GET | `/api/cards/{card_id}/download?type=...&qn=...` | 中转流式下载，返回文件流 |
+| GET | `/api/cards/{card_id}/media-options?kind=watermarked\|clean\|audio` | 返回可选清晰度列表（`qn + label`），不返回 B站原始 URL |
+| GET | `/api/cards/{card_id}/download?kind=...&qn=...` | 中转流式下载，返回文件流 |
 | GET | `/api/cards/{card_id}/danmaku` | 现取并转发弹幕 XML |
 | GET | `/api/cards/{card_id}/export?kind=txt\|srt` | 导出文本文件（txt 全量归档 / srt 字幕） |
 
-`type` 与三档的对应：
+`kind` 与三档的对应：
 
 - `watermarked` → B站单文件流（`durl`，音视频已合并）
 - `clean` → DASH 视频轨（不含音频）
