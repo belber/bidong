@@ -209,3 +209,23 @@ def test_get_playurl_dash_and_durl():
     assert durl["durl"][0]["qn"] == 32
     assert durl["durl"][0]["url"] == "https://d.example.com/d.mp4"
     client.close()
+
+
+@respx.mock
+def test_get_danmaku():
+    respx.get("https://comment.bilibili.com/987654.xml").mock(
+        return_value=httpx.Response(200, text="<i><d p='1,1,25'>哈哈</d></i>")
+    )
+    client = BiliClient()
+    assert client.get_danmaku(987654).startswith("<i>")
+    client.close()
+
+
+@respx.mock
+def test_get_danmaku_empty_on_error():
+    respx.get("https://comment.bilibili.com/987654.xml").mock(
+        return_value=httpx.Response(404)
+    )
+    client = BiliClient()
+    assert client.get_danmaku(987654) == ""
+    client.close()

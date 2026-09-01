@@ -247,3 +247,16 @@ class BiliClient:
 
     def get_dash_audio(self, bvid: str, cid: int) -> list[dict]:
         return self.get_playurl(bvid, cid, fnval=16)["audio"]
+
+    def get_danmaku(self, cid: int) -> str:
+        if not cid:
+            return ""
+        try:
+            resp = self.client.get(
+                f"https://comment.bilibili.com/{cid}.xml",
+                headers={"Referer": "https://www.bilibili.com/"},
+            )
+            resp.raise_for_status()
+            return resp.text
+        except Exception:
+            return ""
