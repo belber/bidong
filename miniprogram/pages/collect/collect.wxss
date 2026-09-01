@@ -333,7 +333,7 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: calc(150rpx + env(safe-area-inset-bottom));
   height: 110rpx;
   padding: 0 28rpx;
   background: #FFFFFF;
@@ -341,7 +341,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  z-index: 20;
+  z-index: 110;
 }
 
 .edit-count {
