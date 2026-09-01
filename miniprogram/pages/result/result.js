@@ -86,8 +86,31 @@ Page({
     previewing: false
   },
 
-  onLoad() {
-    const r = getApp().globalData.pendingResult || wx.getStorageSync('pending_result');
+  onLoad(options) {
+    const bvid = (options && options.bvid) || '';
+    if (bvid) {
+      this.loadByBvid(bvid);
+      return;
+    }
+    this.applyResult(getApp().globalData.pendingResult || wx.getStorageSync('pending_result'));
+  },
+
+  loadByBvid(bvid) {
+    wx.showLoading({ title: '加载中' });
+    api.parse('https://www.bilibili.com/video/' + bvid)
+      .then((card) => {
+        wx.hideLoading();
+        getApp().globalData.pendingResult = card;
+        wx.setStorageSync('pending_result', card);
+        this.applyResult(card);
+      })
+      .catch((err) => {
+        wx.hideLoading();
+        toast(err.message || '加载失败');
+      });
+  },
+
+  applyResult(r) {
     if (!r) {
       toast('暂无解析数据');
       return;
@@ -208,30 +231,6 @@ Page({
     }).catch(() => toast('下载失败'));
   },
 
-  onExport() {
-    wx.showLoading({ title: '导出中' });
-    api.exportFile(this.data.cardId, 'txt').then(({ url, header }) => {
-      const title = this.data.title;
-      const bvid = this.data.bvid;
-      wx.downloadFile({
-        url,
-        header,
-        success(res) {
-          wx.hideLoading();
-          if (res.statusCode !== 200) { toast('导出失败'); return; }
-          wx.openDocument({
-            filePath: res.tempFilePath,
-            fileType: 'txt',
-            fail() {
-              shareNamedFile(res.tempFilePath, textFilename(title, bvid, '_解析结果.txt'));
-            }
-          });
-        },
-        fail() { wx.hideLoading(); toast('导出失败'); }
-      });
-    }).catch(() => { wx.hideLoading(); toast('导出失败'); });
-  },
-
   onToggleSub() {
     this.setData({ showAllSub: !this.data.showAllSub });
   },
@@ -285,5 +284,13 @@ Page({
       return;
     }
     wx.navigateToMiniProgram({ appId, path: '/pages/video/video?bvid=' + this.data.bvid });
+  },
+
+  onShareAppMessage() {
+    return {
+      title: this.data.title || 'B站视频收藏',
+      path: '/pages/result/result?bvid=' + this.data.bvid,
+      imageUrl: this.data.coverUrl
+    };
   }
 });
