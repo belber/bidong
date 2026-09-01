@@ -102,7 +102,7 @@ class BiliClient:
             title=d.get("title") or "",
             cover_url=pic,
             up_name=owner.get("name") or "",
-            partition=d.get("tname") or "",
+            partition=d.get("tname") or d.get("tname_v2") or "",
             desc=d.get("desc") or "",
             duration=int(d.get("duration") or 0),
             pubdate=int(d.get("pubdate") or 0),

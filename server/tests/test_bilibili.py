@@ -79,6 +79,33 @@ def test_get_video_maps_fields():
 
 
 @respx.mock
+def test_get_video_partition_fallback_to_tname_v2():
+    respx.get("https://api.bilibili.com/x/web-interface/view?bvid=BV1xx411c7mD").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "bvid": "BV1xx411c7mD",
+                    "title": "标题",
+                    "pic": "//i0.hdslb.com/bfs/archive/a.jpg",
+                    "owner": {"name": "UP主"},
+                    "tname": "",
+                    "tname_v2": "音乐",
+                    "desc": "",
+                    "duration": 1,
+                    "pubdate": 1,
+                },
+            },
+        )
+    )
+    client = BiliClient()
+    meta = client.get_video("BV1xx411c7mD")
+    assert meta.partition == "音乐"
+    client.close()
+
+
+@respx.mock
 def test_get_tags():
     respx.get("https://api.bilibili.com/x/tag/archive/tags?bvid=BV1xx411c7mD").mock(
         return_value=httpx.Response(
