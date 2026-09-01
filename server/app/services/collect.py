@@ -27,7 +27,7 @@ def card_to_out(card: VideoCard) -> CardOut:
     )
 
 
-def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[dict]]:
+def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[dict], dict, int]:
     client = BiliClient()
     try:
         bvid = client.resolve_bvid(url)
@@ -37,8 +37,15 @@ def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[di
             .first()
         )
         if existing is not None:
+            meta = client.get_video(existing.bvid)
             subtitles = client.get_subtitles(existing.bvid, existing.cid)
-            return existing, subtitles
+            stats = {
+                "like": meta.like,
+                "reply": meta.reply,
+                "favorite": meta.favorite,
+                "coin": meta.coin,
+            }
+            return existing, subtitles, stats, meta.danmaku
 
         meta = client.get_video(bvid)
         archive_tags = client.get_tags(bvid)
@@ -74,4 +81,10 @@ def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[di
 
     db.commit()
     db.refresh(card)
-    return card, subtitles
+    stats = {
+        "like": meta.like,
+        "reply": meta.reply,
+        "favorite": meta.favorite,
+        "coin": meta.coin,
+    }
+    return card, subtitles, stats, meta.danmaku

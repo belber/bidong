@@ -20,6 +20,13 @@ def mock_bili(bvid=BVID):
                     "duration": 123,
                     "pubdate": 1700000000,
                     "cid": 987654,
+                    "stat": {
+                        "like": 111,
+                        "reply": 22,
+                        "favorite": 333,
+                        "coin": 44,
+                        "danmaku": 55,
+                    },
                 },
             },
         )
