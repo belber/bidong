@@ -1,6 +1,6 @@
 import httpx
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -98,4 +98,83 @@ def download(
         gen(),
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{card.bvid}_{kind}.{suffix}"'},
+    )
+
+
+def _fmt_srt_time(t: int) -> str:
+    return f"{t // 3600:02d}:{t % 3600 // 60:02d}:{t % 60:02d},000"
+
+
+def _to_srt(subs: list[dict]) -> str:
+    out = []
+    for i, s in enumerate(subs, 1):
+        out.append(str(i))
+        out.append(f"{_fmt_srt_time(s['t'])} --> {_fmt_srt_time(s['t'] + 2)}")
+        out.append(s["text"])
+        out.append("")
+    return "\n".join(out)
+
+
+def _to_txt(card: VideoCard, subs: list[dict], danmaku: str) -> str:
+    lines = [f"标题：{card.title}", f"UP主：{card.up_name}", f"链接：{card.source_url}"]
+    if card.partition:
+        lines.append(f"分区：{card.partition}")
+    if card.tags:
+        lines.append("标签：" + " ".join("#" + t.name for t in card.tags))
+    if card.desc:
+        lines.append(f"简介：{card.desc}")
+    if subs:
+        lines.append("\n【字幕】")
+        lines.extend(f"{_fmt_srt_time(s['t'])} {s['text']}" for s in subs)
+    if danmaku:
+        lines.append("\n【弹幕】")
+        lines.append(danmaku)
+    return "\n".join(lines)
+
+
+@router.get("/api/cards/{card_id}/danmaku")
+def danmaku(
+    card_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    card = _get_owned_card(db, user, card_id)
+    client = BiliClient()
+    try:
+        text = client.get_danmaku(card.cid)
+    finally:
+        client.close()
+    return Response(
+        content=text or "",
+        media_type="application/xml; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{card.bvid}.xml"'},
+    )
+
+
+@router.get("/api/cards/{card_id}/export")
+def export(
+    card_id: int,
+    kind: str = "txt",
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    card = _get_owned_card(db, user, card_id)
+    client = BiliClient()
+    try:
+        subs = client.get_subtitles(card.bvid, card.cid)
+        if kind == "srt":
+            content = _to_srt(subs)
+            filename = f"{card.bvid}.srt"
+            media_type = "text/plain; charset=utf-8"
+        else:
+            danmaku_text = client.get_danmaku(card.cid)
+            content = _to_txt(card, subs, danmaku_text)
+            filename = f"{card.bvid}.txt"
+            media_type = "text/plain; charset=utf-8"
+    finally:
+        client.close()
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
