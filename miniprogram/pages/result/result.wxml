@@ -1,65 +1,103 @@
 <view class="page">
-  <view class="actions">
-    <button class="copy-all" bindtap="onCopyAll">复制全部信息</button>
+  <view class="top-actions">
+    <button class="export" bindtap="onExport">下载解析结果.txt</button>
   </view>
 
-  <view class="cover" bindtap="onPreviewCover">
-    <view class="cover-bg"></view>
-    <image class="cover-img" src="{{video.cover_url}}" mode="aspectFill" />
-    <view class="open-bili" catchtap="onOpenBili">↗ 去查看</view>
-  </view>
-  <view class="dur-field">时长 {{dur}}</view>
-
-  <view class="title-row">
-    <view class="title">{{video.title}}</view>
-    <text class="copy-btn" bindtap="onCopyTitle">复制</text>
+  <view class="field">
+    <text class="label">标题</text>
+    <view class="content">{{title || '无标题'}}</view>
+    <text class="op" bindtap="onCopyTag" data-field="title">复制</text>
   </view>
 
-  <view class="up-row">
-    <view class="ava">{{upInitial}}</view>
-    <text class="uname">{{video.up_name}}</text>
-    <text class="chip">{{video.partition}}</text>
+  <view class="field">
+    <text class="label">up主</text>
+    <view class="content">{{upName || '未知'}}</view>
+    <text class="op" bindtap="onCopyTag" data-field="upName">复制</text>
   </view>
 
-  <view class="meta-line">
-    <text>{{video.bvid}} · {{pubText}}</text>
-    <text class="copy-btn" bindtap="onCopyLink">复制链接</text>
+  <view class="field">
+    <text class="label">发布时间</text>
+    <view class="content">{{pubText || '未知'}}</view>
+    <text class="op" bindtap="onCopyTag" data-field="pubText">复制</text>
   </view>
 
-  <view class="sec-head">
-    <text class="sec-label">标签</text>
-    <text class="copy-btn" bindtap="onCopyTags">复制</text>
-  </view>
-  <view class="tag-row">
-    <text class="chip chip-tag" wx:for="{{video.tags}}" wx:key="*this">＃{{item}}</text>
+  <view class="field">
+    <text class="label">标签</text>
+    <view class="content">{{tags.length ? tags.join(' ') : '无标签'}}</view>
+    <text class="op" bindtap="onCopyTag" data-field="tags">复制</text>
   </view>
 
-  <view class="sec-head">
-    <text class="sec-label">简介</text>
-    <text class="copy-btn" bindtap="onCopyDesc">复制</text>
+  <view class="field">
+    <text class="label">简介</text>
+    <view class="content">{{desc || '无简介'}}</view>
+    <text class="op" bindtap="onCopyTag" data-field="desc">复制</text>
   </view>
-  <view class="desc" selectable>{{video.desc}}</view>
 
-  <view class="subtitle card" wx:if="{{video.subtitles.length}}">
-    <view class="sub-head">
-      <text class="sub-title">📄 字幕</text>
-      <text class="chip chip-on">{{video.subtitles.length}} 条</text>
-    </view>
-    <block wx:if="{{!showAllSub}}">
-      <view class="sub-it" wx:for="{{subPreview}}" wx:key="t">
-        <text class="sub-t">{{item.timeText}}</text>
-        <text selectable>{{item.text}}</text>
-      </view>
-    </block>
-    <block wx:else>
-      <view class="sub-it" wx:for="{{video.subtitles}}" wx:key="t">
-        <text class="sub-t">{{item.timeText}}</text>
-        <text selectable>{{item.text}}</text>
-      </view>
-    </block>
-    <view class="sub-actions">
-      <button class="btn-ghost sub-btn" bindtap="onToggleSub">{{showAllSub ? '收起' : '查看更多'}}</button>
-      <button class="btn-primary sub-btn" bindtap="onCopySub">复制字幕</button>
+  <view class="field">
+    <text class="label">统计</text>
+    <view class="stats">
+      <text>点赞 {{stats.like}}</text>
+      <text>评论 {{stats.reply}}</text>
+      <text>收藏 {{stats.favorite}}</text>
+      <text>投币 {{stats.coin}}</text>
     </view>
   </view>
+
+  <view class="field">
+    <text class="label">封面</text>
+    <view class="content">
+      <image wx:if="{{coverUrl}}" class="cover" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewCover" />
+      <text wx:else>无封面</text>
+    </view>
+    <view class="ops">
+      <text class="op" bindtap="onPreviewCover">预览</text>
+      <text class="op" bindtap="onSaveCover">保存相册</text>
+    </view>
+  </view>
+
+  <view class="field" wx:if="{{media.watermarked}}">
+    <text class="label">有水印视频（含音频）</text>
+    <view class="content">单文件流，下载即含音频</view>
+    <text class="op" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
+  </view>
+
+  <view class="field" wx:if="{{media.clean}}">
+    <text class="label">无水印视频（不含音频）</text>
+    <view class="content">高清视频轨，不含音频</view>
+    <text class="op" bindtap="onDownloadVideo" data-kind="clean">下载</text>
+  </view>
+
+  <view class="field" wx:if="{{media.audio}}">
+    <text class="label">纯音频</text>
+    <view class="content">音频轨</view>
+    <text class="op" bindtap="onDownloadAudio">下载</text>
+  </view>
+
+  <view class="field">
+    <text class="label">字幕</text>
+    <view class="content" wx:if="{{subtitles.length}}">
+      <view wx:for="{{showAllSub ? subtitles : subPreview}}" wx:key="t" class="sub">{{item.timeText}} {{item.text}}</view>
+      <view class="ops">
+        <text class="op" bindtap="onToggleSub">{{showAllSub ? '收起' : '查看全部'}}</text>
+        <text class="op" bindtap="onCopySub">复制全文</text>
+        <text class="op" bindtap="onDownloadSrt">下载 .srt</text>
+      </view>
+    </view>
+    <view class="content" wx:else>无字幕</view>
+  </view>
+
+  <view class="field">
+    <text class="label">弹幕</text>
+    <view class="content">{{danmakuCount ? '共 ' + danmakuCount + ' 条' : '无弹幕'}}</view>
+    <view class="ops" wx:if="{{danmakuCount}}">
+      <text class="op" bindtap="onDownloadDanmaku">下载 .xml</text>
+    </view>
+  </view>
+
+  <view class="field">
+    <text class="label">评论正文</text>
+    <view class="content muted">暂不支持（本期不做）</view>
+  </view>
+
+  <button class="bili" bindtap="onOpenBili">去 B站查看</button>
 </view>
