@@ -10,10 +10,11 @@ Page({
     tagFilter: '全部',
     allTags: ['全部'],
     groups: [],
-    // TODO: 后端就绪后从接口读取用户绑定状态
     isBound: false,
     hasRobotRecords: false,
-    showRobotGuide: false
+    showRobotGuide: false,
+    editing: false,
+    selectedCount: 0
   },
 
   onShow() {
@@ -32,9 +33,10 @@ Page({
     api.getCards()
       .then((cards) => {
         const mapped = cards.map((c) => Object.assign({}, c, {
-          dur: formatDuration(c.duration)
+          dur: formatDuration(c.duration),
+          selected: false
         }));
-        this.setData({ cards: mapped }, () => this.rebuild());
+        this.setData({ cards: mapped, editing: false }, () => this.rebuild());
       })
       .catch((err) => {
         wx.showToast({ title: err.message || '加载失败', icon: 'none' });
@@ -60,12 +62,14 @@ Page({
     const showRobotGuide =
       this.data.sourceFilter === 'robot' &&
       (!this.data.isBound || !hasRobotRecords);
+    const selectedCount = filtered.filter((c) => c.selected).length;
 
     this.setData({
       groups: groupByMonth(filtered),
       allTags: tags,
       hasRobotRecords,
-      showRobotGuide
+      showRobotGuide,
+      selectedCount
     });
   },
 
@@ -77,30 +81,82 @@ Page({
     this.setData({ tagFilter: e.currentTarget.dataset.tag }, () => this.rebuild());
   },
 
+  visibleIds() {
+    return this.data.groups.reduce((acc, g) => acc.concat(g.items.map((c) => String(c.id))), []);
+  },
+
   onCardTap(e) {
     const id = e.currentTarget.dataset.id;
     const card = this.data.cards.find((c) => String(c.id) === String(id));
     if (!card) {
       return;
     }
+    if (this.data.editing) {
+      this.toggleSelect(id);
+      return;
+    }
     wx.navigateTo({ url: '/pages/result/result?bvid=' + card.bvid });
   },
 
-  onDelete(e) {
+  onCardLongPress(e) {
+    if (this.data.editing) {
+      return;
+    }
     const id = e.currentTarget.dataset.id;
+    const cards = this.data.cards.map((c) => Object.assign({}, c, {
+      selected: String(c.id) === String(id)
+    }));
+    this.setData({ editing: true, cards }, () => this.rebuild());
+  },
+
+  toggleSelect(id) {
+    const cards = this.data.cards.map((c) => {
+      if (String(c.id) === String(id)) {
+        return Object.assign({}, c, { selected: !c.selected });
+      }
+      return c;
+    });
+    this.setData({ cards }, () => this.rebuild());
+  },
+
+  onSelectAll() {
+    const vis = this.visibleIds();
+    const cards = this.data.cards.map((c) => {
+      if (vis.indexOf(String(c.id)) >= 0) {
+        return Object.assign({}, c, { selected: true });
+      }
+      return c;
+    });
+    this.setData({ cards }, () => this.rebuild());
+  },
+
+  onCancelEdit() {
+    const cards = this.data.cards.map((c) => Object.assign({}, c, { selected: false }));
+    this.setData({ editing: false, cards }, () => this.rebuild());
+  },
+
+  onDeleteSelected() {
+    const ids = this.data.cards.filter((c) => c.selected).map((c) => c.id);
+    if (!ids.length) {
+      return;
+    }
     wx.showModal({
       title: '删除收藏',
-      content: '删除后不可恢复，确定删除？',
+      content: '删除 ' + ids.length + ' 个视频，删除后不可恢复，确定删除？',
       success: (res) => {
         if (!res.confirm) {
           return;
         }
-        api.deleteCard(id)
+        wx.showLoading({ title: '删除中' });
+        Promise.all(ids.map((id) => api.deleteCard(id)))
           .then(() => {
+            wx.hideLoading();
             wx.showToast({ title: '已删除', icon: 'success' });
+            this.setData({ editing: false });
             this.loadCards();
           })
           .catch((err) => {
+            wx.hideLoading();
             wx.showToast({ title: err.message || '删除失败', icon: 'none' });
           });
       }

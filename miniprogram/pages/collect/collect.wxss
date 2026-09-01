@@ -4,6 +4,10 @@
   min-height: 100vh;
 }
 
+.page.editing {
+  padding-bottom: 150rpx;
+}
+
 .seg {
   display: flex;
   background: #FFF4F7;
@@ -297,16 +301,71 @@
   padding: 2rpx 12rpx;
 }
 
-.del {
+.check {
+  flex: none;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 3rpx solid #E5D7DB;
+  align-self: center;
+  box-sizing: border-box;
+}
+
+.check.on {
+  position: relative;
+  border-color: #FB7299;
+  background: #FB7299;
+}
+
+.check.on::after {
+  content: '';
   position: absolute;
-  top: 14rpx;
-  right: 18rpx;
-  font-size: 22rpx;
-  color: #FB7299;
-  padding: 4rpx 12rpx;
-  border: 1rpx solid #FBDDE6;
+  left: 11rpx;
+  top: 5rpx;
+  width: 10rpx;
+  height: 20rpx;
+  border: solid #fff;
+  border-width: 0 3rpx 3rpx 0;
+  transform: rotate(45deg);
+}
+
+.edit-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 110rpx;
+  padding: 0 28rpx;
+  background: #FFFFFF;
+  border-top: 1rpx solid #F7E4EA;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 20;
+}
+
+.edit-count {
+  font-size: 28rpx;
+  color: #2B1E23;
+  font-weight: 650;
+}
+
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 36rpx;
+}
+
+.edit-btn {
+  font-size: 28rpx;
+  color: #7A6A70;
+}
+
+.edit-btn.danger {
+  color: #FFFFFF;
+  background: #FB7299;
+  padding: 12rpx 30rpx;
   border-radius: 999rpx;
-  background: #FFF4F7;
 }
 
 .empty {
