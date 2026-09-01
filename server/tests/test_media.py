@@ -12,7 +12,10 @@ def _playurl_video(qn=64):
             "data": {
                 "dash": {
                     "video": [
-                        {"id": qn, "baseUrl": "https://v.example.com/v.m4s", "backupUrl": []}
+                        {"id": 64, "baseUrl": "https://v.example.com/v.m4s", "backupUrl": []},
+                        {"id": 64, "baseUrl": "https://v.example.com/v2.m4s", "backupUrl": []},
+                        {"id": 32, "baseUrl": "https://v.example.com/v3.m4s", "backupUrl": []},
+                        {"id": 32, "baseUrl": "https://v.example.com/v4.m4s", "backupUrl": []},
                     ],
                     "audio": [
                         {"id": 30280, "baseUrl": "https://a.example.com/a.m4s", "backupUrl": []}
@@ -70,7 +73,7 @@ def test_media_options_and_download(client, auth_headers, monkeypatch):
         headers=auth_headers,
     )
     assert opts.status_code == 200
-    assert opts.json() == [{"qn": 64, "label": "720P"}]
+    assert opts.json() == [{"qn": 64, "label": "720P"}, {"qn": 32, "label": "480P"}]
 
     resp = client.get(
         f"/api/cards/{card['id']}/download",

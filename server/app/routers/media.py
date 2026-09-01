@@ -61,7 +61,13 @@ def media_options(
         streams = _streams(client, card, kind)
     finally:
         client.close()
-    return [MediaOption(qn=s["qn"], label=s["label"]) for s in streams if s["qn"]]
+    seen = set()
+    unique = []
+    for s in streams:
+        if s["qn"] and s["qn"] not in seen:
+            seen.add(s["qn"])
+            unique.append(s)
+    return [MediaOption(qn=s["qn"], label=s["label"]) for s in unique]
 
 
 @router.get("/api/cards/{card_id}/download")
