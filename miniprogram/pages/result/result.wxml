@@ -5,31 +5,31 @@
     <view class="field">
       <text class="label">标题</text>
       <view class="content title">{{title || '无标题'}}</view>
-      <text class="icon-btn" bindtap="onCopyTag" data-field="title">📋</text>
+      <text class="action" bindtap="onCopyTag" data-field="title">复制</text>
     </view>
 
     <view class="field">
       <text class="label">up主</text>
       <view class="content">{{upName || '未知'}}</view>
-      <text class="icon-btn" bindtap="onCopyTag" data-field="upName">📋</text>
+      <text class="action" bindtap="onCopyTag" data-field="upName">复制</text>
     </view>
 
     <view class="field">
       <text class="label">发布时间</text>
       <view class="content">{{pubText || '未知'}}</view>
-      <text class="icon-btn" bindtap="onCopyTag" data-field="pubText">📋</text>
+      <text class="action" bindtap="onCopyTag" data-field="pubText">复制</text>
     </view>
 
     <view class="field">
       <text class="label">标签</text>
       <view class="content"><text wx:if="{{tagsText}}">{{tagsText}}</text><text wx:else class="muted">无标签</text></view>
-      <text class="icon-btn" bindtap="onCopyTag" data-field="tags">📋</text>
+      <text class="action" bindtap="onCopyTag" data-field="tags">复制</text>
     </view>
 
     <view class="field">
       <text class="label">简介</text>
       <view class="content">{{desc || '无简介'}}</view>
-      <text class="icon-btn" bindtap="onCopyTag" data-field="desc">📋</text>
+      <text class="action" bindtap="onCopyTag" data-field="desc">复制</text>
     </view>
   </view>
 
@@ -57,19 +57,19 @@
     <view class="field" wx:if="{{media.watermarked}}">
       <text class="label">有水印视频</text>
       <view class="content muted">单文件流，含音频</view>
-      <text class="icon-btn" bindtap="onDownloadVideo" data-kind="watermarked">⬇</text>
+      <text class="action" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
     </view>
 
     <view class="field" wx:if="{{media.clean}}">
       <text class="label">无水印视频</text>
       <view class="content muted">高清视频轨，不含音频</view>
-      <text class="icon-btn" bindtap="onDownloadVideo" data-kind="clean">⬇</text>
+      <text class="action" bindtap="onDownloadVideo" data-kind="clean">下载</text>
     </view>
 
     <view class="field" wx:if="{{media.audio}}">
       <text class="label">纯音频</text>
       <view class="content muted">音频轨</view>
-      <text class="icon-btn" bindtap="onDownloadAudio">⬇</text>
+      <text class="action" bindtap="onDownloadAudio">下载</text>
     </view>
   </view>
 
@@ -81,9 +81,9 @@
       <view class="content" wx:if="{{subtitles.length}}">
         <view wx:for="{{showAllSub ? subtitles : subPreview}}" wx:key="t" class="sub">{{item.timeText}} {{item.text}}</view>
         <view class="ops">
-          <text class="text-btn" bindtap="onToggleSub">{{showAllSub ? '收起' : '展开'}}</text>
-          <text class="icon-btn" bindtap="onCopySub">📋</text>
-          <text class="icon-btn" bindtap="onDownloadSrt">📄</text>
+          <text class="action" bindtap="onToggleSub">{{showAllSub ? '收起' : '展开'}}</text>
+          <text class="action" bindtap="onCopySub">复制</text>
+          <text class="action" bindtap="onDownloadSrt">导出</text>
         </view>
       </view>
       <view class="content muted" wx:else>无字幕</view>
@@ -93,7 +93,7 @@
       <text class="label">弹幕</text>
       <view class="content">{{danmakuCount ? '共 ' + danmakuCount + ' 条' : '无弹幕'}}</view>
       <view class="ops" wx:if="{{danmakuCount}}">
-        <text class="icon-btn" bindtap="onDownloadDanmaku">📄</text>
+        <text class="action" bindtap="onDownloadDanmaku">导出</text>
       </view>
     </view>
 

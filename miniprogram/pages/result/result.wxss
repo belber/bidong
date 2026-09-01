@@ -64,18 +64,12 @@
   color: #b7aab0;
 }
 
-.icon-btn {
-  flex: none;
-  font-size: 30rpx;
-  padding: 4rpx 6rpx;
-  color: #fb7299;
-}
-
-.text-btn {
+.action {
   flex: none;
   font-size: 24rpx;
   color: #fb7299;
-  padding: 4rpx 0;
+  padding: 6rpx 4rpx;
+  line-height: 1;
 }
 
 .ops {
