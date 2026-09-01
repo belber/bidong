@@ -27,7 +27,9 @@ function coverFilename(url, title) {
 function copyToNamed(tempFilePath, filename) {
   return new Promise((resolve, reject) => {
     const dest = wx.env.USER_DATA_PATH + '/' + filename;
-    wx.getFileSystemManager().copyFile({
+    const fs = wx.getFileSystemManager();
+    try { fs.unlinkSync(dest); } catch (e) { /* 保留：目录不存在或文件不存在 */ }
+    fs.copyFile({
       srcPath: tempFilePath,
       destPath: dest,
       success: () => resolve(dest),
@@ -70,7 +72,8 @@ Page({
     subtitles: [],
     subPreview: [],
     showAllSub: false,
-    danmakuCount: 0
+    danmakuCount: 0,
+    previewing: false
   },
 
   onLoad() {
@@ -120,8 +123,16 @@ Page({
 
   onPreviewCover() {
     if (this.data.coverUrl) {
-      wx.previewImage({ urls: [this.data.coverUrl] });
+      this.setData({ previewing: true });
     }
+  },
+
+  onPreviewTap() {
+    // 阻止点击大图关闭预览
+  },
+
+  onClosePreview() {
+    this.setData({ previewing: false });
   },
 
   onSaveCover() {
