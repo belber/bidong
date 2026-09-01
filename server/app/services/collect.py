@@ -39,6 +39,9 @@ def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[di
         if existing is not None:
             meta = client.get_video(existing.bvid)
             subtitles = client.get_subtitles(existing.bvid, existing.cid)
+            if meta.partition:
+                existing.partition = meta.partition
+                db.commit()
             stats = {
                 "like": meta.like,
                 "reply": meta.reply,
