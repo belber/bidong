@@ -50,19 +50,16 @@ function saveToAlbum(saveFn, filePath) {
   });
 }
 
-function shareNamedFile(tempFilePath, filename) {
+function shareLocalFile(localPath, filename) {
   if (!wx.shareFileMessage) {
     toast('当前微信版本不支持文件分享');
     return;
   }
-  const doShare = (filePath) => {
-    wx.shareFileMessage({
-      filePath,
-      fileName: filename,
-      fail(err) { toast((err && err.errMsg) || '分享失败'); }
-    });
-  };
-  copyToNamed(tempFilePath, filename).then(doShare).catch(() => doShare(tempFilePath));
+  wx.shareFileMessage({
+    filePath: localPath,
+    fileName: filename,
+    fail(err) { toast((err && err.errMsg) || '分享失败'); }
+  });
 }
 
 Page({
@@ -83,7 +80,10 @@ Page({
     subPreview: [],
     showAllSub: false,
     danmakuCount: 0,
-    previewing: false
+    previewing: false,
+    srtLocalPath: '',
+    danmakuLocalPath: '',
+    audioLocalPath: ''
   },
 
   onLoad(options) {
@@ -138,6 +138,34 @@ Page({
       subtitles,
       subPreview: subtitles.slice(0, 5)
     });
+    this.prepareExports(r);
+  },
+
+  prepareExports(r) {
+    if (r.subtitles && r.subtitles.length) {
+      this.prepareFile(api.exportFile(r.id, 'srt'), textFilename(r.title, r.bvid, '.srt'), 'srtLocalPath');
+    }
+    if (r.danmaku_count) {
+      this.prepareFile(api.danmaku(r.id), textFilename(r.title, r.bvid, '_弹幕.txt'), 'danmakuLocalPath');
+    }
+    if (r.media && r.media.audio) {
+      this.prepareFile(api.download(r.id, 'audio'), mediaFilename(r.title, r.bvid, 'audio'), 'audioLocalPath');
+    }
+  },
+
+  prepareFile(downloadPromise, filename, key) {
+    downloadPromise.then(({ url, header }) => {
+      wx.downloadFile({
+        url,
+        header,
+        success: (res) => {
+          if (res.statusCode !== 200) { return; }
+          copyToNamed(res.tempFilePath, filename).then((filePath) => {
+            this.setData({ [key]: filePath });
+          }).catch(() => {});
+        }
+      });
+    }).catch(() => {});
   },
 
   copy(field) {
@@ -179,28 +207,15 @@ Page({
     });
   },
 
-  saveMedia(url, header, kind) {
-    const filename = mediaFilename(this.data.title, this.data.bvid, kind);
-    wx.showLoading({ title: kind === 'audio' ? '准备分享' : '下载中' });
+  saveMedia(url, header) {
+    wx.showLoading({ title: '下载中' });
     wx.downloadFile({
       url,
       header,
       success(res) {
         wx.hideLoading();
         if (res.statusCode !== 200) { toast('下载失败'); return; }
-        if (kind === 'audio') {
-          if (!wx.shareFileMessage) {
-            toast('当前微信版本不支持文件分享');
-            return;
-          }
-          wx.shareFileMessage({
-            filePath: res.tempFilePath,
-            fileName: filename,
-            fail(err) { toast((err && err.errMsg) || '分享失败'); }
-          });
-        } else {
-          saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
-        }
+        saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
       },
       fail() { wx.hideLoading(); toast('下载失败'); }
     });
@@ -218,7 +233,7 @@ Page({
         success: (res) => {
           const chosen = options[res.tapIndex];
           api.download(this.data.cardId, kind, chosen.qn).then(({ url, header }) => {
-            this.saveMedia(url, header, kind);
+            this.saveMedia(url, header);
           }).catch(() => toast('下载失败'));
         }
       });
@@ -226,9 +241,12 @@ Page({
   },
 
   onDownloadAudio() {
-    api.download(this.data.cardId, 'audio').then(({ url, header }) => {
-      this.saveMedia(url, header, 'audio');
-    }).catch(() => toast('下载失败'));
+    const filename = mediaFilename(this.data.title, this.data.bvid, 'audio');
+    if (this.data.audioLocalPath) {
+      shareLocalFile(this.data.audioLocalPath, filename);
+    } else {
+      toast('文件准备中，请稍后重试');
+    }
   },
 
   onToggleSub() {
@@ -242,39 +260,21 @@ Page({
   },
 
   onDownloadSrt() {
-    wx.showLoading({ title: '导出中' });
-    api.exportFile(this.data.cardId, 'srt').then(({ url, header }) => {
-      const title = this.data.title;
-      const bvid = this.data.bvid;
-      wx.downloadFile({
-        url,
-        header,
-        success(res) {
-          wx.hideLoading();
-          if (res.statusCode !== 200) { toast('导出失败'); return; }
-          shareNamedFile(res.tempFilePath, textFilename(title, bvid, '.srt'));
-        },
-        fail() { wx.hideLoading(); toast('导出失败'); }
-      });
-    }).catch(() => { wx.hideLoading(); toast('导出失败'); });
+    const filename = textFilename(this.data.title, this.data.bvid, '.srt');
+    if (this.data.srtLocalPath) {
+      shareLocalFile(this.data.srtLocalPath, filename);
+    } else {
+      toast('文件准备中，请稍后重试');
+    }
   },
 
   onDownloadDanmaku() {
-    wx.showLoading({ title: '下载中' });
-    api.danmaku(this.data.cardId).then(({ url, header }) => {
-      const title = this.data.title;
-      const bvid = this.data.bvid;
-      wx.downloadFile({
-        url,
-        header,
-        success(res) {
-          wx.hideLoading();
-          if (res.statusCode !== 200) { toast('下载失败'); return; }
-          shareNamedFile(res.tempFilePath, textFilename(title, bvid, '_弹幕.txt'));
-        },
-        fail() { wx.hideLoading(); toast('下载失败'); }
-      });
-    }).catch(() => { wx.hideLoading(); toast('下载失败'); });
+    const filename = textFilename(this.data.title, this.data.bvid, '_弹幕.txt');
+    if (this.data.danmakuLocalPath) {
+      shareLocalFile(this.data.danmakuLocalPath, filename);
+    } else {
+      toast('文件准备中，请稍后重试');
+    }
   },
 
   onOpenBili() {
