@@ -3,7 +3,7 @@
     <view class="sec-title">使用指引</view>
     <view class="step">① 首页粘贴 B站链接，点「解析视频」自动收藏</view>
     <view class="step">② 在 B站评论区 @壁咚收藏，视频自动进收藏夹</view>
-    <view class="step">③ 点收藏夹卡片，跳 B站查看原视频</view>
+    <view class="step">③ 点收藏夹卡片，查看视频解析结果</view>
     <view class="step">④ 关注 @壁咚收藏，私信收激活码后绑定</view>
   </view>
 
@@ -14,12 +14,8 @@
       <view class="a">B站视频链接、BV 号、b23.tv 短链。</view>
     </view>
     <view class="faq">
-      <view class="q">会下载视频吗？</view>
-      <view class="a">不会，只保存标题 / 封面 / UP主等元数据，不下载视频本体。</view>
-    </view>
-    <view class="faq">
       <view class="q">怎么删除收藏？</view>
-      <view class="a">收藏夹卡片右上角「⋯」→ 删除。</view>
+      <view class="a">收藏夹卡片右上角「删除」按钮。</view>
     </view>
     <view class="faq">
       <view class="q">@壁咚收藏 没反应？</view>
