@@ -49,12 +49,8 @@
     <view class="field">
       <text class="label">封面</text>
       <view class="content">
-        <image wx:if="{{coverUrl}}" class="cover" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewCover" />
+        <image wx:if="{{coverUrl}}" class="cover" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewCover" bindlongpress="onSaveCover" />
         <text wx:else class="muted">无封面</text>
-      </view>
-      <view class="ops">
-        <text class="icon-btn" bindtap="onPreviewCover">👁</text>
-        <text class="icon-btn" bindtap="onSaveCover">⬇</text>
       </view>
     </view>
 
