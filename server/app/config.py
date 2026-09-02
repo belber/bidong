@@ -33,5 +33,15 @@ class Settings(BaseSettings):
     cos_bucket: str = ""
     cos_region: str = ""
 
+    robot_enabled: bool = False
+    robot_uid: str = ""
+    robot_sessdata: str = ""
+    robot_bili_jct: str = ""
+    robot_dedeuserid: str = ""
+    robot_buvid3: str = ""
+    robot_buvid4: str = ""
+    robot_poll_interval_seconds: int = 45
+    robot_send_interval_seconds: int = 5
+
 
 settings = Settings()

@@ -73,3 +73,12 @@ class ParseResult(CardOut):
     stats: VideoStats = Field(default_factory=VideoStats)
     danmaku_count: int = 0
     media: MediaAvailability = Field(default_factory=MediaAvailability)
+
+
+class BindingRequest(BaseModel):
+    code: str
+
+
+class BindingOut(BaseModel):
+    bound: bool
+    bili_uid: str | None = None

@@ -27,10 +27,22 @@ def card_to_out(card: VideoCard) -> CardOut:
     )
 
 
-def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[dict], dict, int]:
+def collect_video(
+    db: Session, user: User, url: str, source: str = "local"
+) -> tuple[VideoCard, list[dict], dict, int]:
     client = BiliClient()
     try:
         bvid = client.resolve_bvid(url)
+    finally:
+        client.close()
+    return collect_video_by_bvid(db, user, bvid, source=source)
+
+
+def collect_video_by_bvid(
+    db: Session, user: User, bvid: str, source: str = "robot"
+) -> tuple[VideoCard, list[dict], dict, int]:
+    client = BiliClient()
+    try:
         existing = (
             db.query(VideoCard)
             .filter(VideoCard.user_id == user.id, VideoCard.bvid == bvid)
@@ -71,7 +83,7 @@ def collect_video(db: Session, user: User, url: str) -> tuple[VideoCard, list[di
         duration=meta.duration,
         pubdate=meta.pubdate,
         cid=meta.cid,
-        source="local",
+        source=source,
         collected_at=now,
         month=month_of(now),
     )

@@ -1,0 +1,52 @@
+import secrets
+
+from sqlalchemy.orm import Session
+
+from ..errors import AppError
+from ..models import Binding
+from ..time import utcnow_naive
+
+ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def generate_code(length: int = 10) -> str:
+    return "".join(secrets.choice(ALPHABET) for _ in range(length))
+
+
+def issue_activation(db: Session, bili_uid: str) -> Binding:
+    bili_uid = str(bili_uid)
+    existing = db.query(Binding).filter(Binding.bili_uid == bili_uid).first()
+    if existing is not None:
+        return existing
+
+    binding = Binding(
+        bili_uid=bili_uid,
+        activation_code=generate_code(),
+        created_at=utcnow_naive(),
+    )
+    db.add(binding)
+    db.commit()
+    db.refresh(binding)
+    return binding
+
+
+def bind(db: Session, user_id: int, code: str) -> Binding:
+    normalized = (code or "").strip().upper()
+    if not normalized:
+        raise AppError(400, "激活码无效")
+
+    binding = db.query(Binding).filter(Binding.activation_code == normalized).first()
+    if binding is None:
+        raise AppError(400, "激活码无效")
+    if binding.bound_at is not None or binding.user_id is not None:
+        raise AppError(400, "激活码已使用")
+
+    already = db.query(Binding).filter(Binding.user_id == user_id).first()
+    if already is not None:
+        raise AppError(400, "该账号已绑定过 B站账号")
+
+    binding.user_id = user_id
+    binding.bound_at = utcnow_naive()
+    db.commit()
+    db.refresh(binding)
+    return binding

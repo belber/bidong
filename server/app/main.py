@@ -10,7 +10,7 @@ from .config import settings
 from .db import Base, engine
 from .errors import AppError
 from . import models  # noqa: F401  # 注册模型到 metadata
-from .routers import auth, cards, media, parse, tags
+from .routers import auth, binding, cards, media, parse, tags
 
 
 @asynccontextmanager
@@ -35,7 +35,14 @@ async def app_error_handler(request: Request, exc: AppError):
     return JSONResponse(status_code=exc.status_code, content={"message": exc.message})
 
 
-for router in (auth.router, parse.router, cards.router, tags.router, media.router):
+for router in (
+    auth.router,
+    parse.router,
+    cards.router,
+    tags.router,
+    media.router,
+    binding.router,
+):
     app.include_router(router)
 
 local_dir = Path(settings.local_storage_dir)

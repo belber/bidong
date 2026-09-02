@@ -64,3 +64,33 @@ class Tag(Base):
         back_populates="tags",
         lazy="selectin",
     )
+
+
+class Binding(Base):
+    __tablename__ = "binding"
+    __table_args__ = (
+        UniqueConstraint("bili_uid", name="uq_binding_bili_uid"),
+        UniqueConstraint("activation_code", name="uq_binding_activation_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id"), unique=True, nullable=True
+    )
+    bili_uid: Mapped[str] = mapped_column(String(32))
+    activation_code: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    code_sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    bound_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
+class RobotCursor(Base):
+    __tablename__ = "robot_cursor"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), unique=True)
+    last_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_time: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=utcnow_naive, onupdate=utcnow_naive
+    )
