@@ -76,13 +76,19 @@ _SUB_TID_V2_RANGES = (
 )
 
 
-def channel_from_tid_v2(tid_v2: int | None) -> str:
-    if not tid_v2:
+def channel_from_tid_v2(tid_v2: int | str | None) -> str:
+    if tid_v2 is None:
         return ""
-    name = _MAIN_TID_V2.get(tid_v2)
+    try:
+        tid = int(tid_v2)
+    except (TypeError, ValueError):
+        return ""
+    if not tid:
+        return ""
+    name = _MAIN_TID_V2.get(tid)
     if name:
         return name
     for start, end, channel in _SUB_TID_V2_RANGES:
-        if start <= tid_v2 <= end:
+        if start <= tid <= end:
             return channel
     return ""

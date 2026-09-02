@@ -18,4 +18,6 @@ def test_sub_partition_id_range():
 def test_unknown_id():
     assert channel_from_tid_v2(0) == ""
     assert channel_from_tid_v2(None) == ""
+    assert channel_from_tid_v2("") == ""
+    assert channel_from_tid_v2("2017") == "音乐"
     assert channel_from_tid_v2(9999) == ""
