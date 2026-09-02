@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import httpx
 
 from ..errors import AppError
+from .partition import channel_from_tid_v2
 from .wbi import WbiSigner
 
 BVID_RE = re.compile(r"BV[0-9A-Za-z]{10}")
@@ -97,12 +98,13 @@ class BiliClient:
             pic = "https:" + pic
         owner = d.get("owner") or {}
         stat = d.get("stat") or {}
+        partition = d.get("tname") or d.get("tname_v2") or channel_from_tid_v2(d.get("tid_v2"))
         return VideoMeta(
             bvid=bvid,
             title=d.get("title") or "",
             cover_url=pic,
             up_name=owner.get("name") or "",
-            partition=d.get("tname") or d.get("tname_v2") or "",
+            partition=partition or "",
             desc=d.get("desc") or "",
             duration=int(d.get("duration") or 0),
             pubdate=int(d.get("pubdate") or 0),
