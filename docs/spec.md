@@ -201,7 +201,7 @@ Phase 1：机器人触发
 
 ## 7. 机器人子系统要点（Phase 1）
 
-- **两条监听链路**：worker 低频（90s，即 1.5 分钟）轮询两个需 cookie 的通知流——新粉丝 `x/relation/followers`（发激活码）与评论区 @ `x/msgfeed/at`（触发收藏）
+- **两条监听链路**：worker 低频（30s）轮询两个需 cookie 的通知流——新粉丝 `x/relation/followers`（发激活码）与评论区 @ `x/msgfeed/at`（触发收藏）
 - **激活码走私信**：**只给最近 30 分钟内（`ROBOT_FOLLOW_WINDOW_SECONDS`，可配置）关注的粉丝发码**——按粉丝列表的 `mtime` 做滑动窗口，旧粉丝一律跳过；命中后未发过则生成激活码、存 `binding`（记录「激活码 → bili_uid」）→ `web_im/send_msg` 私信回码；**取关后重新关注（`mtime` 更新）会重发同一个码**（`bili_uid` 唯一，防「取关→再关注」刷码）；已绑定不再发
 - **收藏走评论区 @**：用户在视频评论区 @机器人；worker 解析出「发送者 mid + 评论所在视频」，**不解析评论正文里的链接、也不解析 #标签**（本期不做）
 - **绑定匹配**：发送者 mid → 查 `binding` → 落到对应 user 的收藏；未绑定直接忽略

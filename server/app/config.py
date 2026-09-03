@@ -40,9 +40,24 @@ class Settings(BaseSettings):
     robot_dedeuserid: str = ""
     robot_buvid3: str = ""
     robot_buvid4: str = ""
-    robot_poll_interval_seconds: int = 90
+    robot_poll_interval_seconds: int = 30
     robot_send_interval_seconds: int = 5
     robot_follow_window_seconds: int = 1800
+
+    # 后台管理端（PC Web，独立端口）
+    admin_port: int = 8081
+    admin_password: str = "admin-dev-password"
+
+    # Cookie 失效告警
+    alert_enabled: bool = False
+    alert_email: str = ""
+    cookie_check_interval_seconds: int = 1800
+
+    # SMTP（告警邮件）
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_pass: str = ""
 
 
 settings = Settings()
