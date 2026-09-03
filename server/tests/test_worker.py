@@ -1,7 +1,9 @@
+import time
+
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
-from app.models import Binding, RobotCursor, User
+from app.models import Binding, User
 from app.robot.worker import process_at, process_follow, run_once
 from app.services.activation import bind, issue_activation
 from app.time import utcnow_naive
@@ -23,51 +25,33 @@ class FakeClient:
         self.sent.append((uid, content))
 
 
-def _seed_follow_since(db, ts):
-    cursor = db.query(RobotCursor).filter(RobotCursor.kind == "follow_since").first()
-    if cursor is None:
-        cursor = RobotCursor(
-            kind="follow_since", last_id="", last_time=ts, updated_at=utcnow_naive()
-        )
-        db.add(cursor)
-    else:
-        cursor.last_time = ts
-    db.commit()
-    return cursor
-
-
-def test_process_follow_first_run_skips_existing(db_engine):
+def test_process_follow_sends_recent_follower(db_engine):
     settings.robot_send_interval_seconds = 0
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()
-    client = FakeClient(followers=[{"mid": "111", "uname": "A", "mtime": 1700000000}])
-
-    process_follow(db, client)
-
-    assert client.sent == []
-    cursor = db.query(RobotCursor).filter(RobotCursor.kind == "follow_since").one()
-    assert cursor.last_time > 0
-    db.close()
-
-
-def test_process_follow_sends_only_after_baseline(db_engine):
-    settings.robot_send_interval_seconds = 0
-    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
-    db = Session()
-    _seed_follow_since(db, 1700000000)
     client = FakeClient(
-        followers=[
-            {"mid": "111", "uname": "A", "mtime": 1699999999},
-            {"mid": "222", "uname": "B", "mtime": 1700000001},
-        ]
+        followers=[{"mid": "222", "uname": "B", "mtime": int(time.time()) - 60}]
     )
 
     process_follow(db, client)
 
-    assert [uid for uid, _ in client.sent] == ["222"]
-    assert db.query(Binding).filter(Binding.bili_uid == "111").count() == 0
     binding = db.query(Binding).filter(Binding.bili_uid == "222").one()
     assert client.sent == [("222", f"壁咚激活码：{binding.activation_code}")]
+    db.close()
+
+
+def test_process_follow_skips_old_follower(db_engine):
+    settings.robot_send_interval_seconds = 0
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    client = FakeClient(
+        followers=[{"mid": "111", "uname": "A", "mtime": int(time.time()) - 3600}]
+    )
+
+    process_follow(db, client)
+
+    assert client.sent == []
+    assert db.query(Binding).filter(Binding.bili_uid == "111").count() == 0
     db.close()
 
 
@@ -75,8 +59,9 @@ def test_process_follow_does_not_resend(db_engine):
     settings.robot_send_interval_seconds = 0
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()
-    _seed_follow_since(db, 1700000000)
-    client = FakeClient(followers=[{"mid": "222", "uname": "B", "mtime": 1700000001}])
+    client = FakeClient(
+        followers=[{"mid": "222", "uname": "B", "mtime": int(time.time()) - 60}]
+    )
 
     process_follow(db, client)
     process_follow(db, client)
@@ -118,9 +103,8 @@ def test_run_once_runs_both_loops(db_engine):
     settings.robot_send_interval_seconds = 0
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()
-    _seed_follow_since(db, 1700000000)
     client = FakeClient(
-        followers=[{"mid": "222", "uname": "B", "mtime": 1700000001}],
+        followers=[{"mid": "222", "uname": "B", "mtime": int(time.time()) - 60}],
         at=[],
     )
 

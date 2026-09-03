@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     robot_buvid4: str = ""
     robot_poll_interval_seconds: int = 45
     robot_send_interval_seconds: int = 5
+    robot_follow_window_seconds: int = 1800
 
 
 settings = Settings()
