@@ -4,12 +4,18 @@
   <view class="bind card">
     <view class="bind-head">
       <text class="bind-t">@壁咚收藏夹 绑定</text>
-      <text class="chip chip-on">未绑定</text>
+      <text class="chip {{bound ? 'chip-ok' : 'chip-on'}}">{{bound ? '已绑定' : '未绑定'}}</text>
     </view>
-    <view class="steps">① 关注 @壁咚收藏夹</view>
-    <view class="steps">② 查看私信，收到激活码</view>
-    <view class="steps">③ 回小程序粘贴激活码 → 绑定成功</view>
-    <button class="btn-primary bind-btn" bindtap="onBind">去绑定</button>
+    <block wx:if="{{!bound}}">
+      <view class="steps">① 关注 @壁咚收藏夹</view>
+      <view class="steps">② 查看私信，收到激活码</view>
+      <view class="steps">③ 回小程序粘贴激活码 → 绑定成功</view>
+      <button class="btn-primary bind-btn" bindtap="onBind">去绑定</button>
+    </block>
+    <block wx:else>
+      <view class="steps">已绑定 B站账号：{{biliUid}}</view>
+      <view class="steps">在视频评论区 @壁咚收藏夹 即可自动收藏</view>
+    </block>
   </view>
 
   <view class="menu card">

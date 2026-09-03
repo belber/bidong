@@ -1,8 +1,29 @@
+const api = require('../../utils/api.js');
 const { validateActivationCode } = require('../../utils/bind.js');
+
+function toast(title) {
+  wx.showToast({ title, icon: 'none' });
+}
 
 Page({
   data: {
-    code: ''
+    code: '',
+    loading: false,
+    bound: false,
+    biliUid: ''
+  },
+
+  onShow() {
+    this.refreshStatus();
+  },
+
+  refreshStatus() {
+    api
+      .getBinding()
+      .then((r) => {
+        this.setData({ bound: !!r.bound, biliUid: r.bili_uid || '' });
+      })
+      .catch(() => {});
   },
 
   onInput(e) {
@@ -18,15 +39,25 @@ Page({
   },
 
   onBind() {
-    const result = validateActivationCode(this.data.code);
-    if (!result.valid) {
-      wx.showToast({ title: '请输入有效激活码', icon: 'none' });
+    if (this.data.loading || this.data.bound) {
       return;
     }
-
-    // TODO: 后端就绪后调用 POST /api/binding { activation_code: result.code }
-    // 当前为演示：直接提示成功并返回「我的」页。
-    wx.showToast({ title: '绑定成功', icon: 'success' });
-    setTimeout(() => wx.navigateBack(), 600);
+    const result = validateActivationCode(this.data.code);
+    if (!result.valid) {
+      toast('请输入有效激活码');
+      return;
+    }
+    this.setData({ loading: true });
+    api
+      .bind(result.code)
+      .then((r) => {
+        this.setData({ bound: true, biliUid: r.bili_uid || '' });
+        wx.showToast({ title: '绑定成功', icon: 'success' });
+        setTimeout(() => wx.navigateBack(), 900);
+      })
+      .catch((err) => {
+        this.setData({ loading: false });
+        toast(err.message || '绑定失败，请检查激活码');
+      });
   }
 });

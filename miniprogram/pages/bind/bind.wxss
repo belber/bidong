@@ -43,3 +43,49 @@
   font-size: 32rpx;
   padding: 22rpx 0;
 }
+
+.ok-card {
+  margin-top: 24rpx;
+  padding: 44rpx 32rpx;
+  text-align: center;
+  border: 2rpx solid #F0C9D4;
+  border-radius: 24rpx;
+  background: #FFF8FA;
+}
+
+.ok-icon {
+  width: 96rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin: 0 auto 20rpx;
+  font-size: 56rpx;
+  color: #FFFFFF;
+  background: #FB7299;
+  border-radius: 50%;
+}
+
+.ok-title {
+  font-size: 34rpx;
+  font-weight: 750;
+  color: #2B1E23;
+}
+
+.ok-sub {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #7A6A70;
+}
+
+.ok-note {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #B28B97;
+  line-height: 1.6;
+}
+
+.tip {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: #B28B97;
+  line-height: 1.6;
+}

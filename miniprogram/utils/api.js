@@ -114,6 +114,12 @@ module.exports = {
   addCardTags(id, tags) {
     return request('POST', '/api/cards/' + id + '/tags', { tags });
   },
+  bind(code) {
+    return request('POST', '/api/binding', { code });
+  },
+  getBinding() {
+    return request('GET', '/api/binding');
+  },
   mediaOptions(id, kind) {
     return request('GET', '/api/cards/' + id + '/media-options?kind=' + encodeURIComponent(kind));
   },

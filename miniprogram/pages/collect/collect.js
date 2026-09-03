@@ -31,13 +31,20 @@ Page({
   },
 
   loadCards() {
-    api.getCards()
-      .then((cards) => {
+    Promise.all([
+      api.getCards(),
+      api.getBinding().catch(() => ({ bound: false }))
+    ])
+      .then(([cards, binding]) => {
         const mapped = cards.map((c) => Object.assign({}, c, {
           dur: formatDuration(c.duration),
           selected: false
         }));
-        this.setData({ cards: mapped, editing: false }, () => this.rebuild());
+        this.setData({
+          cards: mapped,
+          isBound: !!binding.bound,
+          editing: false
+        }, () => this.rebuild());
       })
       .catch((err) => {
         wx.showToast({ title: err.message || '加载失败', icon: 'none' });

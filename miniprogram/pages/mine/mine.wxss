@@ -33,6 +33,12 @@
   border-radius: 20rpx;
 }
 
+.chip-ok {
+  background: #E8F6EC;
+  color: #2E9E5B;
+  font-weight: 600;
+}
+
 .menu {
   margin-top: 32rpx;
   padding: 0;
