@@ -31,14 +31,17 @@
 .unbind-icon {
   width: 56rpx;
   height: 56rpx;
+  border-radius: 50%;
+  background: #FCEAF0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.unbind-img {
-  width: 36rpx;
-  height: 36rpx;
+.unbind-glyph {
+  font-size: 26rpx;
+  color: #B28B97;
+  line-height: 1;
 }
 
 .steps {
