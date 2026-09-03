@@ -22,6 +22,28 @@
   color: #2B1E23;
 }
 
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.unbind-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #FCEAF0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.unbind-glyph {
+  font-size: 26rpx;
+  color: #B28B97;
+  line-height: 1;
+}
+
 .steps {
   font-size: 28rpx;
   color: #7A6A70;
@@ -37,17 +59,6 @@
   background: #E8F6EC;
   color: #2E9E5B;
   font-weight: 600;
-}
-
-.unbind-row {
-  margin-top: 16rpx;
-  text-align: right;
-}
-
-.unbind-link {
-  font-size: 26rpx;
-  color: #B28B97;
-  padding: 12rpx 4rpx;
 }
 
 .menu {
