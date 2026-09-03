@@ -120,6 +120,9 @@ module.exports = {
   getBinding() {
     return request('GET', '/api/binding');
   },
+  unbind() {
+    return request('DELETE', '/api/binding');
+  },
   mediaOptions(id, kind) {
     return request('GET', '/api/cards/' + id + '/media-options?kind=' + encodeURIComponent(kind));
   },

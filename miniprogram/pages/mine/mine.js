@@ -31,6 +31,29 @@ Page({
     wx.navigateTo({ url: '/pages/bind/bind' });
   },
 
+  onUnbind() {
+    wx.showModal({
+      title: '解绑',
+      content: '解绑后 @壁咚收藏夹 将不再自动收藏到你的账号，确定解绑？',
+      confirmText: '解绑',
+      confirmColor: '#FB7299',
+      success: (res) => {
+        if (!res.confirm) {
+          return;
+        }
+        api
+          .unbind()
+          .then(() => {
+            this.setData({ bound: false, biliUid: '', biliName: '' });
+            wx.showToast({ title: '已解绑', icon: 'success' });
+          })
+          .catch((err) => {
+            wx.showToast({ title: err.message || '解绑失败', icon: 'none' });
+          });
+      }
+    });
+  },
+
   onGoHelp() {
     wx.navigateTo({ url: '/pages/help/help' });
   },

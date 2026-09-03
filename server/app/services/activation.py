@@ -56,3 +56,11 @@ def bind(db: Session, user_id: int, code: str) -> Binding:
     db.commit()
     db.refresh(binding)
     return binding
+
+
+def unbind(db: Session, user_id: int) -> None:
+    binding = db.query(Binding).filter(Binding.user_id == user_id).first()
+    if binding is not None:
+        binding.user_id = None
+        binding.bound_at = None
+        db.commit()

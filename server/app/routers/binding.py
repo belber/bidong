@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import get_current_user
 from ..models import Binding, User
 from ..schemas import BindingOut, BindingRequest
-from ..services.activation import bind as bind_code
+from ..services.activation import bind as bind_code, unbind as unbind_code
 
 router = APIRouter(tags=["binding"])
 
@@ -37,3 +37,12 @@ def get_binding(
     if binding is None:
         return BindingOut(bound=False)
     return _binding_out(binding)
+
+
+@router.delete("/api/binding", status_code=204)
+def unbind_account(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    unbind_code(db, user.id)
+    return Response(status_code=204)

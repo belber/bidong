@@ -39,6 +39,11 @@
   font-weight: 600;
 }
 
+.unbind-btn {
+  margin-top: 24rpx;
+  border-radius: 20rpx;
+}
+
 .menu {
   margin-top: 32rpx;
   padding: 0;

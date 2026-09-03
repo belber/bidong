@@ -186,7 +186,7 @@ Phase 1：机器人触发
 | GET  | `/api/cards/:id/export?kind=txt\|srt` | 导出文本（txt 全量 / srt 字幕） |
 
 > Phase 0 不提供 `POST /api/cards`；解析即收藏。Phase 1 机器人由 worker 直接写库，也不走该接口。
-> Phase 1 提供 `POST /api/binding`（粘贴激活码绑定）与 `GET /api/binding`（查绑定状态）。
+> Phase 1 提供 `POST /api/binding`（粘贴激活码绑定）、`GET /api/binding`（查绑定状态）与 `DELETE /api/binding`（解绑）。
 
 > **收藏夹前端交互**：卡片数据量小，筛选/搜索先在前端本地完成。顶部依次为「搜索框（标题 / UP主 / 分区 / 标签关键字）」「来源分段（全部 / 本机 / @壁咚）」「分区 chips（全部 + 去重后的 B站分区）」。标签不再作为一级筛选维度（标签数量不可控、横向 chip 过长），仅保留为卡片元数据并可被搜索命中。
 
