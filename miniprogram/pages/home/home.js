@@ -1,9 +1,14 @@
 const { extractBiliLink } = require('../../utils/parse.js');
 const api = require('../../utils/api.js');
 
+const DEMO_LINK = 'https://b23.tv/2g9l5YF';
+const DEMO_PLACEHOLDER =
+  '【高校妖娆版【极乐净土】与原舞蹈对比版！！！-哔哩哔哩】 ' + DEMO_LINK;
+
 Page({
   data: {
     input: '',
+    demoPlaceholder: DEMO_PLACEHOLDER,
     parsing: false
   },
 
@@ -38,7 +43,9 @@ Page({
     if (this.data.parsing) {
       return;
     }
-    const link = extractBiliLink(this.data.input);
+    const raw = (this.data.input || '').trim();
+    const text = raw || DEMO_PLACEHOLDER;
+    const link = extractBiliLink(text);
     if (!link) {
       wx.showToast({ title: '请输入 B站视频链接或 BV 号', icon: 'none' });
       return;

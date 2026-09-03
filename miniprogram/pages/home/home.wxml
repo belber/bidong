@@ -5,7 +5,7 @@
     <image class="lk-icon" src="/images/icon-link.png" mode="aspectFit" />
     <textarea
       class="input"
-      placeholder="https://www.bilibili.com/video/&#10;BV1BE4U6BEg8"
+      placeholder="{{demoPlaceholder}}"
       placeholder-class="ph"
       value="{{input}}"
       bindinput="onInput"
