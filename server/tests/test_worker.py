@@ -70,6 +70,26 @@ def test_process_follow_does_not_resend(db_engine):
     db.close()
 
 
+def test_process_follow_resends_on_refollow(db_engine):
+    settings.robot_send_interval_seconds = 0
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    now = int(time.time())
+
+    first = FakeClient(followers=[{"mid": "222", "uname": "B", "mtime": now - 60}])
+    process_follow(db, first)
+    assert len(first.sent) == 1
+
+    # 取关后重新关注：mtime 更新为更近的时间
+    second = FakeClient(followers=[{"mid": "222", "uname": "B", "mtime": now - 30}])
+    process_follow(db, second)
+    assert len(second.sent) == 1
+
+    binding = db.query(Binding).filter(Binding.bili_uid == "222").one()
+    assert first.sent == second.sent == [("222", f"壁咚激活码：{binding.activation_code}")]
+    db.close()
+
+
 def test_process_at_collects_for_bound_and_ignores_unbound(db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()

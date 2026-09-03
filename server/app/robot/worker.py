@@ -63,9 +63,10 @@ def process_follow(db: Session, client: BiliRobotClient) -> None:
             continue
         mid = str(follower["mid"])
         binding = issue_activation(db, mid, follower.get("uname") or "")
-        if binding.bound_at is None and binding.code_sent_at is None:
+        if binding.bound_at is None and mtime > (binding.last_follow_mtime or 0):
             client.send_msg(mid, f"壁咚激活码：{binding.activation_code}")
             binding.code_sent_at = utcnow_naive()
+            binding.last_follow_mtime = mtime
             db.commit()
             if settings.robot_send_interval_seconds > 0:
                 time.sleep(settings.robot_send_interval_seconds)

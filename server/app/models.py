@@ -82,6 +82,7 @@ class Binding(Base):
     activation_code: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
     code_sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    last_follow_mtime: Mapped[int] = mapped_column(Integer, default=0)
     bound_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
