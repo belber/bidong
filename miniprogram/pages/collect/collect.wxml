@@ -30,7 +30,7 @@
     <view class="guide-card">
       <view class="guide-title">你还未绑定或未 @过，可以按下面的方式操作</view>
       <view class="guide-steps">
-        <view class="guide-step">① B站评论区 @壁咚收藏</view>
+        <view class="guide-step">① B站评论区 @壁咚收藏夹</view>
         <view class="guide-step">② 进收藏夹查看视频</view>
       </view>
       <view class="demo">
@@ -48,7 +48,7 @@
           <view class="demo-avatar"></view>
           <view class="demo-cbody">
             <text class="demo-cname">我</text>
-            <text class="demo-ctext highlight">@壁咚收藏</text>
+            <text class="demo-ctext highlight">@壁咚收藏夹</text>
           </view>
         </view>
       </view>

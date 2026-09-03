@@ -8,6 +8,6 @@
   <view class="card">
     <view class="sec-label">理念</view>
     <view class="txt">壁咚帮你解析并保存 B站视频的信息——封面、标题、UP主、视频分类、字幕等，都整理成卡片方便回看。</view>
-    <view class="txt">亮点：关注 @壁咚收藏，在评论区 @它 + 视频链接，就能快速把视频收进你的收藏夹。</view>
+    <view class="txt">亮点：关注 @壁咚收藏夹，在评论区 @它 + 视频链接，就能快速把视频收进你的收藏夹。</view>
   </view>
 </view>

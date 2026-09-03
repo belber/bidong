@@ -44,7 +44,7 @@ def test_get_at_notifications_extracts_bvid():
                                 "type": "reply",
                                 "business": "评论",
                                 "uri": "https://www.bilibili.com/video/BV1xx411c7mD",
-                                "source_content": "@壁咚收藏",
+                                "source_content": "@壁咚收藏夹",
                             },
                         }
                     ]
