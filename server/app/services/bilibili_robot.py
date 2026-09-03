@@ -71,7 +71,13 @@ class BiliRobotClient:
         out: list[dict] = []
         for u in items:
             if isinstance(u, dict) and u.get("mid") is not None:
-                out.append({"mid": str(u["mid"]), "uname": u.get("uname") or ""})
+                out.append(
+                    {
+                        "mid": str(u["mid"]),
+                        "uname": u.get("uname") or "",
+                        "mtime": int(u.get("mtime") or 0),
+                    }
+                )
         return out
 
     def get_at_notifications(self) -> list[dict]:

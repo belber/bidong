@@ -130,7 +130,7 @@ binding (                      -- Phase 1：激活码绑定 B站账号
 
 robot_cursor (                  -- Phase 1：worker 轮询游标，重启不重复处理
   id          PK,
-  kind        text unique,  -- 'follow'（新粉丝）| 'at'（评论区@）
+  kind        text unique,  -- 'follow_since'（上线基线）| 'at'（评论区@）
   last_id     text,         -- 已处理的最大通知/消息 id
   last_time   int,          -- 已处理的最大时间戳（unix 秒）
   updated_at  timestamp
@@ -202,7 +202,7 @@ Phase 1：机器人触发
 ## 7. 机器人子系统要点（Phase 1）
 
 - **两条监听链路**：worker 低频（30–60s）轮询两个需 cookie 的通知流——新粉丝 `x/msgfeed/follow`（发激活码）与评论区 @ `x/msgfeed/at`（触发收藏）
-- **激活码走私信**：检测到新粉丝 mid → 未发过则生成激活码、存 `binding`（记录「激活码 → bili_uid」）→ `web_im/send_msg` 私信回码；已发过则**重发同一个码**（`bili_uid` 唯一，防「取关→再关注」刷码）；已绑定不再发
+- **激活码走私信**：**只对上线后的新增关注发码**——worker 首次运行记录一个时间基线，之后只处理 `mtime` 晚于基线的粉丝（跳过存量粉丝）；命中后未发过则生成激活码、存 `binding`（记录「激活码 → bili_uid」）→ `web_im/send_msg` 私信回码；已发过则**重发同一个码**（`bili_uid` 唯一，防「取关→再关注」刷码）；已绑定不再发
 - **收藏走评论区 @**：用户在视频评论区 @机器人；worker 解析出「发送者 mid + 评论所在视频」，**不解析评论正文里的链接、也不解析 #标签**（本期不做）
 - **绑定匹配**：发送者 mid → 查 `binding` → 落到对应 user 的收藏；未绑定直接忽略
 - **默认不回复**：收藏成功后不在评论区/私信回「已收藏」，避免触发风控

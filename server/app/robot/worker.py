@@ -12,6 +12,8 @@ from ..services.bilibili_robot import BiliRobotClient
 from ..services.collect import collect_video_by_bvid
 from ..time import utcnow_naive
 
+FOLLOW_SINCE_KIND = "follow_since"
+
 
 def get_cursor(db: Session, kind: str) -> RobotCursor:
     cursor = db.query(RobotCursor).filter(RobotCursor.kind == kind).first()
@@ -56,7 +58,16 @@ def _max_cursor(items: list[dict]) -> tuple[str, int]:
 
 
 def process_follow(db: Session, client: BiliRobotClient) -> None:
+    cursor = get_cursor(db, FOLLOW_SINCE_KIND)
+    if cursor.last_time == 0:
+        # 首次运行：把「当前时间」记为上线基线，跳过所有存量粉丝
+        update_cursor(db, FOLLOW_SINCE_KIND, "", int(time.time()))
+        return
+
     for follower in client.get_followers():
+        mtime = int(follower.get("mtime") or 0)
+        if mtime <= cursor.last_time:
+            continue
         mid = str(follower["mid"])
         binding = issue_activation(db, mid, follower.get("uname") or "")
         if binding.bound_at is None and binding.code_sent_at is None:

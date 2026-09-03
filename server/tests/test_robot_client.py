@@ -17,13 +17,16 @@ def test_get_followers():
     respx.get(url__regex=r"https://api\.bilibili\.com/x/relation/followers.*").mock(
         return_value=httpx.Response(
             200,
-            json={"code": 0, "data": {"list": [{"mid": 111, "uname": "用户A"}]}},
+            json={
+                "code": 0,
+                "data": {"list": [{"mid": 111, "uname": "用户A", "mtime": 1700000000}]},
+            },
         )
     )
     client = _client()
     items = client.get_followers()
     client.close()
-    assert items == [{"mid": "111", "uname": "用户A"}]
+    assert items == [{"mid": "111", "uname": "用户A", "mtime": 1700000000}]
 
 
 @respx.mock
