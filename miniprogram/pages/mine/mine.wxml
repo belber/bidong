@@ -15,7 +15,9 @@
     <block wx:else>
       <view class="steps">已绑定 B站账号：{{biliName || biliUid}}</view>
       <view class="steps">在视频评论区 @壁咚收藏夹 即可自动收藏</view>
-      <button class="btn-ghost unbind-btn" bindtap="onUnbind">解绑</button>
+      <view class="unbind-row">
+        <text class="unbind-link" bindtap="onUnbind">解绑</text>
+      </view>
     </block>
   </view>
 
