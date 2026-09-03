@@ -201,12 +201,12 @@ Phase 1：机器人触发
 
 ## 7. 机器人子系统要点（Phase 1）
 
-- **两条监听链路**：worker 低频（30–60s）轮询两个需 cookie 的通知流——新粉丝 `x/msgfeed/follow`（发激活码）与评论区 @ `x/msgfeed/at`（触发收藏）
+- **两条监听链路**：worker 低频（90s，即 1.5 分钟）轮询两个需 cookie 的通知流——新粉丝 `x/relation/followers`（发激活码）与评论区 @ `x/msgfeed/at`（触发收藏）
 - **激活码走私信**：**只给最近 30 分钟内（`ROBOT_FOLLOW_WINDOW_SECONDS`，可配置）关注的粉丝发码**——按粉丝列表的 `mtime` 做滑动窗口，旧粉丝一律跳过；命中后未发过则生成激活码、存 `binding`（记录「激活码 → bili_uid」）→ `web_im/send_msg` 私信回码；已发过则**重发同一个码**（`bili_uid` 唯一，防「取关→再关注」刷码）；已绑定不再发
 - **收藏走评论区 @**：用户在视频评论区 @机器人；worker 解析出「发送者 mid + 评论所在视频」，**不解析评论正文里的链接、也不解析 #标签**（本期不做）
 - **绑定匹配**：发送者 mid → 查 `binding` → 落到对应 user 的收藏；未绑定直接忽略
 - **默认不回复**：收藏成功后不在评论区/私信回「已收藏」，避免触发风控
-- **关注检测**：轮询 `x/msgfeed/follow`（新粉丝通知流，需 cookie）取 `user.mid` / `user.uname`；兜底用 `x/relation/followers` 粉丝列表做差集
+- **关注检测**：轮询 `x/relation/followers`（粉丝列表）取 `mid` / `uname` / `mtime`（关注时间）
 - **@ 检测**：轮询 `x/msgfeed/at`（@ 通知流，需 cookie），需拿到「发送者 mid / 评论正文 / 评论所在视频 aid/bvid」；字段以实测为准
 - **激活码回送**：私信接口 `web_im/send_msg`（`msg[content]` = 激活码）
 - **Cookie 前置**：机器人账号须持登录态 `SESSDATA`、`bili_jct`、`DedeUserID`、`buvid3/4`（二维码登录获取，见 bilibili-api.md §5.1）

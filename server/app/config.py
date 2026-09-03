@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     robot_dedeuserid: str = ""
     robot_buvid3: str = ""
     robot_buvid4: str = ""
-    robot_poll_interval_seconds: int = 45
+    robot_poll_interval_seconds: int = 90
     robot_send_interval_seconds: int = 5
     robot_follow_window_seconds: int = 1800
 
