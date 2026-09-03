@@ -96,7 +96,8 @@
 
     <view class="field">
       <text class="label">弹幕</text>
-      <view class="content">{{danmakuCount ? '共 ' + danmakuCount + ' 条' : '无弹幕'}}</view>
+      <view class="content" wx:if="{{danmakuCount}}">共 {{danmakuCount}} 条</view>
+      <view class="content muted" wx:else>无弹幕</view>
       <view class="ops" wx:if="{{danmakuCount}}">
         <text class="action" bindtap="onDownloadDanmaku">导出</text>
       </view>
