@@ -82,3 +82,4 @@ class BindingRequest(BaseModel):
 class BindingOut(BaseModel):
     bound: bool
     bili_uid: str | None = None
+    bili_name: str | None = None

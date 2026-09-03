@@ -78,6 +78,7 @@ class Binding(Base):
         ForeignKey("user.id"), unique=True, nullable=True
     )
     bili_uid: Mapped[str] = mapped_column(String(32))
+    bili_name: Mapped[str] = mapped_column(String(128), default="")
     activation_code: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
     code_sent_at: Mapped[datetime | None] = mapped_column(nullable=True)

@@ -24,6 +24,22 @@ def test_issue_activation_idempotent_per_uid(db_engine):
     db.close()
 
 
+def test_issue_activation_stores_and_backfills_name(db_engine):
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    first = issue_activation(db, "555", "壁咚菌")
+    assert first.bili_name == "壁咚菌"
+
+    first.bili_name = ""
+    db.commit()
+
+    again = issue_activation(db, "555", "壁咚菌")
+    assert again.bili_name == "壁咚菌"
+    db.close()
+
+
 def test_bind_success_and_single_use(db_engine):
     from sqlalchemy.orm import sessionmaker
 

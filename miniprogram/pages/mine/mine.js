@@ -3,7 +3,8 @@ const api = require('../../utils/api.js');
 Page({
   data: {
     bound: false,
-    biliUid: ''
+    biliUid: '',
+    biliName: ''
   },
 
   onShow() {
@@ -17,7 +18,11 @@ Page({
     api
       .getBinding()
       .then((r) => {
-        this.setData({ bound: !!r.bound, biliUid: r.bili_uid || '' });
+        this.setData({
+          bound: !!r.bound,
+          biliUid: r.bili_uid || '',
+          biliName: r.bili_name || ''
+        });
       })
       .catch(() => {});
   },

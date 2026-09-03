@@ -13,7 +13,7 @@ def test_bind_and_get_binding(client, auth_headers, db_engine):
 
     resp = client.get("/api/binding", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.json() == {"bound": False, "bili_uid": None}
+    assert resp.json() == {"bound": False, "bili_uid": None, "bili_name": None}
 
     resp = client.post("/api/binding", json={"code": code}, headers=auth_headers)
     assert resp.status_code == 200

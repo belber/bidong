@@ -10,6 +10,14 @@ from ..services.activation import bind as bind_code
 router = APIRouter(tags=["binding"])
 
 
+def _binding_out(binding: Binding) -> BindingOut:
+    return BindingOut(
+        bound=True,
+        bili_uid=binding.bili_uid,
+        bili_name=binding.bili_name or None,
+    )
+
+
 @router.post("/api/binding", response_model=BindingOut)
 def bind_account(
     payload: BindingRequest,
@@ -17,7 +25,7 @@ def bind_account(
     db: Session = Depends(get_db),
 ):
     binding = bind_code(db, user.id, payload.code)
-    return BindingOut(bound=True, bili_uid=binding.bili_uid)
+    return _binding_out(binding)
 
 
 @router.get("/api/binding", response_model=BindingOut)
@@ -28,4 +36,4 @@ def get_binding(
     binding = db.query(Binding).filter(Binding.user_id == user.id).first()
     if binding is None:
         return BindingOut(bound=False)
-    return BindingOut(bound=True, bili_uid=binding.bili_uid)
+    return _binding_out(binding)

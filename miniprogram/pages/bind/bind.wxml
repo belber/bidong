@@ -5,7 +5,7 @@
     <view class="ok-card">
       <view class="ok-icon">✓</view>
       <view class="ok-title">已绑定 @壁咚收藏夹</view>
-      <view class="ok-sub">B站 UID：{{biliUid}}</view>
+      <view class="ok-sub">B站账号：{{biliName || biliUid}}</view>
       <view class="ok-note">之后在视频评论区 @壁咚收藏夹，就能把视频收进收藏夹。</view>
     </view>
   </block>

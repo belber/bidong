@@ -10,7 +10,8 @@ Page({
     code: '',
     loading: false,
     bound: false,
-    biliUid: ''
+    biliUid: '',
+    biliName: ''
   },
 
   onShow() {
@@ -21,7 +22,11 @@ Page({
     api
       .getBinding()
       .then((r) => {
-        this.setData({ bound: !!r.bound, biliUid: r.bili_uid || '' });
+        this.setData({
+          bound: !!r.bound,
+          biliUid: r.bili_uid || '',
+          biliName: r.bili_name || ''
+        });
       })
       .catch(() => {});
   },
@@ -51,7 +56,11 @@ Page({
     api
       .bind(result.code)
       .then((r) => {
-        this.setData({ bound: true, biliUid: r.bili_uid || '' });
+        this.setData({
+          bound: true,
+          biliUid: r.bili_uid || '',
+          biliName: r.bili_name || ''
+        });
         wx.showToast({ title: '绑定成功', icon: 'success' });
         setTimeout(() => wx.navigateBack(), 900);
       })

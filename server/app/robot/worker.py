@@ -58,7 +58,7 @@ def _max_cursor(items: list[dict]) -> tuple[str, int]:
 def process_follow(db: Session, client: BiliRobotClient) -> None:
     for follower in client.get_followers():
         mid = str(follower["mid"])
-        binding = issue_activation(db, mid)
+        binding = issue_activation(db, mid, follower.get("uname") or "")
         if binding.bound_at is None and binding.code_sent_at is None:
             client.send_msg(mid, f"壁咚激活码：{binding.activation_code}")
             binding.code_sent_at = utcnow_naive()

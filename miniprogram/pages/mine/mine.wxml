@@ -13,7 +13,7 @@
       <button class="btn-primary bind-btn" bindtap="onBind">去绑定</button>
     </block>
     <block wx:else>
-      <view class="steps">已绑定 B站账号：{{biliUid}}</view>
+      <view class="steps">已绑定 B站账号：{{biliName || biliUid}}</view>
       <view class="steps">在视频评论区 @壁咚收藏夹 即可自动收藏</view>
     </block>
   </view>

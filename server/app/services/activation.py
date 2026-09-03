@@ -13,14 +13,20 @@ def generate_code(length: int = 10) -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(length))
 
 
-def issue_activation(db: Session, bili_uid: str) -> Binding:
+def issue_activation(db: Session, bili_uid: str, bili_name: str = "") -> Binding:
     bili_uid = str(bili_uid)
+    name = (bili_name or "").strip()
     existing = db.query(Binding).filter(Binding.bili_uid == bili_uid).first()
     if existing is not None:
+        if name and not (existing.bili_name or "").strip():
+            existing.bili_name = name
+            db.commit()
+            db.refresh(existing)
         return existing
 
     binding = Binding(
         bili_uid=bili_uid,
+        bili_name=name,
         activation_code=generate_code(),
         created_at=utcnow_naive(),
     )
