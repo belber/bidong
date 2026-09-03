@@ -7,7 +7,7 @@
       <view class="head-right">
         <text class="chip {{bound ? 'chip-ok' : 'chip-on'}}">{{bound ? '已绑定' : '未绑定'}}</text>
         <view wx:if="{{bound}}" class="unbind-icon" bindtap="onUnbind">
-          <text class="unbind-glyph">✕</text>
+          <image class="unbind-img" src="/images/icon-unlink.png" mode="aspectFit" />
         </view>
       </view>
     </view>
