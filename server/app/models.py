@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Table, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Table, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -39,7 +39,7 @@ class VideoCard(Base):
     source_url: Mapped[str] = mapped_column(Text)
     duration: Mapped[int] = mapped_column(Integer, default=0)
     pubdate: Mapped[int] = mapped_column(Integer, default=0)
-    cid: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    cid: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
     source: Mapped[str] = mapped_column(String(16), default="local")
     collected_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
     month: Mapped[str] = mapped_column(String(7), index=True)

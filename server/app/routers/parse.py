@@ -70,6 +70,7 @@ def parse(
             db, user, bvid, source="local"
         )
     except Exception as exc:  # noqa: BLE001
+        db.rollback()
         tracking.log_parse(
             db,
             source="local",

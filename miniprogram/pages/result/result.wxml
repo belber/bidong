@@ -74,7 +74,7 @@
     <view class="field" wx:if="{{media.audio}}">
       <text class="label">纯音频</text>
       <view class="content muted">音频轨</view>
-      <text class="action" bindtap="onDownloadAudio">下载</text>
+      <text class="action" bindtap="onDownloadAudio">转发</text>
     </view>
   </view>
 
@@ -88,7 +88,7 @@
         <view class="ops">
           <text class="action" bindtap="onToggleSub">{{showAllSub ? '收起' : '展开'}}</text>
           <text class="action" bindtap="onCopySub">复制</text>
-          <text class="action" bindtap="onDownloadSrt">导出</text>
+          <text class="action" bindtap="onDownloadSrt">转发</text>
         </view>
       </view>
       <view class="content muted" wx:else>无字幕</view>
@@ -99,7 +99,7 @@
       <view class="content" wx:if="{{danmakuCount}}">共 {{danmakuCount}} 条</view>
       <view class="content muted" wx:else>无弹幕</view>
       <view class="ops" wx:if="{{danmakuCount}}">
-        <text class="action" bindtap="onDownloadDanmaku">导出</text>
+        <text class="action" bindtap="onDownloadDanmaku">转发</text>
       </view>
     </view>
 

@@ -7,10 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 源码（.dockerignore 已排除 .env / var / tests / docs 等）
-COPY . .
-
-# 生产依赖：Postgres 驱动 + COS + 机器人（qrcode）
+# 先只拷 pyproject.toml 安装依赖（依赖不变时该层走缓存，不用每次下载）
+COPY pyproject.toml ./
 RUN pip install --no-cache-dir ".[postgres,cos,robot]"
+
+# 再拷贝源码（.dockerignore 已排除 .env / var / tests / docs / logs 等）
+COPY . .
 
 EXPOSE 8000 8081

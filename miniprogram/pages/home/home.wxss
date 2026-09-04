@@ -362,3 +362,11 @@
   color: #FF7A00;
   font-weight: 700;
 }
+
+.home-footer-note {
+  margin: 36rpx 8rpx 8rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #B28B97;
+  line-height: 1.6;
+}
