@@ -32,6 +32,7 @@ rsync -az --progress \
   --exclude '.venv' \
   --exclude 'var' \
   --exclude 'logs' \
+  --exclude '*.egg-info' \
   --exclude 'tests' \
   --exclude '.git' \
   --exclude '.pytest_cache' \
