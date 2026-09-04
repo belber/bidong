@@ -52,7 +52,7 @@
       </view>
     </view>
 
-    <view class="way">
+    <view class="way" wx:if="{{showRobotGuide}}">
       <view class="way-label">方式 2 · @壁咚收藏夹</view>
       <view class="guide-steps">
         <view class="guide-step">① B站评论区 @壁咚收藏夹</view>

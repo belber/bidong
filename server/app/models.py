@@ -96,3 +96,87 @@ class RobotCursor(Base):
     updated_at: Mapped[datetime] = mapped_column(
         default=utcnow_naive, onupdate=utcnow_naive
     )
+
+
+class FollowEvent(Base):
+    """每次「发现新关注」落一条，按 (bili_uid, mtime) 去重。"""
+
+    __tablename__ = "follow_event"
+    __table_args__ = (
+        UniqueConstraint("bili_uid", "mtime", name="uq_follow_event_uid_mtime"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bili_uid: Mapped[str] = mapped_column(String(32), index=True)
+    bili_name: Mapped[str] = mapped_column(String(128), default="")
+    mtime: Mapped[int] = mapped_column(Integer, default=0)
+    sent_code: Mapped[bool] = mapped_column(default=False)
+    bound: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+
+
+class AtEvent(Base):
+    """评论区 @ 通知，按 feed id 去重。"""
+
+    __tablename__ = "at_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    feed_id: Mapped[str] = mapped_column(String(64), unique=True)
+    bili_uid: Mapped[str] = mapped_column(String(32), index=True)
+    bili_name: Mapped[str] = mapped_column(String(128), default="")
+    bvid: Mapped[str] = mapped_column(String(32), default="")
+    video_title: Mapped[str] = mapped_column(String(256), default="")
+    comment: Mapped[str] = mapped_column(Text, default="")
+    result: Mapped[str] = mapped_column(String(32), default="collected")
+    reason: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+
+
+class ActivationLog(Base):
+    """每次「发码尝试」落一条。"""
+
+    __tablename__ = "activation_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bili_uid: Mapped[str] = mapped_column(String(32), index=True)
+    bili_name: Mapped[str] = mapped_column(String(128), default="")
+    code: Mapped[str] = mapped_column(String(32), default="")
+    sent_ok: Mapped[bool] = mapped_column(default=False)
+    send_reason: Mapped[str] = mapped_column(String(64), default="")
+    bound: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+
+
+class ParseLog(Base):
+    """每次「解析尝试」落一条。"""
+
+    __tablename__ = "parse_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(16), index=True)  # local | robot
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id"), nullable=True, index=True
+    )
+    bili_uid: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, index=True
+    )
+    input: Mapped[str] = mapped_column(Text, default="")
+    bvid: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    video_title: Mapped[str] = mapped_column(String(256), default="")
+    ok: Mapped[bool] = mapped_column(default=False)
+    reason: Mapped[str] = mapped_column(String(64), default="")
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+
+
+class AdminConfig(Base):
+    """动态配置的 key-value 存储，读时优先 DB，缺省回退 env。"""
+
+    __tablename__ = "admin_config"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        default=utcnow_naive, onupdate=utcnow_naive
+    )

@@ -7,10 +7,21 @@ from ..config import settings
 from ..db import Base, SessionLocal, engine
 from ..errors import AppError
 from ..models import Binding, RobotCursor, User
+from ..services import config_store, tracking
 from ..services.activation import issue_activation
 from ..services.bilibili_robot import BiliRobotClient
 from ..services.collect import collect_video_by_bvid
 from ..time import utcnow_naive
+from .cookie import build_client, check_cookie
+
+
+def activation_message(code: str) -> str:
+    return (
+        "谢谢关注我呀 ✨\n"
+        f"这是你的专属激活码：{code}\n"
+        "去微信小程序「壁咚视频助手」绑定一下，就能连上你的收藏夹啦～\n"
+        "之后在视频评论区 @壁咚收藏夹，我就会帮你把视频收进收藏夹哦 🌸"
+    )
 
 
 def get_cursor(db: Session, kind: str) -> RobotCursor:
@@ -56,20 +67,53 @@ def _max_cursor(items: list[dict]) -> tuple[str, int]:
 
 
 def process_follow(db: Session, client: BiliRobotClient) -> None:
-    cutoff = int(time.time()) - settings.robot_follow_window_seconds
+    cfg = config_store.schedule(db)
+    cutoff = int(time.time()) - int(cfg["follow_window"])
     for follower in client.get_followers():
         mtime = int(follower.get("mtime") or 0)
-        if mtime < cutoff:
-            continue
         mid = str(follower["mid"])
-        binding = issue_activation(db, mid, follower.get("uname") or "")
+        uname = follower.get("uname") or ""
+        if mtime < cutoff:
+            # 旧粉丝：不入开码逻辑，但记录一次关注事件以支撑「累计粉丝」统计
+            tracking.log_follow_event(
+                db, mid, uname, mtime, sent_code=False, bound=False
+            )
+            continue
+        binding = issue_activation(db, mid, uname)
+        bound = binding.bound_at is not None
+        sent_code = bound or binding.code_sent_at is not None
         if binding.bound_at is None and mtime > (binding.last_follow_mtime or 0):
-            client.send_msg(mid, f"壁咚激活码：{binding.activation_code}")
-            binding.code_sent_at = utcnow_naive()
-            binding.last_follow_mtime = mtime
-            db.commit()
+            try:
+                client.send_msg(mid, activation_message(binding.activation_code))
+            except AppError as exc:
+                tracking.log_activation(
+                    db,
+                    mid,
+                    uname,
+                    binding.activation_code,
+                    sent_ok=False,
+                    send_reason=tracking.classify_send_error(exc),
+                    bound=bound,
+                )
+            else:
+                binding.code_sent_at = utcnow_naive()
+                binding.last_follow_mtime = mtime
+                db.commit()
+                sent_code = True
+                tracking.log_activation(
+                    db,
+                    mid,
+                    uname,
+                    binding.activation_code,
+                    sent_ok=True,
+                    send_reason="",
+                    bound=bound,
+                )
             if settings.robot_send_interval_seconds > 0:
                 time.sleep(settings.robot_send_interval_seconds)
+        tracking.log_follow_event(
+            db, mid, uname, mtime, sent_code=sent_code, bound=bound
+        )
 
 
 def process_at(
@@ -84,20 +128,88 @@ def process_at(
 
     for it in _new_items(items, cursor):
         mid = str(it["mid"])
+        feed_id = str(it.get("id") or "")
+        if feed_id and _at_exists(db, feed_id):
+            continue
         binding = (
             db.query(Binding)
             .filter(Binding.bili_uid == mid, Binding.bound_at.isnot(None))
             .first()
         )
         if binding is None:
+            _record_at(db, feed_id, it, "unbound")
             continue
         user = db.get(User, binding.user_id)
         if user is None:
+            _record_at(db, feed_id, it, "error", "user_missing")
             continue
-        collect(db, user, it["bvid"], source="robot")
+        start = time.monotonic()
+        try:
+            res = collect(db, user, it["bvid"], source="robot")
+        except Exception as exc:  # noqa: BLE001
+            reason = tracking.classify_error(exc)
+            _record_at(db, feed_id, it, "parse_failed", reason)
+            tracking.log_parse(
+                db,
+                source="robot",
+                user_id=None,
+                bili_uid=mid,
+                input=it.get("bvid") or "",
+                bvid=it.get("bvid"),
+                ok=False,
+                reason=reason,
+                duration_ms=tracking.elapsed_ms(start),
+                video_title="",
+            )
+        else:
+            title = ""
+            if isinstance(res, tuple) and res:
+                title = getattr(res[0], "title", "") or ""
+            _record_at(db, feed_id, it, "collected", video_title=title)
+            tracking.log_parse(
+                db,
+                source="robot",
+                user_id=None,
+                bili_uid=mid,
+                input=it.get("bvid") or "",
+                bvid=it.get("bvid"),
+                ok=True,
+                reason="",
+                duration_ms=tracking.elapsed_ms(start),
+                video_title=title,
+            )
 
     last_id, last_time = _max_cursor(items)
     update_cursor(db, "at", last_id, last_time)
+
+
+def _at_exists(db: Session, feed_id: str) -> bool:
+    from ..models import AtEvent
+
+    return (
+        db.query(AtEvent).filter(AtEvent.feed_id == feed_id).first() is not None
+    )
+
+
+def _record_at(
+    db: Session,
+    feed_id: str,
+    item: dict,
+    result: str,
+    reason: str = "",
+    video_title: str = "",
+) -> None:
+    tracking.log_at_event(
+        db,
+        feed_id or "",
+        item.get("mid") or "",
+        item.get("uname") or "",
+        item.get("bvid") or "",
+        item.get("comment") or "",
+        result=result,
+        reason=reason,
+        video_title=video_title,
+    )
 
 
 def run_once(
@@ -109,17 +221,8 @@ def run_once(
     process_at(db, client, collect)
 
 
-def build_client() -> BiliRobotClient:
-    return BiliRobotClient(
-        cookie={
-            "SESSDATA": settings.robot_sessdata,
-            "bili_jct": settings.robot_bili_jct,
-            "DedeUserID": settings.robot_dedeuserid,
-            "buvid3": settings.robot_buvid3,
-            "buvid4": settings.robot_buvid4,
-        },
-        robot_uid=settings.robot_uid,
-    )
+def build_worker_client(db: Session) -> BiliRobotClient:
+    return build_client(config_store.robot_cookie(db))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -132,18 +235,41 @@ def main(argv: list[str] | None = None) -> None:
     if settings.dev_mode:
         Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    client = build_client()
     try:
+        last_follow = 0.0
+        last_at = 0.0
+        last_cookie = 0.0
         while True:
-            try:
-                run_once(db, client)
-            except AppError as exc:
-                print(f"本轮处理出错：{exc}")
+            now = time.time()
+            cfg = config_store.schedule(db)
+            if now - last_follow >= int(cfg["follow_poll_interval"]):
+                client = build_worker_client(db)
+                try:
+                    process_follow(db, client)
+                except AppError as exc:
+                    print(f"关注轮询出错：{exc}")
+                finally:
+                    client.close()
+                last_follow = now
+            if now - last_at >= int(cfg["at_poll_interval"]):
+                client = build_worker_client(db)
+                try:
+                    process_at(db, client)
+                except AppError as exc:
+                    print(f"@轮询出错：{exc}")
+                finally:
+                    client.close()
+                last_at = now
+            if now - last_cookie >= int(cfg["cookie_check_interval"]):
+                try:
+                    check_cookie(db)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Cookie 检测出错：{exc}")
+                last_cookie = now
             if once:
                 break
-            time.sleep(settings.robot_poll_interval_seconds)
+            time.sleep(1)
     finally:
-        client.close()
         db.close()
 
 

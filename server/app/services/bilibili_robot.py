@@ -101,9 +101,29 @@ class BiliRobotClient:
                     "mid": str(mid),
                     "uname": user.get("uname") or user.get("nickname") or "",
                     "bvid": bvid,
+                    "comment": self._extract_comment(it),
                 }
             )
         return out
+
+    def _extract_comment(self, item: dict) -> str:
+        inner = item.get("item")
+        candidates: list[str] = []
+        if isinstance(inner, dict):
+            candidates += [
+                inner.get("source_content"),
+                inner.get("content"),
+                inner.get("desc"),
+            ]
+        candidates += [
+            item.get("source_content"),
+            item.get("content"),
+            item.get("desc"),
+        ]
+        for value in candidates:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
 
     def _extract_bvid(self, item: dict) -> str:
         inner = item.get("item")

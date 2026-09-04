@@ -10,7 +10,7 @@ from .config import settings
 from .db import Base, engine
 from .errors import AppError
 from . import models  # noqa: F401  # 注册模型到 metadata
-from .routers import auth, binding, cards, media, parse, tags
+from .routers import auth, binding, cards, help, media, meta, parse, tags
 
 
 @asynccontextmanager
@@ -42,6 +42,8 @@ for router in (
     tags.router,
     media.router,
     binding.router,
+    help.router,
+    meta.router,
 ):
     app.include_router(router)
 

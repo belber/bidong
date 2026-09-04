@@ -94,7 +94,7 @@
       <view class="content muted" wx:else>无字幕</view>
     </view>
 
-    <view class="field">
+    <view class="field" wx:if="{{features.danmaku}}">
       <text class="label">弹幕</text>
       <view class="content" wx:if="{{danmakuCount}}">共 {{danmakuCount}} 条</view>
       <view class="content muted" wx:else>无弹幕</view>
@@ -103,14 +103,14 @@
       </view>
     </view>
 
-    <view class="field">
+    <view class="field" wx:if="{{features.comment}}">
       <text class="label">评论</text>
       <view class="content muted">暂不支持</view>
     </view>
   </view>
 
   <view class="bottom-bar">
-    <button class="btn-ghost" open-type="share">分享</button>
+    <button class="btn-ghost" wx:if="{{shareEnabled}}" open-type="share">分享</button>
     <button class="btn-primary" bindtap="onOpenBili">去 B站查看</button>
   </view>
 

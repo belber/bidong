@@ -4,14 +4,25 @@ Page({
   data: {
     bound: false,
     biliUid: '',
-    biliName: ''
+    biliName: '',
+    showRobotGuide: true
   },
 
   onShow() {
     if (this.getTabBar) {
       this.getTabBar().setData({ selected: 2 });
     }
+    this.loadUiConfig();
     this.refreshBinding();
+  },
+
+  loadUiConfig() {
+    api
+      .getPublicConfig()
+      .then((cfg) => {
+        this.setData({ showRobotGuide: cfg.robot_guide !== false });
+      })
+      .catch(() => {});
   },
 
   refreshBinding() {

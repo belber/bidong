@@ -1,10 +1,15 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+var/
+logs/
 .env
 .env.*
 !.env.example
-var/
-logs/
+tests/
+docs/
 *.egg-info/
+.DS_Store
+dev.sh

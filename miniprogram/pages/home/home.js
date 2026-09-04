@@ -9,7 +9,8 @@ Page({
   data: {
     input: '',
     demoPlaceholder: DEMO_PLACEHOLDER,
-    parsing: false
+    parsing: false,
+    showRobotGuide: true
   },
 
   onShow() {
@@ -19,6 +20,16 @@ Page({
     if (this.getTabBar) {
       this.getTabBar().setData({ selected: 0 });
     }
+    this.loadUiConfig();
+  },
+
+  loadUiConfig() {
+    api
+      .getPublicConfig()
+      .then((cfg) => {
+        this.setData({ showRobotGuide: cfg.robot_guide !== false });
+      })
+      .catch(() => {});
   },
 
   onPaste() {

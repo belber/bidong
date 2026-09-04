@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./var/bili.db"
 
+    parse_cache_seconds: int = 60
+
     jwt_secret: str = "dev-secret-change-me-0123456789abcdef"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 30
@@ -23,6 +25,10 @@ class Settings(BaseSettings):
     enable_watermarked_video: bool = False
     enable_clean_video: bool = False
     enable_audio: bool = False
+    enable_comment: bool = True
+    enable_danmaku: bool = True
+    enable_robot_guide: bool = True
+    enable_share: bool = True
 
     storage_backend: str = "local"
     local_storage_dir: str = "./var/covers"
@@ -58,6 +64,9 @@ class Settings(BaseSettings):
     smtp_port: int = 465
     smtp_user: str = ""
     smtp_pass: str = ""
+
+    # 帮助与反馈页展示的 QQ 群号（默认为空，可后台配置）
+    help_qq_group: str = ""
 
 
 settings = Settings()

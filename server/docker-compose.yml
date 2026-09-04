@@ -1,0 +1,76 @@
+name: bidong
+
+# 同一份 compose，用 APP_ENV_FILE 变量区分环境文件：
+#   本地测试：APP_ENV_FILE=.env.local docker compose up -d --build
+#   生产部署：APP_ENV_FILE=.env.prod  docker compose up -d --build
+# 不指定时默认读 .env。
+# 对应环境文件里要包含 POSTGRES_USER/PASSWORD/DB、DATABASE_URL（指向 db 服务）、
+# JWT_SECRET、WECHAT_*、COS_*、ROBOT_*、ADMIN_PASSWORD 等。
+#
+# 拓扑建议：
+#   宿主机 Nginx(443/备案域名) ──▶ 127.0.0.1:8000  api
+#   管理端只绑定 127.0.0.1:8081，不暴露公网
+#   worker 无端口，后台轮询 B站
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  migrate:
+    build: .
+    restart: "no"
+    env_file: ${APP_ENV_FILE:-.env}
+    volumes:
+      - ./logs:/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "mkdir -p /logs && exec alembic upgrade head 2>&1 | tee -a /logs/migrate.log"]
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    volumes:
+      - ./logs:/logs
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "mkdir -p /logs && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 2>&1 | tee -a /logs/api.log"]
+
+  admin:
+    build: .
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    volumes:
+      - ./logs:/logs
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "mkdir -p /logs && exec uvicorn app.admin_app:app --host 0.0.0.0 --port 8081 2>&1 | tee -a /logs/admin.log"]
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    volumes:
+      - ./logs:/logs
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "mkdir -p /logs && exec python -m app.robot.worker 2>&1 | tee -a /logs/worker.log"]
+
+volumes:
+  pgdata:

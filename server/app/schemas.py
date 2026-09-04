@@ -41,6 +41,11 @@ class MediaAvailability(BaseModel):
     audio: bool = False
 
 
+class ParseFeatures(BaseModel):
+    comment: bool = True
+    danmaku: bool = True
+
+
 class MediaOption(BaseModel):
     qn: int
     label: str
@@ -73,6 +78,7 @@ class ParseResult(CardOut):
     stats: VideoStats = Field(default_factory=VideoStats)
     danmaku_count: int = 0
     media: MediaAvailability = Field(default_factory=MediaAvailability)
+    features: ParseFeatures = Field(default_factory=ParseFeatures)
 
 
 class BindingRequest(BaseModel):

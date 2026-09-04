@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..db import get_db
 from ..deps import get_current_user
 from ..errors import AppError
 from ..models import User, VideoCard
 from ..schemas import MediaOption
 from ..services.bilibili import BiliClient, UA
+from ..services import config_store
 
 router = APIRouter(tags=["media"])
 
@@ -28,12 +28,13 @@ def _get_owned_card(db: Session, user: User, card_id: int) -> VideoCard:
     return card
 
 
-def _require_enabled(kind: str) -> None:
-    if kind == "watermarked" and not settings.enable_watermarked_video:
+def _require_enabled(kind: str, db: Session) -> None:
+    switches = config_store.media_switches(db)
+    if kind == "watermarked" and not switches["watermarked"]:
         raise AppError(403, "该下载未开放")
-    if kind == "clean" and not settings.enable_clean_video:
+    if kind == "clean" and not switches["clean"]:
         raise AppError(403, "该下载未开放")
-    if kind == "audio" and not settings.enable_audio:
+    if kind == "audio" and not switches["audio"]:
         raise AppError(403, "该下载未开放")
 
 
@@ -54,7 +55,7 @@ def media_options(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_enabled(kind)
+    _require_enabled(kind, db)
     card = _get_owned_card(db, user, card_id)
     client = BiliClient()
     try:
@@ -78,7 +79,7 @@ def download(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_enabled(kind)
+    _require_enabled(kind, db)
     card = _get_owned_card(db, user, card_id)
     client = BiliClient()
     try:
@@ -166,6 +167,8 @@ def danmaku(
     db: Session = Depends(get_db),
 ):
     card = _get_owned_card(db, user, card_id)
+    if not config_store.parse_switches(db)["danmaku"]:
+        raise AppError(403, "弹幕解析未开放")
     client = BiliClient()
     try:
         raw = client.get_danmaku(card.cid)
@@ -202,7 +205,9 @@ def export(
             filename = f"{card.bvid}.srt"
             media_type = "text/plain; charset=utf-8"
         else:
-            danmaku_text = _format_danmaku(client.get_danmaku(card.cid))
+            danmaku_text = ""
+            if config_store.parse_switches(db)["danmaku"]:
+                danmaku_text = _format_danmaku(client.get_danmaku(card.cid))
             content = _to_txt(card, subs, danmaku_text)
             filename = f"{card.bvid}.txt"
             media_type = "text/plain; charset=utf-8"

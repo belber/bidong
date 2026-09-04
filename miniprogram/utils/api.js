@@ -92,6 +92,26 @@ function fileDownload(path) {
   }));
 }
 
+function publicRequest(method, path, data) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: baseUrl() + path,
+      method,
+      data,
+      success(r) {
+        if (r.statusCode === 200 && r.data) {
+          resolve(r.data);
+        } else {
+          reject(new Error((r.data && r.data.message) || ('请求失败 ' + r.statusCode)));
+        }
+      },
+      fail(err) {
+        reject(new Error(err.errMsg || '网络请求失败'));
+      }
+    });
+  });
+}
+
 module.exports = {
   parse(url) {
     return request('POST', '/api/parse', { url });
@@ -119,6 +139,12 @@ module.exports = {
   },
   getBinding() {
     return request('GET', '/api/binding');
+  },
+  getHelpConfig() {
+    return publicRequest('GET', '/api/help/config');
+  },
+  getPublicConfig() {
+    return publicRequest('GET', '/api/config/public');
   },
   unbind() {
     return request('DELETE', '/api/binding');

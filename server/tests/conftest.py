@@ -11,6 +11,15 @@ from app.db import Base, get_db
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def _clear_parse_cache():
+    from app.services.parse_cache import parse_cache
+
+    parse_cache.clear()
+    yield
+    parse_cache.clear()
+
+
 @pytest.fixture()
 def db_engine():
     engine = create_engine(

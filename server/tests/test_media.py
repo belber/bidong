@@ -109,6 +109,26 @@ def test_danmaku_and_export(client, auth_headers):
     assert "第一句" in txt.text
     assert "01:05 哈哈" in txt.text
 
+
+@respx.mock
+def test_danmaku_disabled_by_switch(client, auth_headers, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "enable_danmaku", False)
+    card = _make_card(client, auth_headers)
+
+    resp = client.get(f"/api/cards/{card['id']}/danmaku", headers=auth_headers)
+    assert resp.status_code == 403
+
+    txt = client.get(
+        f"/api/cards/{card['id']}/export",
+        params={"kind": "txt"},
+        headers=auth_headers,
+    )
+    assert txt.status_code == 200
+    assert "测试标题" in txt.text
+    assert "弹幕" not in txt.text
+
     srt = client.get(
         f"/api/cards/{card['id']}/export",
         params={"kind": "srt"},

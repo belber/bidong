@@ -1,0 +1,10 @@
+# 复制到服务器：sudo cp logrotate.bidong.example /etc/logrotate.d/bidong
+# 再把下面的目录改成你 REMOTE_DIR/logs 的实际路径
+/opt/bidong/server/logs/*.log {
+    daily
+    rotate 30
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

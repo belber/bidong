@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>壁咚收藏 后台管理</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root { --bg:#f5f7fb; --panel:#fff; --line:#e5e9f0; --text:#1f2733; --muted:#7a869a;
+          --main:#2563eb; --danger:#dc2626; --ok:#16a34a; --warn:#d97706; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:var(--text); background:var(--bg); }
+  .hidden { display:none !important; }
+  #login { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:var(--bg); }
+  .login-card { width:320px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; box-shadow:0 8px 30px rgba(0,0,0,.08); }
+  .login-card h2 { margin:0 0 4px; font-size:20px; }
+  .login-card p { color:var(--muted); margin:0 0 18px; font-size:13px; }
+  input, select, textarea { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; width:100%; background:#fff; }
+  button { font:inherit; padding:8px 14px; border:1px solid transparent; border-radius:8px; cursor:pointer; background:var(--main); color:#fff; }
+  button.ghost { background:#fff; color:var(--main); border-color:var(--main); }
+  button.danger { background:var(--danger); }
+  button.small { padding:4px 10px; font-size:13px; }
+  #app { display:flex; min-height:100vh; }
+  aside { width:200px; background:#111827; color:#cbd5e1; padding:16px 0; flex:0 0 200px; }
+  aside .brand { padding:0 18px 16px; color:#fff; font-weight:600; font-size:16px; }
+  aside nav a { display:block; padding:10px 18px; color:#cbd5e1; text-decoration:none; }
+  aside nav a.active { background:#2563eb; color:#fff; }
+  aside nav .group { padding:12px 18px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#64748b; }
+  main { flex:1; padding:20px 24px; overflow:auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card .label { color:var(--muted); font-size:12px; }
+  .card .value { font-size:26px; font-weight:700; margin-top:2px; }
+  .card .sub { color:var(--muted); font-size:12px; margin-top:2px; }
+  .card .sub.ok { color:var(--ok); } .card .sub.bad { color:var(--danger); }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .panel h3 { margin:0 0 12px; font-size:15px; }
+  .chart { width:100%; height:280px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; }
+  .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .toolbar input, .toolbar select { width:auto; min-width:120px; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; }
+  .tag.ok { background:#dcfce7; color:#166534; } .tag.bad { background:#fee2e2; color:#991b1b; } .tag.muted { background:#f1f5f9; color:#475569; }
+  .alert { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:10px 14px; border-radius:8px; margin-bottom:16px; }
+  .alert.ok { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+  .muted { color:var(--muted); }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  .field-group { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:14px; }
+  .group-label { font-size:12px; font-weight:600; color:#475569; margin-bottom:10px; letter-spacing:.02em; }
+  .flex { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .switch { display:inline-flex; align-items:center; gap:8px; padding:8px 0; cursor:pointer; }
+  .switch input { width:auto; }
+  .pill { background:#f1f5f9; color:#475569; padding:6px 14px; border-radius:8px; border:1px solid var(--line); cursor:pointer; }
+  .pill.active { background:var(--main); color:#fff; border-color:var(--main); }
+  .pager { display:flex; gap:8px; align-items:center; margin-top:12px; }
+  #modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999; }
+  #modal .modal-mask { position:absolute; inset:0; background:rgba(15,23,42,.4); }
+  #modal .modal-box { position:relative; width:320px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  #modal .modal-box h4 { margin:0 0 10px; font-size:16px; }
+  #modal .modal-box p { margin:0 0 16px; color:var(--muted); word-break:break-all; }
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-card">
+    <h2>壁咚收藏 后台</h2>
+    <p>请输入后台管理密码</p>
+    <input id="pass" type="password" placeholder="密码" autocomplete="current-password" />
+    <p id="login-err" class="muted"></p>
+    <button style="width:100%" onclick="doLogin()">登录</button>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside>
+    <div class="brand">壁咚收藏 后台</div>
+    <nav>
+      <div class="group">数据监控</div>
+      <a data-view="overview" class="active" href="javascript:void(0)">概览</a>
+      <a data-view="follow" href="javascript:void(0)">关注监控</a>
+      <a data-view="parse" href="javascript:void(0)">解析监控</a>
+      <div class="group">运维配置</div>
+      <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
+      <a data-view="features" href="javascript:void(0)">功能开关</a>
+      <a data-view="schedule" href="javascript:void(0)">定时任务</a>
+      <a data-view="alert" href="javascript:void(0)">告警邮件</a>
+      <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
+      <div class="group"></div>
+      <a href="javascript:void(0)" onclick="logout()">退出登录</a>
+    </nav>
+  </aside>
+  <main id="main">
+    <section id="view-overview" class="view"></section>
+    <section id="view-follow" class="view hidden"></section>
+    <section id="view-parse" class="view hidden"></section>
+    <section id="view-cookie" class="view hidden"></section>
+    <section id="view-features" class="view hidden"></section>
+    <section id="view-schedule" class="view hidden"></section>
+    <section id="view-alert" class="view hidden"></section>
+    <section id="view-help" class="view hidden"></section>
+  </main>
+</div>
+
+<div id="modal" class="hidden">
+  <div class="modal-mask" onclick="hideModal()"></div>
+  <div class="modal-box">
+    <h4 id="modal-title">提示</h4>
+    <p id="modal-body"></p>
+    <button onclick="hideModal()">确定</button>
+  </div>
+</div>
+
+<script>
+const API = "/api/admin";
+let token = localStorage.getItem("admin_token") || "";
+let currentView = "overview";
+const charts = {};
+const S = {
+  follow: { days: 30, q: "" },
+  parse: { source: "local", days: 30, q: "" }
+};
+
+function api(path, opts = {}) {
+  opts.headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+  if (token) opts.headers["Authorization"] = "Bearer " + token;
+  return fetch(API + path, opts).then(async r => {
+    if (r.status === 401) { logout(); throw new Error("登录已过期"); }
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || data.message || ("请求失败 " + r.status));
+    return data;
+  });
+}
+function qs(obj) { return "?" + Object.entries(obj).filter(([,v]) => v !== "" && v != null).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join("&"); }
+function fmt(n) { return (n ?? 0).toLocaleString(); }
+function esc(s) { return (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function showModal(title, body, isError) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-title").style.color = isError ? "var(--danger)" : "var(--text)";
+  document.getElementById("modal-body").textContent = body;
+  document.getElementById("modal").classList.remove("hidden");
+}
+function hideModal() {
+  document.getElementById("modal").classList.add("hidden");
+}
+
+function init() {
+  document.querySelectorAll("aside nav a[data-view]").forEach(a => a.onclick = () => show(a.dataset.view));
+  document.getElementById("pass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  if (token) { boot(); } else { document.getElementById("login").classList.remove("hidden"); }
+}
+async function doLogin() {
+  const pass = document.getElementById("pass").value;
+  try {
+    const data = await api("/login", { method: "POST", body: JSON.stringify({ password: pass }) });
+    token = data.token; localStorage.setItem("admin_token", token);
+    boot();
+  } catch (e) { document.getElementById("login-err").textContent = e.message; }
+}
+function logout() { token = ""; localStorage.removeItem("admin_token"); location.reload(); }
+function boot() {
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  show("overview");
+}
+function show(view) {
+  currentView = view;
+  document.querySelectorAll("aside nav a[data-view]").forEach(a => a.classList.toggle("active", a.dataset.view === view));
+  document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
+  const el = document.getElementById("view-" + view);
+  el.classList.remove("hidden");
+  renderers[view] && renderers[view](el);
+}
+function drawChart(id, render) {
+  if (typeof echarts === "undefined") return;
+  if (charts[id]) charts[id].dispose();
+  const el = document.getElementById(id);
+  const chart = echarts.init(el);
+  render(chart);
+  charts[id] = chart;
+  window.addEventListener("resize", () => chart.resize());
+}
+
+const renderers = {
+  async overview(el) {
+    el.innerHTML = "加载中…";
+    const d = await api("/stats/overview?days=30").catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return null; });
+    if (!d) return;
+    const cookie = d.cookie || {};
+    const alertHtml = cookie.cookie_valid === false
+      ? `<div class="alert">⚠ 机器人 Cookie 已失效（${esc(cookie.cookie_last_error || "")}）</div>`
+      : `<div class="alert ok">◎ Cookie 正常（最近检查 ${esc(cookie.cookie_last_checked || "—")}）</div>`;
+    el.innerHTML = `
+      ${alertHtml}
+      <div class="cards">
+        <div class="card"><div class="label">粉丝总数</div><div class="value">${fmt(d.followers.total)}</div><div class="sub ok">今日 +${fmt(d.followers.today)}</div></div>
+        <div class="card"><div class="label">评论@总数</div><div class="value">${fmt(d.at.total)}</div><div class="sub ok">今日 +${fmt(d.at.today)}</div></div>
+        <div class="card"><div class="label">已绑定</div><div class="value">${fmt(d.activation.bound)}</div><div class="sub">发码成功 ${fmt(d.activation.sent_ok)}</div></div>
+        <div class="card"><div class="label">贴链接解析</div><div class="value">${fmt(d.local_parse.ok)}</div><div class="sub">成功 / 失败 ${fmt(d.local_parse.fail)}</div></div>
+        <div class="card"><div class="label">@触发解析</div><div class="value">${fmt(d.robot_parse.ok)}</div><div class="sub">成功 / 失败 ${fmt(d.robot_parse.fail)}</div></div>
+      </div>
+      <div class="panel"><h3>近 30 天趋势（粉丝新增 / 评论@触发）</h3><div id="chart-overview" class="chart"></div></div>`;
+    drawChart("chart-overview", chart => chart.setOption({
+      tooltip: { trigger: "axis" }, legend: { data: ["粉丝新增", "评论@触发"] },
+      grid: { left: 40, right: 20, top: 30, bottom: 30 },
+      xAxis: { type: "category", data: d.followers.trend.map(x => x.date.slice(5)) },
+      yAxis: { type: "value", minInterval: 1 },
+      series: [
+        { name: "粉丝新增", type: "line", smooth: true, data: d.followers.trend.map(x => x.count) },
+        { name: "评论@触发", type: "line", smooth: true, data: d.at.trend.map(x => x.count) }
+      ]
+    }));
+  },
+
+  async follow(el) {
+    const { days, q } = S.follow;
+    const s = await api("/stats/follow-monitor?days=" + days);
+    const det = await api("/stats/follow-monitor/detail" + qs({ q, days, page: 1, size: 20 }));
+    el.innerHTML = `
+      <div class="cards">
+        <div class="card"><div class="label">关注总数</div><div class="value">${fmt(s.total)}</div><div class="sub ok">今日 +${fmt(s.today)}</div></div>
+        <div class="card"><div class="label">已发码</div><div class="value ok">${fmt(s.sent_ok)}</div></div>
+        <div class="card"><div class="label">发码失败</div><div class="value bad">${fmt(s.sent_fail)}</div></div>
+        <div class="card"><div class="label">已绑定</div><div class="value">${fmt(s.bound)}</div></div>
+      </div>
+      <div class="panel"><h3>新增关注趋势</h3><div id="chart-follow" class="chart"></div></div>
+      <div class="panel">
+        <h3>明细</h3>
+        <div class="toolbar">
+          <input placeholder="搜索昵称 / UID" value="${esc(q)}" onchange="S.follow.q=this.value; show('follow')"/>
+          <select onchange="S.follow.days=parseInt(this.value); show('follow')">${[7,30,90].map(d=>`<option value="${d}" ${d===days?"selected":""}>近${d}天</option>`).join("")}</select>
+        </div>
+        <div class="toolbar">
+          <button onclick="batchResend()">重新发送选中</button>
+          <button class="ghost" onclick="retryFailed()">重发全部失败</button>
+          <span id="follow-msg" class="muted"></span>
+        </div>
+        <table>
+          <thead><tr><th></th><th>粉丝</th><th>关注时间</th><th>激活码</th><th>发送</th><th>失败原因</th><th>绑定</th><th>绑定时间</th><th>操作</th></tr></thead>
+          <tbody>${det.items.map(followRow).join("")}</tbody>
+        </table>
+        <p class="muted">共 ${fmt(det.total)} 条</p>
+      </div>
+      <div class="panel">
+        <h3>单独发送</h3>
+        <div class="toolbar">
+          <input id="single-uid" placeholder="输入 B站 UID" style="min-width:180px"/>
+          <button onclick="singleSend()">发送激活码</button>
+        </div>
+        <p class="muted">用于临时给指定 B站账号发码（已有码且未绑定的会重发同一个码）。</p>
+      </div>`;
+    drawChart("chart-follow", chart => chart.setOption({
+      tooltip: { trigger: "axis" }, grid: { left: 40, right: 20, top: 20, bottom: 30 },
+      xAxis: { type: "category", data: s.trend.map(x => x.date.slice(5)) },
+      yAxis: { type: "value", minInterval: 1 },
+      series: [{ type: "line", smooth: true, areaStyle: {}, data: s.trend.map(x => x.count) }]
+    }));
+  },
+
+  async parse(el) {
+    const { source, days, q } = S.parse;
+    const rangeOpts = [7,30,90].map(d => `<option value="${d}" ${d===days?"selected":""}>近${d}天</option>`).join("");
+    const tabs = `
+      <div class="toolbar">
+        <button class="pill ${source==='local'?'active':''}" onclick="S.parse.source='local'; S.parse.q=''; show('parse')">贴链接解析</button>
+        <button class="pill ${source==='robot'?'active':''}" onclick="S.parse.source='robot'; S.parse.q=''; show('parse')">@评论触发</button>
+        <input placeholder="搜索" value="${esc(q)}" onchange="S.parse.q=this.value; show('parse')" style="min-width:180px"/>
+        <select onchange="S.parse.days=parseInt(this.value); show('parse')">${rangeOpts}</select>
+      </div>`;
+    const range = qs({ q, days, page: 1, size: 20 });
+    const rangeSuffix = range ? "&" + range.slice(1) : "";
+
+    if (source === 'robot') {
+      const s = await api("/stats/at?days=" + days);
+      const det = await api("/stats/at/detail" + range);
+      const reasonRows = (s.fail_by_reason || []).map(r => `<tr><td>${esc(r.reason)}</td><td>${fmt(r.count)}</td></tr>`).join("");
+      el.innerHTML = `
+        ${tabs}
+        <div class="cards">
+          <div class="card"><div class="label">累计评论@</div><div class="value">${fmt(s.total)}</div></div>
+          <div class="card"><div class="label">今日</div><div class="value">${fmt(s.today)}</div></div>
+          <div class="card"><div class="label">解析成功</div><div class="value ok">${fmt(s.collected)}</div></div>
+          <div class="card"><div class="label">解析失败</div><div class="value bad">${fmt(s.failed)}</div></div>
+        </div>
+        <div class="panel"><h3>@评论触发趋势</h3><div id="chart-at" class="chart"></div></div>
+        <div class="panel"><h3>失败原因分布</h3><table><thead><tr><th>失败原因</th><th>数量</th></tr></thead><tbody>${reasonRows || '<tr><td colspan=2 class="muted">暂无失败</td></tr>'}</tbody></table></div>
+        <div class="panel">
+          <h3>明细</h3>
+          <table><thead><tr><th>时间</th><th>评论正文</th><th>发起者</th><th>视频</th><th>结果</th><th>失败原因</th></tr></thead>
+          <tbody>${det.items.map(atRow).join("")}</tbody></table>
+          <p class="muted">共 ${fmt(det.total)} 条</p>
+        </div>`;
+      drawChart("chart-at", chart => chart.setOption({
+        tooltip: { trigger: "axis" }, grid: { left: 40, right: 20, top: 20, bottom: 30 },
+        xAxis: { type: "category", data: s.trend.map(x => x.date.slice(5)) },
+        yAxis: { type: "value", minInterval: 1 },
+        series: [{ type: "bar", data: s.trend.map(x => x.count) }]
+      }));
+      return;
+    }
+
+    const s = await api("/stats/parse?source=local&days=" + days);
+    const det = await api("/stats/parse/detail?source=local" + rangeSuffix);
+    const reasonRows = s.fail_by_reason.map(r => `<tr><td>${esc(r.reason)}</td><td>${fmt(r.count)}</td></tr>`).join("");
+    el.innerHTML = `
+      ${tabs}
+      <div class="cards">
+        <div class="card"><div class="label">总数</div><div class="value">${fmt(s.total)}</div></div>
+        <div class="card"><div class="label">成功</div><div class="value ok">${fmt(s.ok)}</div></div>
+        <div class="card"><div class="label">失败</div><div class="value bad">${fmt(s.fail)}</div></div>
+      </div>
+      <div class="panel"><h3>失败原因分布</h3><table><thead><tr><th>失败原因</th><th>数量</th></tr></thead><tbody>${reasonRows || '<tr><td colspan=2 class="muted">暂无失败</td></tr>'}</tbody></table></div>
+      <div class="panel">
+        <h3>明细</h3>
+        <table><thead><tr><th>时间</th><th>发起者</th><th>完整链接</th><th>视频名称</th><th>BVID</th><th>结果</th><th>失败原因</th></tr></thead>
+        <tbody>${det.items.map(localRow).join("")}</tbody></table>
+        <p class="muted">共 ${fmt(det.total)} 条</p>
+      </div>`;
+  },
+
+  async cookie(el) {
+    const load = async () => {
+      const s = await api("/cookie/status");
+      const badge = s.cookie_valid === false ? '<span class="tag bad">失效</span>' : '<span class="tag ok">正常</span>';
+      el.innerHTML = `
+        <div class="panel">
+          <h3>机器人账号 ${badge}</h3>
+          <p>UID：${esc(s.robot_uid || "—")} ｜ 已配置 Cookie：${s.has_cookie ? "是" : "否"}</p>
+          <p class="muted">最近检查：${esc(s.cookie_last_checked || "—")} ｜ ${esc(s.cookie_last_error || "")}</p>
+          <div class="flex"><button onclick="checkCookie()">立即检测</button><span id="cookie-msg" class="muted"></span></div>
+        </div>
+        <div class="panel">
+          <h3>更新 Cookie</h3>
+          <p class="muted">粘贴整段 Cookie（cookie 字段键值用分号分隔，如 SESSDATA=xxx; bili_jct=xxx; DedeUserID=xxx; buvid3=xxx; buvid4=xxx）。</p>
+          <textarea id="cookie-text" rows="4" style="width:100%"></textarea>
+          <div class="flex" style="margin-top:10px"><button onclick="updateCookie()">保存并检测</button></div>
+        </div>`;
+    };
+    await load();
+  },
+
+  async features(el) {
+    const [f, p, u] = await Promise.all([
+      api("/config/features"),
+      api("/config/parse-features"),
+      api("/config/ui"),
+    ]);
+    const mk = (key, label, desc, val) => `
+      <label class="switch"><input type="checkbox" id="feat-${key}" ${val ? "checked" : ""}/> <span><b>${label}</b><br/><span class="muted">${desc}</span></span></label><br/>`;
+    el.innerHTML = `
+      <div class="panel">
+        <h3>下载能力开关</h3>
+        ${mk("watermarked", "有水印视频", "允许用户下载带水印版本", f.watermarked)}
+        ${mk("clean", "无水印视频", "允许用户下载无水印版本（风险高）", f.clean)}
+        ${mk("audio", "纯音频", "允许用户下载音频 MP3", f.audio)}
+      </div>
+      <div class="panel">
+        <h3>解析能力开关</h3>
+        ${mk("comment", "评论解析", "允许解析视频评论（评论读取暂未开放，开关预留）", p.comment)}
+        ${mk("danmaku", "弹幕解析", "允许解析视频弹幕", p.danmaku)}
+      </div>
+      <div class="panel">
+        <h3>展示开关</h3>
+        ${mk("robot_guide", "@壁咚收藏夹 引导", "首页是否展示「方式 2 · @壁咚收藏夹」引导（审核期可关闭）", u.robot_guide)}
+        ${mk("share", "结果页分享按钮", "视频解析结果页是否展示「分享」按钮", u.share)}
+        <button style="margin-top:12px" onclick="saveFeatures()">保存</button>
+      </div>`;
+  },
+
+  async schedule(el) {
+    const s = await api("/config/schedule");
+    const field = (k, label, desc) => `<div style="margin-bottom:12px"><label class="muted">${label}</label><input id="sched-${k}" type="number" value="${s[k]}" style="margin-top:4px"/><div class="hint">${desc}</div></div>`;
+    el.innerHTML = `
+      <div class="panel">
+        <h3>定时任务</h3>
+        <p class="muted" style="margin:0 0 12px">这些是<b>同一个后台 worker</b> 的轮询频率 / 限速 / 发码资格，不是多个定时任务。保存后即时生效（无需重启）。</p>
+        <div class="field-group"><div class="group-label">发现频率（多久查一次 B站）</div>
+          ${field("at_poll_interval", "评论@轮询间隔（秒）", "多久查一次「评论区 @我」的提醒，用来自动收藏。调小更及时，但请求 B站更频繁。")}
+          ${field("follow_poll_interval", "关注轮询间隔（秒）", "多久查一次「新粉丝」列表，用来给新关注发激活码。")}
+        </div>
+        <div class="field-group"><div class="group-label">防风控限速</div>
+          ${field("send_interval", "私信发送间隔（秒）", "连续给用户私信激活码之间的停顿，防 B站风控。调大更安全，但多人同时关注时发得慢。")}
+        </div>
+        <div class="field-group"><div class="group-label">发码资格</div>
+          ${field("follow_window", "关注发码窗口（秒）", "只给最近 N 秒内才关注的粉丝发码，跳过存量老粉丝（避免批量刷码/风控）。")}
+        </div>
+        <div class="field-group"><div class="group-label">健康检查</div>
+          ${field("cookie_check_interval", "Cookie 检测间隔（秒）", "多久探测一次机器人登录态，失效才发告警邮件。")}
+        </div>
+        <button style="margin-top:12px" onclick="saveSchedule()">保存</button> <span id="sched-msg" class="muted"></span>
+      </div>`;
+  },
+
+  async alert(el) {
+    const a = await api("/config/alert");
+    el.innerHTML = `
+      <div class="panel">
+        <h3>Cookie 失效告警</h3>
+        <label class="switch"><input type="checkbox" id="alert-on" ${a.alert_enabled ? "checked" : ""}/> 启用告警邮件</label>
+        <div style="margin:8px 0"><label class="muted">收件邮箱</label><input id="alert-email" value="${esc(a.alert_email)}" style="margin-top:4px"/></div>
+        <div><label class="muted">SMTP 主机</label><input id="alert-host" value="${esc(a.smtp_host)}" style="margin-top:4px"/></div>
+        <div><label class="muted">SMTP 端口</label><input id="alert-port" type="number" value="${a.smtp_port}" style="margin-top:4px"/></div>
+        <div><label class="muted">SMTP 用户</label><input id="alert-user" value="${esc(a.smtp_user)}" style="margin-top:4px"/></div>
+        <div><label class="muted">SMTP 密码</label><input id="alert-pass" value="${esc(a.smtp_pass)}" style="margin-top:4px"/></div>
+        <div class="flex" style="margin-top:12px">
+          <button onclick="saveAlert()">保存</button>
+          <button class="ghost" onclick="testAlert()">发送测试邮件</button>
+          <span id="alert-msg" class="muted"></span>
+        </div>
+      </div>`;
+  },
+
+  async help(el) {
+    const h = await api("/config/help");
+    el.innerHTML = `
+      <div class="panel">
+        <h3>帮助与反馈页（QQ 群号）</h3>
+        <p class="muted">小程序「帮助与反馈」页面展示的 QQ 群号，留空则不展示该模块。</p>
+        <div style="margin:10px 0"><label class="muted">QQ 群号</label>
+          <input id="help-qq" value="${esc(h.qq_group)}" style="margin-top:4px" placeholder="例如 123456789"/>
+        </div>
+        <button style="margin-top:8px" onclick="saveHelp()">保存</button> <span id="help-msg" class="muted"></span>
+      </div>`;
+  }
+};
+
+function resultTag(r) {
+  if (r === "collected") return '<span class="tag ok">已收藏</span>';
+  if (r === "parse_failed") return '<span class="tag bad">解析失败</span>';
+  if (r === "unbound") return '<span class="tag muted">未绑定</span>';
+  if (r === "error") return '<span class="tag bad">异常</span>';
+  return esc(r);
+}
+
+function atRow(i) {
+  const origin = esc(i.bili_name || "") +
+    (i.bili_name && i.bili_uid ? "（" + esc(i.bili_uid) + "）" : (i.bili_uid ? esc(i.bili_uid) : ""));
+  const video = esc(i.video_title || "—") + "<br/><span class='muted'>" + esc(i.bvid || "") + "</span>";
+  return `<tr><td>${esc(i.created_at)}</td><td>${esc(i.comment)}</td><td>${origin}</td><td>${video}</td><td>${resultTag(i.result)}</td><td>${esc(i.reason || "—")}</td></tr>`;
+}
+
+function localRow(i) {
+  const result = i.ok ? '<span class="tag ok">成功</span>' : '<span class="tag bad">失败</span>';
+  const reason = i.ok ? "—" : (i.reason || "—");
+  return `<tr><td>${esc(i.created_at)}</td><td>${esc(i.origin || "—")}</td><td>${esc(i.input) || "—"}</td><td>${esc(i.video_title || "—")}</td><td>${esc(i.bvid || "—")}</td><td>${result}</td><td>${esc(reason)}</td></tr>`;
+}
+
+function followMsg(t) {
+  const el = document.getElementById("follow-msg");
+  if (el) el.textContent = t;
+}
+function followRow(i) {
+  const origin = esc(i.bili_name || "") +
+    (i.bili_name && i.bili_uid ? "（" + esc(i.bili_uid) + "）" : (i.bili_uid ? esc(i.bili_uid) : ""));
+  const send = i.sent_ok ? '<span class="tag ok">已发送</span>' : '<span class="tag bad">失败</span>';
+  const bound = i.bound ? '<span class="tag ok">已绑定</span>' : '<span class="tag muted">未绑定</span>';
+  return `<tr>
+    <td><input type="checkbox" class="follow-check" data-uid="${esc(i.bili_uid)}"/></td>
+    <td>${origin}</td>
+    <td>${esc(i.follow_time || "—")}</td>
+    <td>${esc(i.code || "—")}</td>
+    <td>${send}</td>
+    <td>${esc(i.send_reason || "—")}</td>
+    <td>${bound}</td>
+    <td>${esc(i.bound_at || "—")}</td>
+    <td><button class="small" onclick="resendUid('${esc(i.bili_uid)}')">重新发送</button></td>
+  </tr>`;
+}
+async function resendUid(uid) {
+  try {
+    const r = await api("/activation/resend", { method: "POST", body: JSON.stringify({ uids: [uid] }) });
+    followMsg(`重发成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+    show(currentView);
+  } catch (e) { followMsg(e.message); }
+}
+async function batchResend() {
+  const uids = [...document.querySelectorAll(".follow-check:checked")].map(cb => cb.dataset.uid);
+  if (!uids.length) { followMsg("请先勾选要重发的记录"); return; }
+  try {
+    const r = await api("/activation/resend", { method: "POST", body: JSON.stringify({ uids }) });
+    followMsg(`重发成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+    show(currentView);
+  } catch (e) { followMsg(e.message); }
+}
+async function retryFailed() {
+  try {
+    const r = await api("/activation/retry-failed", { method: "POST" });
+    followMsg(`重发成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+    show(currentView);
+  } catch (e) { followMsg(e.message); }
+}
+async function singleSend() {
+  const uid = (document.getElementById("single-uid").value || "").trim();
+  if (!uid) { followMsg("请输入 B站 UID"); return; }
+  try {
+    const r = await api("/activation/resend", { method: "POST", body: JSON.stringify({ uids: [uid] }) });
+    followMsg(`发送成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+  } catch (e) { followMsg(e.message); }
+}
+async function checkCookie() {
+  try {
+    const r = await api("/cookie/check", { method: "POST" });
+    document.getElementById("cookie-msg").textContent = r.cookie_valid ? "Cookie 正常" : ("Cookie 失效：" + r.cookie_last_error);
+  } catch (e) { document.getElementById("cookie-msg").textContent = e.message; }
+}
+async function updateCookie() {
+  const text = document.getElementById("cookie-text").value;
+  try {
+    await api("/cookie/update", { method: "POST", body: JSON.stringify({ cookie_text: text }) });
+    show("cookie");
+  } catch (e) { document.getElementById("cookie-msg").textContent = e.message; }
+}
+async function saveFeatures() {
+  const mediaBody = {
+    watermarked: document.getElementById("feat-watermarked").checked,
+    clean: document.getElementById("feat-clean").checked,
+    audio: document.getElementById("feat-audio").checked
+  };
+  const parseBody = {
+    comment: document.getElementById("feat-comment").checked,
+    danmaku: document.getElementById("feat-danmaku").checked
+  };
+  const uiBody = {
+    robot_guide: document.getElementById("feat-robot_guide").checked,
+    share: document.getElementById("feat-share").checked
+  };
+  try {
+    await api("/config/features", { method: "PUT", body: JSON.stringify(mediaBody) });
+    await api("/config/parse-features", { method: "PUT", body: JSON.stringify(parseBody) });
+    await api("/config/ui", { method: "PUT", body: JSON.stringify(uiBody) });
+    const [f, p, u] = await Promise.all([
+      api("/config/features"),
+      api("/config/parse-features"),
+      api("/config/ui"),
+    ]);
+    document.getElementById("feat-watermarked").checked = !!f.watermarked;
+    document.getElementById("feat-clean").checked = !!f.clean;
+    document.getElementById("feat-audio").checked = !!f.audio;
+    document.getElementById("feat-comment").checked = !!p.comment;
+    document.getElementById("feat-danmaku").checked = !!p.danmaku;
+    document.getElementById("feat-robot_guide").checked = !!u.robot_guide;
+    document.getElementById("feat-share").checked = !!u.share;
+    showModal("保存成功", "功能开关已保存并生效。", false);
+  } catch (e) { showModal("保存失败", e.message, true); }
+}
+async function saveSchedule() {
+  const pick = k => parseInt(document.getElementById("sched-" + k).value || "0", 10);
+  const body = {
+    at_poll_interval: pick("at_poll_interval"),
+    follow_poll_interval: pick("follow_poll_interval"),
+    send_interval: pick("send_interval"),
+    follow_window: pick("follow_window"),
+    cookie_check_interval: pick("cookie_check_interval")
+  };
+  try {
+    await api("/config/schedule", { method: "PUT", body: JSON.stringify(body) });
+    const s = await api("/config/schedule");
+    Object.keys(s).forEach(k => {
+      const el = document.getElementById("sched-" + k);
+      if (el) el.value = s[k];
+    });
+    document.getElementById("sched-msg").textContent = "已保存（以服务端为准）";
+  } catch (e) { document.getElementById("sched-msg").textContent = e.message; }
+}
+async function saveAlert() {
+  const body = {
+    alert_enabled: document.getElementById("alert-on").checked,
+    alert_email: document.getElementById("alert-email").value,
+    smtp_host: document.getElementById("alert-host").value,
+    smtp_port: parseInt(document.getElementById("alert-port").value || "465", 10),
+    smtp_user: document.getElementById("alert-user").value,
+    smtp_pass: document.getElementById("alert-pass").value
+  };
+  try { await api("/config/alert", { method: "PUT", body: JSON.stringify(body) }); document.getElementById("alert-msg").textContent = "已保存"; }
+  catch (e) { document.getElementById("alert-msg").textContent = e.message; }
+}
+async function saveHelp() {
+  const input = document.getElementById("help-qq");
+  if (!input) return;
+  const qq = input.value.trim();
+  try {
+    await api("/config/help", { method: "PUT", body: JSON.stringify({ qq_group: qq }) });
+    const h = await api("/config/help");
+    input.value = (h && h.qq_group) || "";
+    document.getElementById("help-msg").textContent = "已保存（以服务端为准）";
+  } catch (e) { document.getElementById("help-msg").textContent = e.message; }
+}
+async function testAlert() {
+  try { await api("/config/alert/test", { method: "POST" }); document.getElementById("alert-msg").textContent = "测试邮件已发送"; }
+  catch (e) { document.getElementById("alert-msg").textContent = e.message; }
+}
+
+init();
+</script>
+</body>
+</html>

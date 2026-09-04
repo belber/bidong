@@ -1,7 +1,7 @@
 <custom-navbar />
 
 <view class="page">
-  <view class="bind card">
+  <view class="bind card" wx:if="{{showRobotGuide}}">
     <view class="bind-head">
       <text class="bind-t">@壁咚收藏夹 绑定</text>
       <view class="head-right">

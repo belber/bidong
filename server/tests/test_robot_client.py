@@ -65,6 +65,7 @@ def test_get_at_notifications_extracts_bvid():
             "mid": "222",
             "uname": "用户B",
             "bvid": "BV1xx411c7mD",
+            "comment": "@壁咚收藏夹",
         }
     ]
 

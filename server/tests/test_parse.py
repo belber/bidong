@@ -2,6 +2,7 @@ import respx
 from sqlalchemy.orm import sessionmaker
 
 from app.models import VideoCard
+from app.services.parse_cache import parse_cache
 from helpers import BVID, mock_bili
 
 
@@ -59,5 +60,23 @@ def test_parse_backfills_partition_on_existing_card(client, db_engine, auth_head
     db.commit()
     db.close()
 
+    # 清缓存，确保第二次真的重新解析、走到分区回填逻辑
+    parse_cache.clear()
     again = client.post("/api/parse", json={"url": BVID}, headers=auth_headers).json()
     assert again["partition"] == "知识"
+
+
+@respx.mock
+def test_parse_returns_feature_switches(client, auth_headers, monkeypatch):
+    from app.config import settings
+    from app.services.parse_cache import parse_cache
+
+    mock_bili()
+    first = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert first.status_code == 200
+    assert first.json()["features"] == {"comment": True, "danmaku": True}
+
+    monkeypatch.setattr(settings, "enable_danmaku", False)
+    parse_cache.clear()
+    again = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert again.json()["features"] == {"comment": True, "danmaku": False}

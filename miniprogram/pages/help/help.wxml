@@ -23,7 +23,7 @@
     </view>
   </view>
 
-  <view class="section card group">
+  <view class="section card group" wx:if="{{showGroup}}">
     <view class="sec-title">QQ 群</view>
     <view class="group-row">
       <text class="group-no">{{groupNo}}</text>

@@ -77,6 +77,8 @@ Page({
     stats: { like: 0, reply: 0, favorite: 0, coin: 0 },
     coverUrl: '',
     media: { watermarked: false, clean: false, audio: false },
+    features: { comment: true, danmaku: true },
+    shareEnabled: true,
     subtitles: [],
     subPreview: [],
     showAllSub: false,
@@ -88,12 +90,22 @@ Page({
   },
 
   onLoad(options) {
+    this.loadUiConfig();
     const bvid = (options && options.bvid) || '';
     if (bvid) {
       this.loadByBvid(bvid);
       return;
     }
     this.applyResult(getApp().globalData.pendingResult || wx.getStorageSync('pending_result'));
+  },
+
+  loadUiConfig() {
+    api
+      .getPublicConfig()
+      .then((cfg) => {
+        this.setData({ shareEnabled: cfg.share !== false });
+      })
+      .catch(() => {});
   },
 
   loadByBvid(bvid) {
@@ -136,6 +148,7 @@ Page({
       stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0 },
       coverUrl: r.cover_url,
       media: r.media || { watermarked: false, clean: false, audio: false },
+      features: r.features || { comment: true, danmaku: true },
       danmakuCount: r.danmaku_count || 0,
       subtitles,
       subPreview: subtitles.slice(0, 5)
@@ -147,7 +160,8 @@ Page({
     if (r.subtitles && r.subtitles.length) {
       this.prepareFile(api.exportFile(r.id, 'srt'), textFilename(r.title, r.bvid, '.srt'), 'srtLocalPath');
     }
-    if (r.danmaku_count) {
+    const features = r.features || { comment: true, danmaku: true };
+    if (features.danmaku !== false && r.danmaku_count) {
       this.prepareFile(api.danmaku(r.id), textFilename(r.title, r.bvid, '_弹幕.txt'), 'danmakuLocalPath');
     }
     if (r.media && r.media.audio) {
