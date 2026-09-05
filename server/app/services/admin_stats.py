@@ -165,6 +165,13 @@ def follow_monitor_detail(
         .limit(size)
         .all()
     )
+    # 收集已绑定用户的 user_id，批量查 User 表
+    user_ids = list({b.user_id for _, b in rows if b and b.user_id})
+    user_map: dict[int, dict] = {}
+    if user_ids:
+        from ..models import User
+        for u in db.query(User).filter(User.id.in_(user_ids)).all():
+            user_map[u.id] = {"openid": u.openid or "", "nickname": u.nickname or ""}
     uids = [str(f.bili_uid) for f, _ in rows]
     fail_reason: dict[str, str] = {}
     if uids:
@@ -195,6 +202,8 @@ def follow_monitor_detail(
                 "send_reason": fail_reason.get(str(f.bili_uid), ""),
                 "bound": bool(b and b.bound_at is not None),
                 "bound_at": _fmt_dt_sh(b.bound_at) if b and b.bound_at else "",
+                "wx_openid": (user_map.get(b.user_id, {}).get("openid", "") if b and b.user_id else ""),
+                "wx_nickname": (user_map.get(b.user_id, {}).get("nickname", "") if b and b.user_id else ""),
             }
             for f, b in rows
         ],

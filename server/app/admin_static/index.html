@@ -237,7 +237,7 @@ const renderers = {
           <span id="follow-msg" class="muted"></span>
         </div>
         <table>
-          <thead><tr><th></th><th>粉丝</th><th>关注时间</th><th>激活码</th><th>发送</th><th>失败原因</th><th>绑定</th><th>绑定时间</th><th>操作</th></tr></thead>
+          <thead><tr><th></th><th>粉丝</th><th>微信</th><th>关注时间</th><th>激活码</th><th>发送</th><th>失败原因</th><th>绑定</th><th>绑定时间</th><th>操作</th></tr></thead>
           <tbody>${det.items.map(followRow).join("")}</tbody>
         </table>
         <p class="muted">共 ${fmt(det.total)} 条</p>
@@ -453,63 +453,80 @@ function followMsg(t) {
 function followRow(i) {
   const origin = esc(i.bili_name || "") +
     (i.bili_name && i.bili_uid ? "（" + esc(i.bili_uid) + "）" : (i.bili_uid ? esc(i.bili_uid) : ""));
+  const wxInfo = i.wx_nickname
+    ? esc(i.wx_nickname) + (i.wx_openid ? "<br/><span class='muted'>" + esc(i.wx_openid) + "</span>" : "")
+    : (i.wx_openid ? esc(i.wx_openid) : '<span class="muted">—</span>');
   const send = i.sent_ok ? '<span class="tag ok">已发送</span>' : '<span class="tag bad">失败</span>';
   const bound = i.bound ? '<span class="tag ok">已绑定</span>' : '<span class="tag muted">未绑定</span>';
   return `<tr>
     <td><input type="checkbox" class="follow-check" data-uid="${esc(i.bili_uid)}"/></td>
     <td>${origin}</td>
+    <td>${wxInfo}</td>
     <td>${esc(i.follow_time || "—")}</td>
     <td>${esc(i.code || "—")}</td>
     <td>${send}</td>
     <td>${esc(i.send_reason || "—")}</td>
     <td>${bound}</td>
     <td>${esc(i.bound_at || "—")}</td>
-    <td><button class="small" onclick="resendUid('${esc(i.bili_uid)}')">重新发送</button></td>
+    <td><button class="small" onclick="resendUid('${esc(i.bili_uid)}')">重新发送</button>${i.bound ? ' <button class="small" onclick="unbindUid(\'' + esc(i.bili_uid) + '\')">解绑</button>' : ''}</td>
   </tr>`;
 }
 async function resendUid(uid) {
   try {
     const r = await api("/activation/resend", { method: "POST", body: JSON.stringify({ uids: [uid] }) });
-    followMsg(`重发成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+    const failInfo = Object.keys(r.failed || {}).length ? `，失败 ${Object.keys(r.failed).length}` : "";
+    showModal("发送结果", `成功 ${r.sent}${failInfo}，共 ${r.total} 条`, false);
     show(currentView);
-  } catch (e) { followMsg(e.message); }
+  } catch (e) { showModal("发送失败", e.message, true); }
+}
+async function unbindUid(uid) {
+  if (!confirm("确定解绑该用户？")) return;
+  try {
+    const r = await api("/binding/unbind", { method: "POST", body: JSON.stringify({ bili_uid: uid }) });
+    showModal("解绑成功", `B站 UID ${r.bili_uid} 已解绑，激活码：${r.code}`, false);
+    show(currentView);
+  } catch (e) { showModal("解绑失败", e.message, true); }
 }
 async function batchResend() {
   const uids = [...document.querySelectorAll(".follow-check:checked")].map(cb => cb.dataset.uid);
-  if (!uids.length) { followMsg("请先勾选要重发的记录"); return; }
+  if (!uids.length) { showModal("提示", "请先勾选要重发的记录", true); return; }
   try {
     const r = await api("/activation/resend", { method: "POST", body: JSON.stringify({ uids }) });
-    followMsg(`重发成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+    const failInfo = Object.keys(r.failed || {}).length ? `，失败 ${Object.keys(r.failed).length}` : "";
+    showModal("批量发送结果", `成功 ${r.sent}${failInfo}，共 ${r.total} 条`, false);
     show(currentView);
-  } catch (e) { followMsg(e.message); }
+  } catch (e) { showModal("批量发送失败", e.message, true); }
 }
 async function retryFailed() {
   try {
     const r = await api("/activation/retry-failed", { method: "POST" });
-    followMsg(`重发成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
+    const failInfo = Object.keys(r.failed || {}).length ? `，失败 ${Object.keys(r.failed).length}` : "";
+    showModal("重发失败记录结果", `成功 ${r.sent}${failInfo}，共 ${r.total} 条`, false);
     show(currentView);
-  } catch (e) { followMsg(e.message); }
+  } catch (e) { showModal("重发失败", e.message, true); }
 }
 async function singleSend() {
   const uid = (document.getElementById("single-uid").value || "").trim();
-  if (!uid) { followMsg("请输入 B站 UID"); return; }
+  if (!uid) { showModal("提示", "请输入 B站 UID", true); return; }
   try {
     const r = await api("/activation/resend", { method: "POST", body: JSON.stringify({ uids: [uid] }) });
-    followMsg(`发送成功 ${r.sent}，失败 ${Object.keys(r.failed || {}).length}`);
-  } catch (e) { followMsg(e.message); }
+    const failInfo = Object.keys(r.failed || {}).length ? `，失败 ${Object.keys(r.failed).length}` : "";
+    showModal("发送结果", `成功 ${r.sent}${failInfo}，共 ${r.total} 条`, false);
+  } catch (e) { showModal("发送失败", e.message, true); }
 }
 async function checkCookie() {
   try {
     const r = await api("/cookie/check", { method: "POST" });
-    document.getElementById("cookie-msg").textContent = r.cookie_valid ? "Cookie 正常" : ("Cookie 失效：" + r.cookie_last_error);
-  } catch (e) { document.getElementById("cookie-msg").textContent = e.message; }
+    showModal("Cookie 检测", r.cookie_valid ? "Cookie 正常 ✅" : `Cookie 失效：${r.cookie_last_error}`, !r.cookie_valid);
+  } catch (e) { showModal("检测失败", e.message, true); }
 }
 async function updateCookie() {
   const text = document.getElementById("cookie-text").value;
   try {
     await api("/cookie/update", { method: "POST", body: JSON.stringify({ cookie_text: text }) });
+    showModal("保存成功", "Cookie 已更新", false);
     show("cookie");
-  } catch (e) { document.getElementById("cookie-msg").textContent = e.message; }
+  } catch (e) { showModal("保存失败", e.message, true); }
 }
 async function saveFeatures() {
   const mediaBody = {

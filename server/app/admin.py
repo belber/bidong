@@ -9,6 +9,7 @@ from .admin_security import create_admin_token, decode_admin_token, verify_passw
 from .db import get_db
 from .models import Binding
 from .robot.cookie import check_cookie, build_client
+from .robot.worker import activation_message
 from .services import config_store
 from .services import admin_stats as stats
 from .services.activation import issue_activation
@@ -182,7 +183,7 @@ def _send_to_uids(db: Session, uids: list[str]) -> dict:
                 failed[uid] = "already_bound"
                 continue
             try:
-                client.send_msg(uid, f"小破站激活码：{binding.activation_code}")
+                client.send_msg(uid, activation_message(binding.activation_code))
             except Exception as exc:  # noqa: BLE001
                 from .services import tracking
 
@@ -260,6 +261,28 @@ def activation_retry_failed(
             retryable.append(uid)
     return _send_to_uids(db, retryable)
 
+
+class UnbindPayload(BaseModel):
+    bili_uid: str
+
+
+@router.post("/binding/unbind")
+def admin_unbind(
+    payload: UnbindPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    binding = (
+        db.query(Binding)
+        .filter(Binding.bili_uid == payload.bili_uid.strip())
+        .first()
+    )
+    if binding is None:
+        raise HTTPException(404, "未找到该绑定")
+    binding.user_id = None
+    binding.bound_at = None
+    db.commit()
+    return {"ok": True, "bili_uid": binding.bili_uid, "code": binding.activation_code}
 
 # ---------------------------------------------------------------------------
 # Cookie

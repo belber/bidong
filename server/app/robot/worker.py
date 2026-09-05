@@ -18,7 +18,7 @@ from .cookie import build_client, check_cookie
 def activation_message(code: str) -> str:
     return (
         f"你的激活码：{code}\n"
-        "复制整条消息，打开wx「小破站私藏」粘贴即可绑定 ✨"
+        "复制整条消息，打开wx「小破站下载」粘贴即可绑定 ✨"
     )
 
 
