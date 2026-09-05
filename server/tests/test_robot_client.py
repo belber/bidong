@@ -5,6 +5,23 @@ from app.errors import AppError
 from app.services.bilibili_robot import BiliRobotClient
 
 
+def _mock_nav():
+    """Mock WBI nav endpoint for WbiSigner."""
+    respx.get("https://api.bilibili.com/x/web-interface/nav").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "wbi_img": {
+                        "img_url": "https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png",
+                        "sub_url": "https://i0.hdslb.com/bfs/wbi/4932caff0ff746eab6f01bf08b70ac45.png",
+                    }
+                },
+            },
+        )
+    )
+
 def _client():
     return BiliRobotClient(
         {"SESSDATA": "s", "bili_jct": "csrf-token", "DedeUserID": "100"},
@@ -14,7 +31,8 @@ def _client():
 
 @respx.mock
 def test_get_followers():
-    respx.get(url__regex=r"https://api\.bilibili\.com/x/relation/followers.*").mock(
+    _mock_nav()
+    respx.get(url__regex=r"https://api\.bilibili\.com/x/relation/fans.*").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -31,6 +49,7 @@ def test_get_followers():
 
 @respx.mock
 def test_get_at_notifications_extracts_bvid():
+    _mock_nav()
     respx.get("https://api.bilibili.com/x/msgfeed/at").mock(
         return_value=httpx.Response(
             200,
@@ -47,7 +66,7 @@ def test_get_at_notifications_extracts_bvid():
                                 "type": "reply",
                                 "business": "评论",
                                 "uri": "https://www.bilibili.com/video/BV1xx411c7mD",
-                                "source_content": "@壁咚收藏夹",
+                                "source_content": "@小破站私藏",
                             },
                         }
                     ]
@@ -65,7 +84,7 @@ def test_get_at_notifications_extracts_bvid():
             "mid": "222",
             "uname": "用户B",
             "bvid": "BV1xx411c7mD",
-            "comment": "@壁咚收藏夹",
+            "comment": "@小破站私藏",
         }
     ]
 
@@ -76,7 +95,7 @@ def test_send_msg_posts_csrf_and_sender_uid():
         return_value=httpx.Response(200, json={"code": 0})
     )
     client = _client()
-    client.send_msg("333", "壁咚激活码：ABC123")
+    client.send_msg("333", "小破站激活码：ABC123")
     client.close()
     assert route.called
     assert route.calls[0].request.headers.get("cookie", "").find("bili_jct=csrf-token") != -1

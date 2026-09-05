@@ -156,8 +156,18 @@ module.exports = {
     const suffix = qn ? '&qn=' + qn : '';
     return fileDownload('/api/cards/' + id + '/download?kind=' + kind + suffix);
   },
+  downloadUrl(id, kind, qn) {
+    const suffix = qn ? '&qn=' + qn : '';
+    return request('GET', '/api/cards/' + id + '/download-url?kind=' + kind + suffix);
+  },
+  mediaSize(id) {
+    return request('GET', '/api/cards/' + id + '/media-size');
+  },
   danmaku(id) {
     return fileDownload('/api/cards/' + id + '/danmaku');
+  },
+  comments(id) {
+    return fileDownload('/api/cards/' + id + '/comments');
   },
   exportFile(id, kind) {
     return fileDownload('/api/cards/' + id + '/export?kind=' + kind);

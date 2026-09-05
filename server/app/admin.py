@@ -182,7 +182,7 @@ def _send_to_uids(db: Session, uids: list[str]) -> dict:
                 failed[uid] = "already_bound"
                 continue
             try:
-                client.send_msg(uid, f"壁咚激活码：{binding.activation_code}")
+                client.send_msg(uid, f"小破站激活码：{binding.activation_code}")
             except Exception as exc:  # noqa: BLE001
                 from .services import tracking
 
@@ -481,7 +481,7 @@ def alert_test(
 ):
     from .services import notify
 
-    sent = notify.send_alert_email(db, "壁咚管理端测试", "这是一封来自后台管理端的测试邮件。")
+    sent = notify.send_alert_email(db, "小破站管理端测试", "这是一封来自后台管理端的测试邮件。")
     if not sent:
         raise HTTPException(status_code=400, detail="未启用告警或 SMTP 未配置")
     return {"ok": True}

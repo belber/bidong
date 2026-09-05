@@ -3,7 +3,7 @@
 <view class="page">
   <view class="bind card" wx:if="{{showRobotGuide}}">
     <view class="bind-head">
-      <text class="bind-t">@壁咚收藏夹 绑定</text>
+      <text class="bind-t">@小破站私藏 绑定</text>
       <view class="head-right">
         <text class="chip {{bound ? 'chip-ok' : 'chip-on'}}">{{bound ? '已绑定' : '未绑定'}}</text>
         <view wx:if="{{bound}}" class="unbind-icon" bindtap="onUnbind">
@@ -12,14 +12,14 @@
       </view>
     </view>
     <block wx:if="{{!bound}}">
-      <view class="steps">① 关注 @壁咚收藏夹</view>
+      <view class="steps">① 关注 @小破站私藏</view>
       <view class="steps">② 查看私信，收到激活码</view>
       <view class="steps">③ 回小程序粘贴激活码 → 绑定成功</view>
       <button class="btn-primary bind-btn" bindtap="onBind">去绑定</button>
     </block>
     <block wx:else>
       <view class="steps">已绑定 B站账号：{{biliName || biliUid}}</view>
-      <view class="steps">在视频评论区 @壁咚收藏夹 即可自动收藏</view>
+      <view class="steps">在视频评论区 @小破站私藏 即可自动收藏</view>
     </block>
   </view>
 
@@ -33,7 +33,7 @@
       <text class="arr">›</text>
     </view>
     <view class="mi" bindtap="onGoAbout">
-      <text>关于 壁咚视频助手</text>
+      <text>关于 小破站下载</text>
       <text class="arr">›</text>
     </view>
   </view>

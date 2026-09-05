@@ -1,12 +1,12 @@
 <view class="page">
-  <view class="intro">关注 B站 @壁咚收藏夹，机器人会私信你激活码；把激活码粘贴到这里完成绑定</view>
+  <view class="intro">关注 B站 @小破站私藏，机器人会私信你激活码；复制整条消息粘贴即可，会自动识别激活码</view>
 
   <block wx:if="{{bound}}">
     <view class="ok-card">
       <view class="ok-icon">✓</view>
-      <view class="ok-title">已绑定 @壁咚收藏夹</view>
+      <view class="ok-title">已绑定 @小破站私藏</view>
       <view class="ok-sub">B站账号：{{biliName || biliUid}}</view>
-      <view class="ok-note">之后在视频评论区 @壁咚收藏夹，就能把视频收进收藏夹。</view>
+      <view class="ok-note">之后在视频评论区 @小破站私藏，就能把视频收进收藏夹。</view>
     </view>
   </block>
 
@@ -24,6 +24,7 @@
     <button class="btn-primary bind-btn" bindtap="onBind" loading="{{loading}}" disabled="{{loading}}">
       {{loading ? '绑定中…' : '绑定'}}
     </button>
-    <view class="tip">没收到激活码？① 先关注 @壁咚收藏夹 ② 查看 B站私信消息</view>
+    <view class="tip">没收到激活码？① 先关注 @小破站私藏 ② 查看 B站私信消息</view>
   </block>
 </view>
+        placeholder="粘贴激活码或整条消息"

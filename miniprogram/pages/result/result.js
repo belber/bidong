@@ -15,6 +15,14 @@ function mediaFilename(title, bvid, kind) {
   return sanitizeName(title || bvid) + suffix;
 }
 
+function formatSize(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+ }
+
 function textFilename(title, bvid, suffix) {
   return sanitizeName(title || bvid) + suffix;
 }
@@ -86,7 +94,11 @@ Page({
     previewing: false,
     srtLocalPath: '',
     danmakuLocalPath: '',
-    audioLocalPath: ''
+    audioLocalPath: '',
+    mediaSize: {},
+    downloading: false,
+    downloadProgress: 0,
+    downloadSizeText: ''
   },
 
   onLoad(options) {
@@ -154,6 +166,17 @@ Page({
       subPreview: subtitles.slice(0, 5)
     });
     this.prepareExports(r);
+    this.loadMediaSize(r.id);
+  },
+
+  loadMediaSize(cardId) {
+    api.mediaSize(cardId).then((sizes) => {
+      const labels = {};
+      if (sizes.watermarked) labels.watermarked = '约 ' + formatSize(sizes.watermarked);
+      if (sizes.clean) labels.clean = '约 ' + formatSize(sizes.clean);
+      if (sizes.audio) labels.audio = '约 ' + formatSize(sizes.audio);
+      this.setData({ mediaSize: labels });
+    }).catch(() => {});
   },
 
   prepareExports(r) {
@@ -165,6 +188,7 @@ Page({
       this.prepareFile(api.danmaku(r.id), textFilename(r.title, r.bvid, '_弹幕.txt'), 'danmakuLocalPath');
     }
     if (r.media && r.media.audio) {
+      console.log('prepareExports: audio pre-download starting');
       this.prepareFile(api.download(r.id, 'audio'), mediaFilename(r.title, r.bvid, 'audio'), 'audioLocalPath');
     }
   },
@@ -175,13 +199,16 @@ Page({
         url,
         header,
         success: (res) => {
-          if (res.statusCode !== 200) { return; }
+          if (res.statusCode !== 200) {
+            console.error('prepareFile download failed', key, res.statusCode, url);
+            return;
+          }
           copyToNamed(res.tempFilePath, filename).then((filePath) => {
             this.setData({ [key]: filePath });
-          }).catch(() => {});
+          }).catch((err) => { console.error('prepareFile copy failed', key, err); });
         }
       });
-    }).catch(() => {});
+    }).catch((err) => { console.error('prepareFile request failed', key, err); });
   },
 
   copy(field) {
@@ -224,16 +251,31 @@ Page({
   },
 
   saveMedia(url, header) {
-    wx.showLoading({ title: '下载中' });
+    this.setData({ downloading: true, downloadProgress: 0, downloadSizeText: '' });
     wx.downloadFile({
       url,
       header,
-      success(res) {
-        wx.hideLoading();
-        if (res.statusCode !== 200) { toast('下载失败'); return; }
-        saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
+      onProgressUpdate: (res) => {
+        const percent = res.totalBytesWritten && res.totalBytesExpectedToWrite
+          ? Math.round(res.totalBytesWritten / res.totalBytesExpectedToWrite * 100)
+          : 0;
+        const written = formatSize(res.totalBytesWritten);
+        const total = formatSize(res.totalBytesExpectedToWrite);
+        const sizeText = total ? ` (${written}/${total})` : '';
+        this.setData({ downloadProgress: percent, downloadSizeText: sizeText });
       },
-      fail() { wx.hideLoading(); toast('下载失败'); }
+      success: (res) => {
+        this.setData({ downloading: false });
+        if (res.statusCode !== 200) { toast('下载失败'); return; }
+        const filename = mediaFilename(this.data.title, this.data.bvid, 'video');
+        copyToNamed(res.tempFilePath, filename).then((filePath) => {
+          saveToAlbum(wx.saveVideoToPhotosAlbum, filePath);
+        }).catch(() => {
+          // 复制失败则用临时文件保存
+          saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
+        });
+      },
+      fail: () => { this.setData({ downloading: false }); toast('下载失败'); }
     });
   },
 
@@ -248,9 +290,15 @@ Page({
         itemList: options.map((o) => o.label),
         success: (res) => {
           const chosen = options[res.tapIndex];
-          api.download(this.data.cardId, kind, chosen.qn).then(({ url, header }) => {
-            this.saveMedia(url, header);
-          }).catch(() => toast('下载失败'));
+          if (kind === 'watermarked') {
+            api.downloadUrl(this.data.cardId, kind, chosen.qn).then(({ url }) => {
+              this.saveMedia(url, {});
+            }).catch(() => toast('下载失败'));
+          } else {
+            api.download(this.data.cardId, kind, chosen.qn).then(({ url, header }) => {
+              this.saveMedia(url, header);
+            }).catch(() => toast('下载失败'));
+          }
         }
       });
     }).catch(() => toast('获取清晰度失败'));
@@ -291,6 +339,25 @@ Page({
     } else {
       toast('文件准备中，请稍后重试');
     }
+  },
+
+  onDownloadComments() {
+    const filename = textFilename(this.data.title, this.data.bvid, '_评论.txt');
+    wx.showLoading({ title: '加载评论中' });
+    api.comments(this.data.cardId).then(({ url, header }) => {
+      wx.downloadFile({
+        url,
+        header,
+        success: (res) => {
+          wx.hideLoading();
+          if (res.statusCode !== 200) { toast('下载失败'); return; }
+          copyToNamed(res.tempFilePath, filename).then((filePath) => {
+            shareLocalFile(filePath, filename);
+          }).catch(() => shareLocalFile(res.tempFilePath, filename));
+        },
+        fail: () => { wx.hideLoading(); toast('下载失败'); }
+      });
+    }).catch(() => { wx.hideLoading(); toast('加载评论失败'); });
   },
 
   onOpenBili() {

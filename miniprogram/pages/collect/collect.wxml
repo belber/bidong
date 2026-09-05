@@ -17,7 +17,7 @@
   <view class="seg">
     <view class="seg-it {{sourceFilter === 'all' ? 'on' : ''}}" data-source="all" bindtap="onSourceTap">全部</view>
     <view class="seg-it {{sourceFilter === 'local' ? 'on' : ''}}" data-source="local" bindtap="onSourceTap">本机</view>
-    <view class="seg-it {{sourceFilter === 'robot' ? 'on' : ''}}" data-source="robot" bindtap="onSourceTap">@壁咚</view>
+    <view class="seg-it {{sourceFilter === 'robot' ? 'on' : ''}}" data-source="robot" bindtap="onSourceTap">@小破站</view>
   </view>
 
   <scroll-view class="filter-scroll" wx:if="{{!showRobotGuide}}" scroll-x enhanced show-scrollbar="{{false}}">
@@ -30,7 +30,7 @@
     <view class="guide-card">
       <view class="guide-title">你还未绑定或未 @过，可以按下面的方式操作</view>
       <view class="guide-steps">
-        <view class="guide-step">① B站评论区 @壁咚收藏夹</view>
+        <view class="guide-step">① B站评论区 @小破站私藏</view>
         <view class="guide-step">② 进收藏夹查看视频</view>
       </view>
       <view class="demo">
@@ -48,7 +48,7 @@
           <view class="demo-avatar"></view>
           <view class="demo-cbody">
             <text class="demo-cname">我</text>
-            <text class="demo-ctext highlight">@壁咚收藏夹</text>
+            <text class="demo-ctext highlight">@小破站私藏</text>
           </view>
         </view>
       </view>
@@ -75,7 +75,7 @@
           <view wx:if="{{editing}}" class="check {{card.selected ? 'on' : ''}}"></view>
           <view class="thumb">
             <image class="thumb-img" src="{{card.cover_url}}" mode="aspectFill" />
-            <text class="src {{card.source === 'robot' ? 'bot' : ''}}">{{card.source === 'robot' ? '@壁咚' : '本机'}}</text>
+            <text class="src {{card.source === 'robot' ? 'bot' : ''}}">{{card.source === 'robot' ? '@小破站' : '本机'}}</text>
             <text class="dur">{{card.dur}}</text>
           </view>
           <view class="meta">

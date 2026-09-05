@@ -49,7 +49,7 @@ def check_cookie(db: Session) -> dict:
     if prev_valid and prev_checked and not valid:
         notify.send_alert_email(
             db,
-            "壁咚机器人 Cookie 失效",
+            "小破站机器人 Cookie 失效",
             f"检测时间：{checked}\n机器人 UID：{cookie.get('robot_uid')}\n原因：{error}",
         )
 

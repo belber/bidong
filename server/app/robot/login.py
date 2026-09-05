@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> None:
     if "--send" in argv:
         idx = argv.index("--send")
         uid = argv[idx + 1] if idx + 1 < len(argv) else ""
-        content = " ".join(argv[idx + 2 :]) or "壁咚测试消息"
+        content = " ".join(argv[idx + 2 :]) or "小破站测试消息"
         if not uid:
             print("用法：python -m app.robot.login --send <UID> [内容]")
             return

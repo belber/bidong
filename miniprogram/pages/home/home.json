@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "navigationBarTitleText": "壁咚视频助手",
+  "navigationBarTitleText": "小破站下载",
   "usingComponents": {
     "custom-navbar": "/components/navbar/navbar"
   }

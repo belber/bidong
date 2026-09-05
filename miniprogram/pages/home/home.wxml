@@ -53,9 +53,9 @@
     </view>
 
     <view class="way" wx:if="{{showRobotGuide}}">
-      <view class="way-label">方式 2 · @壁咚收藏夹</view>
+      <view class="way-label">方式 2 · @小破站私藏</view>
       <view class="guide-steps">
-        <view class="guide-step">① B站评论区 @壁咚收藏夹</view>
+        <view class="guide-step">① B站评论@小破站私藏</view>
         <view class="guide-step">② 进收藏夹查看视频</view>
       </view>
       <view class="demo">
@@ -73,12 +73,12 @@
           <view class="demo-avatar"></view>
           <view class="demo-cbody">
             <text class="demo-cname">我</text>
-            <text class="demo-ctext highlight">@壁咚收藏夹</text>
+            <text class="demo-ctext highlight">@小破站私藏</text>
           </view>
         </view>
       </view>
     </view>
   </view>
 
-  <view class="home-footer-note">仅收藏整理视频信息，不保存视频，版权归原作者，请尊重原创。</view>
+  <view class="home-footer-note">仅收藏整理视频信息，不存储视频，版权归原作者，请尊重原创</view>
 </view>

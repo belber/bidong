@@ -60,21 +60,32 @@
     </view>
 
     <view class="field" wx:if="{{media.watermarked}}">
-      <text class="label">有水印视频</text>
-      <view class="content muted">单文件流，含音频</view>
+      <text class="label">视频</text>
+      <view class="content muted">{{mediaSize.watermarked || '单文件流，含音频'}}</view>
       <text class="action" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
     </view>
 
     <view class="field" wx:if="{{media.clean}}">
       <text class="label">无水印视频</text>
-      <view class="content muted">高清视频轨，不含音频</view>
+      <view class="content muted">{{mediaSize.clean || '高清视频轨，不含音频'}}</view>
       <text class="action" bindtap="onDownloadVideo" data-kind="clean">下载</text>
     </view>
 
     <view class="field" wx:if="{{media.audio}}">
       <text class="label">纯音频</text>
-      <view class="content muted">音频轨</view>
+      <view class="content muted">{{mediaSize.audio || '音频轨'}}</view>
       <text class="action" bindtap="onDownloadAudio">转发</text>
+    </view>
+
+    <!-- 下载进度 -->
+    <view class="field" wx:if="{{downloading}}">
+      <text class="label">下载中</text>
+      <view class="content">
+        <view class="progress-wrap">
+          <view class="progress-bar" style="width: {{downloadProgress}}%"></view>
+        </view>
+        <text class="progress-text">{{downloadProgress}}%{{downloadSizeText}}</text>
+      </view>
     </view>
   </view>
 
@@ -105,7 +116,11 @@
 
     <view class="field" wx:if="{{features.comment}}">
       <text class="label">评论</text>
-      <view class="content muted">暂不支持</view>
+      <view class="content" wx:if="{{stats.reply}}">共 {{stats.reply}} 条</view>
+      <view class="content muted" wx:else>无评论</view>
+      <view class="ops" wx:if="{{stats.reply}}">
+        <text class="action" bindtap="onDownloadComments">转发</text>
+      </view>
     </view>
   </view>
 

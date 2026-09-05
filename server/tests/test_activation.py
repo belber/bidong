@@ -29,14 +29,14 @@ def test_issue_activation_stores_and_backfills_name(db_engine):
 
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()
-    first = issue_activation(db, "555", "壁咚菌")
-    assert first.bili_name == "壁咚菌"
+    first = issue_activation(db, "555", "小破站菌")
+    assert first.bili_name == "小破站菌"
 
     first.bili_name = ""
     db.commit()
 
-    again = issue_activation(db, "555", "壁咚菌")
-    assert again.bili_name == "壁咚菌"
+    again = issue_activation(db, "555", "小破站菌")
+    assert again.bili_name == "小破站菌"
     db.close()
 
 

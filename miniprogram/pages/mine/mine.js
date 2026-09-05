@@ -45,7 +45,7 @@ Page({
   onUnbind() {
     wx.showModal({
       title: '解绑',
-      content: '解绑后 @壁咚收藏夹 将不再自动收藏到你的账号，确定解绑？',
+      content: '解绑后 @小破站私藏 将不再自动收藏到你的账号，确定解绑？',
       confirmText: '解绑',
       confirmColor: '#FB7299',
       success: (res) => {

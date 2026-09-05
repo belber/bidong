@@ -269,7 +269,7 @@ def test_at_detail_includes_comment_and_video_title(admin_client, db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()
     db.add(AtEvent(feed_id="f1", bili_uid="111", bili_name="小明", bvid="BV1xx411c7mD",
-                   comment="@壁咚收藏夹 帮我收藏这个", result="collected"))
+                   comment="@小破站私藏 帮我收藏这个", result="collected"))
     db.add(VideoCard(user_id=1, bvid="BV1xx411c7mD", title="测试视频标题", cover_url="", up_name="UP",
                      partition="", desc="", source_url="", source="robot",
                      collected_at=utcnow_naive(), month="2026-09"))
@@ -279,7 +279,7 @@ def test_at_detail_includes_comment_and_video_title(admin_client, db_engine):
     token = _login(admin_client).json()["token"]
     data = admin_client.get("/api/admin/stats/at/detail", headers=_auth(token)).json()
     item = data["items"][0]
-    assert item["comment"] == "@壁咚收藏夹 帮我收藏这个"
+    assert item["comment"] == "@小破站私藏 帮我收藏这个"
     assert item["bili_name"] == "小明"
     assert item["video_title"] == "测试视频标题"
     assert item["bvid"] == "BV1xx411c7mD"

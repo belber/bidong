@@ -6,6 +6,7 @@ import uuid
 import httpx
 
 from ..errors import AppError
+from .wbi import WbiSigner
 
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -13,7 +14,7 @@ UA = (
 )
 
 # 接口地址集中在此，实测后如需调整只改这里。
-FOLLOWERS_URL = "https://api.bilibili.com/x/relation/followers"
+FOLLOWERS_URL = "https://api.bilibili.com/x/relation/fans"
 AT_FEED_URL = "https://api.bilibili.com/x/msgfeed/at"
 SEND_MSG_URL = "https://api.vc.bilibili.com/web_im/v1/web_im/send_msg"
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
@@ -31,6 +32,7 @@ class BiliRobotClient:
             headers={"User-Agent": UA, "Referer": "https://www.bilibili.com/"},
             cookies=cookie,
         )
+        self._wbi = WbiSigner(self.client)
 
     def close(self) -> None:
         self.client.close()
@@ -64,9 +66,8 @@ class BiliRobotClient:
         return resp.status_code, resp.text[:3000]
 
     def get_followers(self, pn: int = 1, ps: int = 50) -> list[dict]:
-        data = self._get_json(
-            FOLLOWERS_URL, params={"vmid": self.robot_uid, "pn": pn, "ps": ps}
-        )
+        params = self._wbi.sign({"vmid": self.robot_uid, "pn": str(pn), "ps": str(ps)})
+        data = self._get_json(FOLLOWERS_URL, params=params)
         items = ((data.get("data") or {}).get("list")) or []
         out: list[dict] = []
         for u in items:
@@ -81,7 +82,8 @@ class BiliRobotClient:
         return out
 
     def get_at_notifications(self) -> list[dict]:
-        data = self._get_json(AT_FEED_URL)
+        params = self._wbi.sign({})
+        data = self._get_json(AT_FEED_URL, params=params)
         items = ((data.get("data") or {}).get("items")) or []
         out: list[dict] = []
         for it in items:

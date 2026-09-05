@@ -103,7 +103,7 @@ video_card (
   source_url    text,        -- 原始 B站链接（跳转用）
   duration      int,         -- 时长（秒），用于卡片角标
   pubdate       int,         -- B站发布时间（unix 秒）
-  source        text,        -- 收藏来源：local（本机）| robot（@壁咚）
+  source        text,        -- 收藏来源：local（本机）| robot（@小破站）
   collected_at  timestamp,   -- 收藏时间
   month         text         -- 冗余 'YYYY-MM'，分组索引
 )
@@ -142,7 +142,7 @@ robot_cursor (                  -- Phase 1：worker 轮询游标，重启不重�
 - **月份分组**：由 `collected_at` 派生，`month` 冗余存储便于查询，**与标签正交**。
 - **B站分区**（tname）是视频元数据，存 `partition`，与用户自定义标签分开。`view` 接口近期可能不再返回 `tname`/`tname_v2`，后端用 `tid_v2` 反查主分区（频道）名兜底（见 `services/partition.py`）。
 - **幂等**：`video_card` 以 `(user_id, bvid)` 建唯一约束，同一用户重复解析同一视频不重复建卡。
-- **来源**：`source` 只有 `local` / `robot` 两个值，对应前端「本机 / @壁咚」来源筛选；Phase 0 全部为 `local`。
+- **来源**：`source` 只有 `local` / `robot` 两个值，对应前端「本机 / @小破站」来源筛选；Phase 0 全部为 `local`。
 - **B站 ID 决策**：库表用 `bvid` 作为 `(user_id, bvid)` 唯一键，不存 `aid`。B站小程序跳转直接用 `bvid`；若未来某接口要求数字 ID，按 BV→AV 算法在本地换算，不额外请求 B站接口。
 - **媒体下载**：统计数（点赞/评论/收藏/投币）与弹幕条数来自 `view` 接口，不落库、解析时现取；视频/音频下载走中转流式、不落库本体，由三个后台开关控制。
 
@@ -189,7 +189,7 @@ Phase 1：机器人触发
 > Phase 0 不提供 `POST /api/cards`；解析即收藏。Phase 1 机器人由 worker 直接写库，也不走该接口。
 > Phase 1 提供 `POST /api/binding`（粘贴激活码绑定）、`GET /api/binding`（查绑定状态）与 `DELETE /api/binding`（解绑）。
 
-> **收藏夹前端交互**：卡片数据量小，筛选/搜索先在前端本地完成。顶部依次为「搜索框（标题 / UP主 / 分区 / 标签关键字）」「来源分段（全部 / 本机 / @壁咚）」「分区 chips（全部 + 去重后的 B站分区）」。标签不再作为一级筛选维度（标签数量不可控、横向 chip 过长），仅保留为卡片元数据并可被搜索命中。
+> **收藏夹前端交互**：卡片数据量小，筛选/搜索先在前端本地完成。顶部依次为「搜索框（标题 / UP主 / 分区 / 标签关键字）」「来源分段（全部 / 本机 / @小破站）」「分区 chips（全部 + 去重后的 B站分区）」。标签不再作为一级筛选维度（标签数量不可控、横向 chip 过长），仅保留为卡片元数据并可被搜索命中。
 
 ### 6.1 跳转 B站小程序
 

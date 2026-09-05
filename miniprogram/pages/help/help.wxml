@@ -2,9 +2,9 @@
   <view class="section card">
     <view class="sec-title">使用指引</view>
     <view class="step">① 首页粘贴 B站链接，点「解析视频」自动收藏</view>
-    <view class="step">② 在 B站评论区 @壁咚收藏夹，视频自动进收藏夹</view>
+    <view class="step">② 在 B站评论区 @小破站私藏，视频自动进收藏夹</view>
     <view class="step">③ 点收藏夹卡片，查看视频解析结果</view>
-    <view class="step">④ 关注 @壁咚收藏夹，私信收激活码后绑定</view>
+    <view class="step">④ 关注 @小破站私藏，私信收激活码后绑定</view>
   </view>
 
   <view class="section card">
@@ -18,7 +18,7 @@
       <view class="a">收藏夹卡片右上角「删除」按钮。</view>
     </view>
     <view class="faq">
-      <view class="q">@壁咚收藏夹 没反应？</view>
+      <view class="q">@小破站私藏 没反应？</view>
       <view class="a">确认已关注，并在评论区正确 @它，稍等后台解析。</view>
     </view>
   </view>

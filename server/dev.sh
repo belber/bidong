@@ -10,7 +10,7 @@ export ENABLE_WATERMARKED_VIDEO="true"
 export ENABLE_CLEAN_VIDEO="true"
 export ENABLE_AUDIO="true"
 
-.venv/bin/python -m uvicorn app.main:app --reload &
+.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --reload &
 
 .venv/bin/python -m uvicorn app.admin_app:app --host 0.0.0.0 --port "${ADMIN_PORT:-8081}" --reload &
 

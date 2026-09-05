@@ -109,6 +109,40 @@ def download(
     )
 
 
+@router.get("/api/cards/{card_id}/download-url")
+def download_url(
+    card_id: int,
+    kind: str = "watermarked",
+    qn: int | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """返回 B站 CDN 直链，由客户端直接下载，不经过服务器中转。"""
+    _require_enabled(kind, db)
+    card = _get_owned_card(db, user, card_id)
+    client = BiliClient()
+    try:
+        # platform=html5 的 CDN URL 不校验 Referer，可由小程序直接下载
+        fnval = 1 if kind == "watermarked" else 16
+        data = client.get_playurl(card.bvid, card.cid, fnval=fnval, platform="html5")
+        if kind == "audio":
+            streams = data.get("audio", [])
+        elif kind == "clean":
+            streams = data.get("video", [])
+        else:
+            streams = data.get("durl", [])
+        if qn is not None:
+            streams = [s for s in streams if s["qn"] == qn]
+        if not streams:
+            raise AppError(404, "无可用清晰度")
+        url = streams[0]["url"] or (streams[0]["backup_urls"][0] if streams[0]["backup_urls"] else "")
+        if not url:
+            raise AppError(502, "无可用下载地址")
+    finally:
+        client.close()
+    return {"url": url}
+
+
 def _fmt_srt_time(t: int) -> str:
     return f"{t // 3600:02d}:{t % 3600 // 60:02d}:{t % 60:02d},000"
 
@@ -189,6 +223,43 @@ def danmaku(
     )
 
 
+@router.get("/api/cards/{card_id}/comments")
+def comments(
+    card_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    card = _get_owned_card(db, user, card_id)
+    client = BiliClient()
+    try:
+        # 先获取视频 aid
+        meta = client.get_video(card.bvid)
+        items = client.get_comments(card.bvid, meta.oid)
+    finally:
+        client.close()
+
+    lines: list[str] = []
+    for c in items:
+        dt = __import__("datetime").datetime.fromtimestamp(c["time"]).strftime("%Y-%m-%d %H:%M")
+        lines.append(f"[{dt}] {c['user']}  (👍{c['like']})")
+        lines.append(c["text"])
+        for r in c.get("replies", []):
+            rt = __import__("datetime").datetime.fromtimestamp(r["time"]).strftime("%Y-%m-%d %H:%M")
+            lines.append(f"  └ {r['user']} [{rt}] (👍{r['like']})")
+            lines.append(f"    {r['text']}")
+        lines.append("")
+
+    if not items:
+        lines.append("无评论")
+    content = "\n".join(lines)
+    filename = f"{card.bvid}_comments.txt"
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/api/cards/{card_id}/export")
 def export(
     card_id: int,
@@ -218,3 +289,34 @@ def export(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/api/cards/{card_id}/media-size")
+def media_size(
+    card_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """返回各下载类型的文件大小（字节）。"""
+    card = _get_owned_card(db, user, card_id)
+    switches = config_store.media_switches(db)
+    result = {}
+    client = BiliClient()
+    try:
+        for kind in ("watermarked", "clean", "audio"):
+            if not switches.get(kind):
+                continue
+            try:
+                streams = _streams(client, card, kind)
+                url = streams[0]["url"] if streams else ""
+                if not url:
+                    continue
+                resp = httpx.head(url, headers=MEDIA_HEADERS, timeout=10, follow_redirects=True)
+                size = int(resp.headers.get("content-length", 0))
+                if size > 0:
+                    result[kind] = size
+            except Exception:
+                pass
+    finally:
+        client.close()
+    return result

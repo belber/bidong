@@ -17,10 +17,8 @@ from .cookie import build_client, check_cookie
 
 def activation_message(code: str) -> str:
     return (
-        "谢谢关注我呀 ✨\n"
-        f"这是你的专属激活码：{code}\n"
-        "去微信小程序「壁咚视频助手」绑定一下，就能连上你的收藏夹啦～\n"
-        "之后在视频评论区 @壁咚收藏夹，我就会帮你把视频收进收藏夹哦 🌸"
+        f"你的激活码：{code}\n"
+        "复制整条消息，打开wx「小破站私藏」粘贴即可绑定 ✨"
     )
 
 

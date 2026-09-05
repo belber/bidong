@@ -364,7 +364,7 @@
 }
 
 .home-footer-note {
-  margin: 36rpx 8rpx 8rpx;
+  margin: 48rpx 8rpx 160rpx;
   text-align: center;
   font-size: 22rpx;
   color: #B28B97;

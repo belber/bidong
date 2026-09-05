@@ -1,4 +1,6 @@
 import re
+import hashlib
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -13,6 +15,16 @@ UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
+
+# B站移动端 appkey（公开值，yt-dlp 等工具通用）
+_APP_KEY = "4409e2ce8ffd12b8"
+_APP_SECRET = "59b43e04ad6965f34319062b478f83dd"
+_MOBILE_UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Mobile Safari/537.36"
+
+
+def _mobile_sign(params: dict[str, str]) -> str:
+    sorted_query = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+    return hashlib.md5((sorted_query + _APP_SECRET).encode()).hexdigest()
 
 _QN_LABELS = {
     16: "360P", 32: "480P", 64: "720P", 80: "1080P",
@@ -37,6 +49,7 @@ class VideoMeta:
     duration: int
     pubdate: int
     cid: int
+    oid: int = 0
     like: int = 0
     reply: int = 0
     favorite: int = 0
@@ -109,6 +122,7 @@ class BiliClient:
             duration=int(d.get("duration") or 0),
             pubdate=int(d.get("pubdate") or 0),
             cid=int(d.get("cid") or 0),
+            oid=int(d.get("aid") or 0),
             like=int(stat.get("like") or 0),
             reply=int(stat.get("reply") or 0),
             favorite=int(stat.get("favorite") or 0),
@@ -206,13 +220,14 @@ class BiliClient:
             "backup_urls": [u for u in backups if u],
         }
 
-    def get_playurl(self, bvid: str, cid: int, fnval: int = 16) -> dict:
+    def get_playurl(self, bvid: str, cid: int, fnval: int = 16, platform: str = "") -> dict:
         if not cid:
             return {"durl": [], "video": [], "audio": []}
         try:
-            params = WbiSigner(self.client).sign(
-                {"bvid": bvid, "cid": str(cid), "fnval": str(fnval), "fourk": "1"}
-            )
+            raw = {"bvid": bvid, "cid": str(cid), "fnval": str(fnval), "fourk": "1"}
+            if platform:
+                raw["platform"] = platform
+            params = WbiSigner(self.client).sign(raw)
             resp = self.client.get(
                 "https://api.bilibili.com/x/player/wbi/playurl", params=params
             )
@@ -250,6 +265,55 @@ class BiliClient:
     def get_dash_audio(self, bvid: str, cid: int) -> list[dict]:
         return self.get_playurl(bvid, cid, fnval=16)["audio"]
 
+    def get_playurl_mobile(self, bvid: str, cid: int, kind: str = "video") -> list[dict]:
+        """通过移动端 API 获取播放地址，返回的 CDN URL 可能不需要 Referer。"""
+        if not cid:
+            return []
+        fnval = "16" if kind in ("video", "audio") else "1"
+        params: dict[str, str] = {
+            "appkey": _APP_KEY,
+            "bvid": bvid,
+            "cid": str(cid),
+            "fnval": fnval,
+            "fnver": "0",
+            "fourk": "1",
+            "platform": "android",
+            "qn": "127",
+            "ts": str(int(time.time())),
+        }
+        params["sign"] = _mobile_sign(params)
+        try:
+            resp = httpx.get(
+                "https://app.bilibili.com/x/v2/playurl",
+                params=params,
+                headers={"User-Agent": _MOBILE_UA},
+                timeout=10,
+            )
+            data = resp.json()
+        except Exception as exc:
+            raise AppError(502, f"移动端播放地址获取失败: {exc}") from exc
+        if data.get("code") != 0 or not data.get("data"):
+            raise AppError(502, f"移动端播放地址获取失败: {data.get('message', '')}")
+
+        d = data["data"]
+        dash = d.get("dash") or {}
+        if kind == "audio":
+            return [self._normalize_stream(i) for i in (dash.get("audio") or [])]
+        if kind == "video":
+            return [self._normalize_stream(i) for i in (dash.get("video") or [])]
+        # watermarked: durl
+        durl = d.get("durl") or []
+        if durl:
+            first = durl[0] or {}
+            qn = int(d.get("quality") or 0)
+            return [{
+                "qn": qn,
+                "label": _qn_label(qn),
+                "url": first.get("url") or "",
+                "backup_urls": [u for u in (first.get("backup_url") or []) if u],
+            }]
+        return []
+
     def get_danmaku(self, cid: int) -> str:
         if not cid:
             return ""
@@ -262,3 +326,60 @@ class BiliClient:
             return resp.text
         except Exception:
             return ""
+
+    def get_comments(self, bvid: str, oid: int, max_pages: int = 10) -> list[dict]:
+        """获取视频评论，返回 [{user, text, like, time, replies: [...]}]。"""
+        if not oid:
+            return []
+        out: list[dict] = []
+        next_offset = "0"
+        for _ in range(max_pages):
+            try:
+                params = WbiSigner(self.client).sign({
+                    "oid": str(oid),
+                    "type": "1",
+                    "mode": "3",
+                    "next": next_offset,
+                })
+                resp = self.client.get(
+                    "https://api.bilibili.com/x/v2/reply/wbi/main", params=params
+                )
+                data = resp.json()
+            except Exception:
+                break
+            if data.get("code") != 0:
+                break
+            d = data.get("data") or {}
+            replies = d.get("replies") or []
+            if not replies:
+                break
+            for r in replies:
+                if not isinstance(r, dict):
+                    continue
+                member = r.get("member") or {}
+                content = r.get("content") or {}
+                item = {
+                    "user": member.get("uname") or "",
+                    "text": content.get("message") or "",
+                    "like": int(r.get("like") or 0),
+                    "time": int(r.get("ctime") or 0),
+                    "replies": [],
+                }
+                sub_replies = r.get("replies") or []
+                for sr in sub_replies:
+                    if not isinstance(sr, dict):
+                        continue
+                    sm = sr.get("member") or {}
+                    sc = sr.get("content") or {}
+                    item["replies"].append({
+                        "user": sm.get("uname") or "",
+                        "text": sc.get("message") or "",
+                        "like": int(sr.get("like") or 0),
+                        "time": int(sr.get("ctime") or 0),
+                    })
+                out.append(item)
+            cursor = d.get("cursor") or {}
+            if cursor.get("is_end"):
+                break
+            next_offset = str(cursor.get("next", ""))
+        return out
