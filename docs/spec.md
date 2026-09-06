@@ -177,6 +177,7 @@ Phase 1：机器人触发
 | POST | `/api/parse` | `{url}` → 解析并自动收藏，返回卡片（幂等） |
 | GET  | `/api/cards?month=YYYY-MM&tag=xxx&source=local\|robot` | 按月份 / 标签 / 来源查卡片 |
 | GET  | `/api/cards/:id` | 单卡片 |
+| GET  | `/api/config/public` | 小程序公开 UI 配置（`robot_guide` / `share`） |
 | DELETE | `/api/cards/:id` | 删除卡片 |
 | POST | `/api/tags` | 新建标签 |
 | GET  | `/api/tags` | 用户标签列表（前端筛选用） |
@@ -188,6 +189,8 @@ Phase 1：机器人触发
 
 > Phase 0 不提供 `POST /api/cards`；解析即收藏。Phase 1 机器人由 worker 直接写库，也不走该接口。
 > Phase 1 提供 `POST /api/binding`（粘贴激活码绑定）、`GET /api/binding`（查绑定状态）与 `DELETE /api/binding`（解绑）。
+
+> 公开配置中的 `robot_guide` 同时控制首页引导、我的页引导以及「关于」页的机器人亮点文案展示。
 
 > **收藏夹前端交互**：卡片数据量小，筛选/搜索先在前端本地完成。顶部依次为「搜索框（标题 / UP主 / 分区 / 标签关键字）」「来源分段（全部 / 本机 / @小破站）」「分区 chips（全部 + 去重后的 B站分区）」。标签不再作为一级筛选维度（标签数量不可控、横向 chip 过长），仅保留为卡片元数据并可被搜索命中。
 
