@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "navigationBarTitleText": "小破站下载",
+  "navigationBarTitleText": "壁咚咚藏链阁",
   "usingComponents": {
     "custom-navbar": "/components/navbar/navbar"
   }
