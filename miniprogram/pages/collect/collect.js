@@ -3,7 +3,7 @@ const { filterCards } = require('../../utils/filter.js');
 const { formatDuration } = require('../../utils/format.js');
 const api = require('../../utils/api.js');
 
-Page({
+Page(Object.assign({
   data: {
     cards: [],
     sourceFilter: 'all',
@@ -181,4 +181,4 @@ Page({
   onGotoParse() {
     wx.switchTab({ url: '/pages/home/home' });
   }
-});
+}, require("../../utils/share.js").pageShare));

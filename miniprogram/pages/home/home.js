@@ -5,7 +5,7 @@ const DEMO_LINK = 'https://b23.tv/2g9l5YF';
 const DEMO_PLACEHOLDER =
   '【高校妖娆版【极乐净土】与原舞蹈对比版！！！-哔哩哔哩】 ' + DEMO_LINK;
 
-Page({
+Page(Object.assign({
   data: {
     input: '',
     demoPlaceholder: DEMO_PLACEHOLDER,
@@ -75,4 +75,4 @@ Page({
         wx.showToast({ title: err.message || '解析失败', icon: 'none' });
       });
   }
-});
+}, require("../../utils/share.js").pageShare));

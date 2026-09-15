@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js');
 
-Page({
+Page(Object.assign({
   data: {
     bound: false,
     biliUid: '',
@@ -76,4 +76,4 @@ Page({
   onGoPrivacy() {
     wx.navigateTo({ url: '/pages/privacy/privacy' });
   }
-});
+}, require("../../utils/share.js").pageShare));

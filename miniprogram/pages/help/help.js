@@ -1,4 +1,4 @@
-Page({
+Page(Object.assign({
   data: {
     groupNo: '',
     showGroup: false
@@ -21,4 +21,4 @@ Page({
       success: () => wx.showToast({ title: '群号已复制，去 QQ 搜索加入', icon: 'none' })
     });
   }
-});
+}, require("../../utils/share.js").pageShare));

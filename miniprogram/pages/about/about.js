@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js');
 
-Page({
+Page(Object.assign({
   data: {
     showRobotGuide: true
   },
@@ -17,4 +17,4 @@ Page({
       })
       .catch(() => {});
   }
-});
+}, require("../../utils/share.js").pageShare));
