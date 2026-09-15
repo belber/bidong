@@ -18,6 +18,26 @@
       <view class="a">收藏夹卡片右上角「删除」按钮。</view>
     </view>
     <view class="faq">
+      <view class="q">怎么解析 B站视频链接？</view>
+      <view class="a">在首页粘贴 B站视频链接、BV 号或 b23.tv 短链，点「解析视频」即可查看并收藏。</view>
+    </view>
+    <view class="faq">
+      <view class="q">怎么保存视频封面？</view>
+      <view class="a">打开视频解析结果页，点「保存封面」即可保存到手机相册。</view>
+    </view>
+    <view class="faq">
+      <view class="q">怎么导出视频音频？</view>
+      <view class="a">在解析结果页选择音频导出，保存后可在手机中播放或分享。</view>
+    </view>
+    <view class="faq">
+      <view class="q">怎么导出字幕？</view>
+      <view class="a">视频有可用字幕时，可在解析结果页导出 SRT 字幕文件。</view>
+    </view>
+    <view class="faq">
+      <view class="q">怎么保存视频？</view>
+      <view class="a">在解析结果页选择视频保存，保存后可从手机相册查看。</view>
+    </view>
+    <view class="faq">
       <view class="q">@壁咚咚私藏 没反应？</view>
       <view class="a">确认已关注，并在评论区正确 @它，稍等后台解析。</view>
     </view>

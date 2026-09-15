@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "navigationBarTitleText": "壁咚咚藏链阁",
+  "navigationBarTitleText": "B站视频链接解析 · 壁咚咚藏链阁",
   "usingComponents": {
     "custom-navbar": "/components/navbar/navbar"
   }

@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "navigationBarTitleText": "收藏夹",
+  "navigationBarTitleText": "B站视频收藏整理 · 壁咚咚藏链阁",
   "enablePullDownRefresh": true,
   "usingComponents": {
     "custom-navbar": "/components/navbar/navbar"
