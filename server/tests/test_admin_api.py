@@ -13,6 +13,8 @@ from app.models import (
     AdminConfig,
     AtEvent,
     Binding,
+    BiliCdnDomain,
+    DownloadEvent,
     FollowEvent,
     ParseLog,
     User,
@@ -246,6 +248,76 @@ def test_help_config_admin_requires_auth_and_roundtrips(admin_client):
     assert put.status_code == 200
     assert put.json() == {"qq_group": "987654321"}
     assert admin_client.get("/api/admin/config/help", headers=_auth(token)).json() == {"qq_group": "987654321"}
+
+
+def test_download_stats_and_detail(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    db.add(
+        DownloadEvent(
+            bvid="BV1xx411c7mD",
+            kind="watermarked",
+            qn=16,
+            host="upos-sz-mirrorcoso1.bilivideo.com",
+            stage="download",
+            status="fail",
+            error_type="domain_not_configured",
+            error_message="url not in domain list",
+            wx_err_msg="downloadFile:fail url not in domain list",
+            created_at=utcnow_naive(),
+        )
+    )
+    db.add(
+        DownloadEvent(
+            bvid="BV1yy411c7mD",
+            kind="audio",
+            qn=30280,
+            host="upos-sz-mirrorcos.bilivideo.com",
+            stage="share",
+            status="success",
+            created_at=utcnow_naive(),
+        )
+    )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get("/api/admin/stats/download", headers=_auth(token)).json()
+    assert data["total"] == 2
+    assert data["success"] == 1
+    assert data["fail"] == 1
+    assert data["success_rate"] == 50.0
+    assert {"error_type": "domain_not_configured", "count": 1} in data["fail_by_error"]
+
+    detail = admin_client.get(
+        "/api/admin/stats/download/detail?status=fail", headers=_auth(token)
+    ).json()
+    assert detail["total"] == 1
+    assert detail["items"][0]["bvid"] == "BV1xx411c7mD"
+
+
+def test_download_domains_list_and_update(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    db.add(BiliCdnDomain(host="upos-sz-mirrorcoso1.bilivideo.com", is_configured=False))
+    db.add(BiliCdnDomain(host="upos-sz-estgcos.bilivideo.com", is_configured=True))
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get("/api/admin/download/domains", headers=_auth(token)).json()
+    assert data["total"] == 2
+    hosts = {i["host"]: i for i in data["items"]}
+    assert hosts["upos-sz-mirrorcoso1.bilivideo.com"]["suggestion"] == "需要配置"
+    assert hosts["upos-sz-estgcos.bilivideo.com"]["is_configured"] is True
+
+    put = admin_client.put(
+        "/api/admin/download/domains/upos-sz-mirrorcoso1.bilivideo.com",
+        json={"is_configured": True},
+        headers=_auth(token),
+    )
+    assert put.status_code == 200
+    assert put.json()["is_configured"] is True
 
 
 def test_at_summary_includes_parse_breakdown(admin_client, db_engine):

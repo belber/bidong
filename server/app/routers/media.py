@@ -8,8 +8,9 @@ from ..db import get_db
 from ..deps import get_current_user
 from ..errors import AppError
 from ..models import User, VideoCard
-from ..schemas import MediaOption
+from ..schemas import DownloadEventReport, MediaOption
 from ..services.bilibili import BiliClient, UA
+from ..services import media_download
 from ..services import config_store
 
 router = APIRouter(tags=["media"])
@@ -122,9 +123,11 @@ def download_url(
     card = _get_owned_card(db, user, card_id)
     client = BiliClient()
     try:
-        # platform=html5 的 CDN URL 不校验 Referer，可由小程序直接下载
-        fnval = 1 if kind == "watermarked" else 16
-        data = client.get_playurl(card.bvid, card.cid, fnval=fnval, platform="html5")
+        if kind == "watermarked":
+            # platform=html5 的 CDN URL 不校验 Referer，可由小程序直接下载
+            data = client.get_playurl(card.bvid, card.cid, fnval=1, platform="html5")
+        else:
+            data = client.get_playurl(card.bvid, card.cid, fnval=16)
         if kind == "audio":
             streams = data.get("audio", [])
         elif kind == "clean":
@@ -135,12 +138,42 @@ def download_url(
             streams = [s for s in streams if s["qn"] == qn]
         if not streams:
             raise AppError(404, "无可用清晰度")
-        url = streams[0]["url"] or (streams[0]["backup_urls"][0] if streams[0]["backup_urls"] else "")
-        if not url:
+        candidates = media_download.build_candidates(db, streams)
+        if not candidates:
             raise AppError(502, "无可用下载地址")
+        chosen_qn = streams[0]["qn"]
+        expires_at = media_download.expiry_from_streams(streams)
     finally:
         client.close()
-    return {"url": url}
+    return {
+        "kind": kind,
+        "qn": chosen_qn,
+        "expires_at": expires_at,
+        "candidates": candidates,
+    }
+
+
+@router.post("/api/download-events", response_model=DownloadEventReport)
+def report_download_event(
+    payload: DownloadEventReport,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    event = media_download.report_event(db, user, payload.model_dump())
+    return DownloadEventReport(
+        card_id=event.card_id,
+        bvid=event.bvid,
+        kind=event.kind,
+        qn=event.qn,
+        host=event.host,
+        candidate_index=event.candidate_index,
+        stage=event.stage,
+        status=event.status,
+        error_type=event.error_type,
+        error_message=event.error_message,
+        http_status=event.http_status,
+        wx_err_msg=event.wx_err_msg,
+    )
 
 
 def _fmt_srt_time(t: int) -> str:

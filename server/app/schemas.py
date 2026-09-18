@@ -51,6 +51,34 @@ class MediaOption(BaseModel):
     label: str
 
 
+class MediaDownloadCandidate(BaseModel):
+    url: str
+    host: str
+    configured: bool
+
+
+class MediaDownloadUrlResponse(BaseModel):
+    kind: str
+    qn: int | None = None
+    expires_at: int | None = None
+    candidates: list[MediaDownloadCandidate] = Field(default_factory=list)
+
+
+class DownloadEventReport(BaseModel):
+    card_id: int | None = None
+    bvid: str = ""
+    kind: str = ""
+    qn: int | None = None
+    host: str = ""
+    candidate_index: int = 0
+    stage: str = "download"
+    status: str = "success"
+    error_type: str = ""
+    error_message: str = ""
+    http_status: int | None = None
+    wx_err_msg: str = ""
+
+
 class CardOut(BaseModel):
     id: int
     bvid: str

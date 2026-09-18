@@ -1,6 +1,17 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Table, Text, UniqueConstraint, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -180,3 +191,49 @@ class AdminConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(
         default=utcnow_naive, onupdate=utcnow_naive
     )
+
+
+class BiliCdnDomain(Base):
+    """B站 CDN 域名登记，用于微信 downloadFile 合法域名治理。"""
+
+    __tablename__ = "bili_cdn_domain"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    host: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    is_configured: Mapped[bool] = mapped_column(Boolean, default=False)
+    first_seen_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    last_seen_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    seen_count: Mapped[int] = mapped_column(Integer, default=0)
+    download_success_count: Mapped[int] = mapped_column(Integer, default=0)
+    download_failure_count: Mapped[int] = mapped_column(Integer, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=utcnow_naive, onupdate=utcnow_naive
+    )
+
+
+class DownloadEvent(Base):
+    """前端直连下载的关键阶段事件，用于下载监控与失败分析。"""
+
+    __tablename__ = "download_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id"), nullable=True, index=True
+    )
+    card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("video_card.id"), nullable=True, index=True
+    )
+    bvid: Mapped[str] = mapped_column(String(32), default="", index=True)
+    kind: Mapped[str] = mapped_column(String(16), default="", index=True)
+    qn: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    host: Mapped[str] = mapped_column(String(255), default="", index=True)
+    candidate_index: Mapped[int] = mapped_column(Integer, default=0)
+    stage: Mapped[str] = mapped_column(String(16), index=True)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    error_type: Mapped[str] = mapped_column(String(32), default="", index=True)
+    error_message: Mapped[str] = mapped_column(Text, default="")
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    wx_err_msg: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)

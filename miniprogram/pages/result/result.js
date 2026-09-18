@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js');
 const { formatDuration, formatDateTime } = require('../../utils/format.js');
+const { downloadMedia, domainFromUrl } = require('../../utils/mediaDownload.js');
 
 function toast(title) {
   wx.showToast({ title: title, icon: 'none' });
@@ -70,6 +71,31 @@ function shareLocalFile(localPath, filename) {
   });
 }
 
+function saveVideoPromise(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.saveVideoToPhotosAlbum({
+      filePath,
+      success: () => resolve(),
+      fail: reject
+    });
+  });
+}
+
+function shareFilePromise(filePath, filename) {
+  return new Promise((resolve, reject) => {
+    if (!wx.shareFileMessage) {
+      reject(new Error('当前微信版本不支持文件分享'));
+      return;
+    }
+    wx.shareFileMessage({
+      filePath,
+      fileName: filename,
+      success: () => resolve(),
+      fail: reject
+    });
+  });
+}
+
 Page({
   data: {
     cardId: 0,
@@ -98,7 +124,13 @@ Page({
     mediaSize: {},
     downloading: false,
     downloadProgress: 0,
-    downloadSizeText: ''
+    downloadSizeText: '',
+    fallbackVisible: false,
+    fallbackUrl: '',
+    fallbackMessage: '',
+    tutorialVisible: false,
+    activeKind: '',
+    activeQn: null
   },
 
   onLoad(options) {
@@ -187,10 +219,6 @@ Page({
     if (features.danmaku !== false && r.danmaku_count) {
       this.prepareFile(api.danmaku(r.id), textFilename(r.title, r.bvid, '_弹幕.txt'), 'danmakuLocalPath');
     }
-    if (r.media && r.media.audio) {
-      console.log('prepareExports: audio pre-download starting');
-      this.prepareFile(api.download(r.id, 'audio'), mediaFilename(r.title, r.bvid, 'audio'), 'audioLocalPath');
-    }
   },
 
   prepareFile(downloadPromise, filename, key) {
@@ -250,37 +278,64 @@ Page({
     });
   },
 
-  saveMedia(url, header) {
+  saveMedia(candidates, kind) {
     this.setData({ downloading: true, downloadProgress: 0, downloadSizeText: '' });
-    wx.downloadFile({
-      url,
-      header,
-      onProgressUpdate: (res) => {
-        const percent = res.totalBytesWritten && res.totalBytesExpectedToWrite
-          ? Math.round(res.totalBytesWritten / res.totalBytesExpectedToWrite * 100)
-          : 0;
-        const written = formatSize(res.totalBytesWritten);
-        const total = formatSize(res.totalBytesExpectedToWrite);
-        const sizeText = total ? ` (${written}/${total})` : '';
-        this.setData({ downloadProgress: percent, downloadSizeText: sizeText });
-      },
-      success: (res) => {
-        this.setData({ downloading: false });
-        if (res.statusCode !== 200) { toast('下载失败'); return; }
-        const filename = mediaFilename(this.data.title, this.data.bvid, 'video');
-        copyToNamed(res.tempFilePath, filename).then((filePath) => {
-          saveToAlbum(wx.saveVideoToPhotosAlbum, filePath);
-        }).catch(() => {
-          // 复制失败则用临时文件保存
-          saveToAlbum(wx.saveVideoToPhotosAlbum, res.tempFilePath);
+    const filename = kind === 'audio'
+      ? mediaFilename(this.data.title, this.data.bvid, 'audio')
+      : mediaFilename(this.data.title, this.data.bvid, 'video');
+
+    downloadMedia(candidates, {
+      report: (evt) => this.reportDownload(evt.stage, evt.status, evt)
+    }).then((result) => {
+      this.setData({ downloading: false });
+      return copyToNamed(result.tempFilePath, filename)
+        .then((filePath) => {
+          if (kind === 'audio') {
+            return shareFilePromise(filePath, filename).then(() => {
+              this.reportDownload('share', 'success', { host: result.host });
+              toast('已唤起文件分享');
+            });
+          }
+          return saveVideoPromise(filePath).then(() => {
+            this.reportDownload('save', 'success', { host: result.host });
+            toast('已保存到相册');
+          });
+        })
+        .catch((err) => {
+          if (kind === 'audio') {
+            return shareFilePromise(result.tempFilePath, filename).then(() => {
+              this.reportDownload('share', 'success', { host: result.host });
+              toast('已唤起文件分享');
+            }).catch(() => {
+              this.reportDownload('share', 'fail', {
+                host: result.host,
+                error_type: 'wx_error',
+                error_message: '文件分享失败'
+              });
+              this.openFallback(candidates, '文件分享失败，可复制链接后手动保存');
+            });
+          }
+          return saveVideoPromise(result.tempFilePath).then(() => {
+            this.reportDownload('save', 'success', { host: result.host });
+            toast('已保存到相册');
+          }).catch((saveErr) => {
+            this.reportDownload('save', 'fail', {
+              host: result.host,
+              error_type: 'permission',
+              error_message: (saveErr && saveErr.errMsg) || '保存失败'
+            });
+            this.openFallback(candidates, '保存到相册失败，可在设置中允许保存到相册');
+          });
         });
-      },
-      fail: () => { this.setData({ downloading: false }); toast('下载失败'); }
+    }).catch((err) => {
+      this.setData({ downloading: false });
+      this.openFallback(candidates, (err && err.message) || '下载失败');
     });
   },
 
   onDownloadVideo(e) {
-    const kind = e.currentTarget.dataset.kind;
+    const kind = e.currentTarget.dataset.kind || 'watermarked';
+    this.setData({ activeKind: kind });
     api.mediaOptions(this.data.cardId, kind).then((options) => {
       if (!options.length) {
         toast('无可用清晰度');
@@ -290,26 +345,87 @@ Page({
         itemList: options.map((o) => o.label),
         success: (res) => {
           const chosen = options[res.tapIndex];
-          if (kind === 'watermarked') {
-            api.downloadUrl(this.data.cardId, kind, chosen.qn).then(({ url }) => {
-              this.saveMedia(url, {});
-            }).catch(() => toast('下载失败'));
-          } else {
-            api.download(this.data.cardId, kind, chosen.qn).then(({ url, header }) => {
-              this.saveMedia(url, header);
-            }).catch(() => toast('下载失败'));
-          }
+          this.setData({ activeQn: chosen.qn });
+          api.downloadUrl(this.data.cardId, kind, chosen.qn).then((data) => {
+            this.reportDownload('resolve', 'success', {});
+            this.saveMedia(data.candidates, kind);
+          }).catch(() => {
+            this.reportDownload('resolve', 'fail', { error_type: 'unknown', error_message: '获取下载地址失败' });
+            toast('获取下载地址失败');
+          });
         }
       });
-    }).catch(() => toast('获取清晰度失败'));
+    }).catch(() => {
+      this.reportDownload('resolve', 'fail', { error_type: 'unknown', error_message: '获取清晰度失败' });
+      toast('获取清晰度失败');
+    });
   },
 
   onDownloadAudio() {
-    const filename = mediaFilename(this.data.title, this.data.bvid, 'audio');
-    if (this.data.audioLocalPath) {
-      shareLocalFile(this.data.audioLocalPath, filename);
-    } else {
-      toast('文件准备中，请稍后重试');
+    const kind = 'audio';
+    this.setData({ activeKind: kind, activeQn: null });
+    api.downloadUrl(this.data.cardId, kind).then((data) => {
+      this.reportDownload('resolve', 'success', {});
+      this.saveMedia(data.candidates, kind);
+    }).catch(() => {
+      this.reportDownload('resolve', 'fail', { error_type: 'unknown', error_message: '获取下载地址失败' });
+      toast('获取下载地址失败');
+    });
+  },
+
+  reportDownload(stage, status, evt) {
+    evt = evt || {};
+    api.reportDownloadEvent({
+      card_id: this.data.cardId,
+      bvid: this.data.bvid,
+      kind: this.data.activeKind,
+      qn: this.data.activeQn,
+      host: evt.host || '',
+      candidate_index: evt.candidate_index || 0,
+      stage: stage,
+      status: status,
+      error_type: evt.error_type || '',
+      error_message: evt.error_message || '',
+      http_status: evt.http_status,
+      wx_err_msg: evt.wx_err_msg || ''
+    }).catch(() => {});
+  },
+
+  openFallback(candidates, message) {
+    const first = (candidates && candidates[0]) || {};
+    this.setData({
+      fallbackVisible: true,
+      fallbackUrl: first.url || '',
+      fallbackMessage: message || '下载失败'
+    });
+  },
+
+  onCloseFallback() {
+    this.setData({ fallbackVisible: false });
+  },
+
+  onCopyFallback() {
+    const url = this.data.fallbackUrl;
+    if (!url) {
+      toast('没有可复制的链接');
+      return;
+    }
+    wx.setClipboardData({ data: url, success() { toast('已复制，请立即使用'); } });
+  },
+
+  onShowTutorial() {
+    this.setData({ fallbackVisible: false, tutorialVisible: true });
+  },
+
+  onCloseTutorial() {
+    this.setData({ tutorialVisible: false });
+  },
+
+  onRetryDownload() {
+    this.setData({ fallbackVisible: false });
+    const bvid = this.data.bvid;
+    if (bvid) {
+      this.loadByBvid(bvid);
     }
   },
 

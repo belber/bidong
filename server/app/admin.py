@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from .admin_security import create_admin_token, decode_admin_token, verify_password
 from .db import get_db
-from .models import Binding
+from .models import Binding, BiliCdnDomain, DownloadEvent
 from .robot.cookie import check_cookie, build_client
 from .robot.worker import activation_message
 from .services import config_store
 from .services import admin_stats as stats
 from .services.activation import issue_activation
+from .time import utcnow_naive
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 bearer = HTTPBearer(auto_error=False)
@@ -157,6 +158,195 @@ def parse_detail(
     db: Session = Depends(get_db),
 ):
     return stats.parse_detail(db, source, q, result, days, page, size)
+
+
+# ---------------------------------------------------------------------------
+# 下载监控
+# ---------------------------------------------------------------------------
+@router.get("/stats/download")
+def download_stats(
+    days: int = Query(30),
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    cutoff = utcnow_naive().replace(hour=0, minute=0, second=0, microsecond=0)
+    from datetime import timedelta
+
+    start = cutoff - timedelta(days=days - 1)
+    events = db.query(DownloadEvent).filter(DownloadEvent.created_at >= start).all()
+
+    total = len(events)
+    success = sum(1 for e in events if e.status == "success")
+    fail = total - success
+
+    by_stage: dict[str, int] = {}
+    by_error_type: dict[str, int] = {}
+    by_host: dict[str, dict] = {}
+    for e in events:
+        by_stage[e.stage] = by_stage.get(e.stage, 0) + 1
+        if e.status == "fail":
+            key = e.error_type or "unknown"
+            by_error_type[key] = by_error_type.get(key, 0) + 1
+            if e.host:
+                item = by_host.setdefault(e.host, {"fail": 0, "success": 0})
+                item["fail"] += 1
+        elif e.host:
+            item = by_host.setdefault(e.host, {"fail": 0, "success": 0})
+            item["success"] += 1
+
+    trend = []
+    for offset in range(days):
+        day = (start + timedelta(days=offset)).date()
+        count = sum(
+            1
+            for e in events
+            if e.created_at is not None and e.created_at.date() == day
+        )
+        trend.append({"date": day.isoformat(), "count": count})
+
+    return {
+        "total": total,
+        "success": success,
+        "fail": fail,
+        "success_rate": round(success / total * 100, 1) if total else 0,
+        "by_stage": [
+            {"stage": k, "count": v} for k, v in sorted(by_stage.items(), key=lambda x: -x[1])
+        ],
+        "fail_by_error": [
+            {"error_type": k, "count": v}
+            for k, v in sorted(by_error_type.items(), key=lambda x: -x[1])
+        ],
+        "fail_by_host": [
+            {"host": k, "fail": v["fail"], "success": v["success"]}
+            for k, v in sorted(by_host.items(), key=lambda x: -x[1]["fail"])
+        ],
+        "trend": trend,
+    }
+
+
+@router.get("/stats/download/detail")
+def download_detail(
+    q: str = "",
+    status: str = Query("", pattern="^(success|fail)?$"),
+    days: int = Query(30),
+    page: int = Query(1),
+    size: int = Query(20),
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    from datetime import timedelta
+
+    query = db.query(DownloadEvent)
+    start = utcnow_naive() - timedelta(days=days)
+    query = query.filter(DownloadEvent.created_at >= start)
+    if status:
+        query = query.filter(DownloadEvent.status == status)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (DownloadEvent.bvid.ilike(like))
+            | (DownloadEvent.host.ilike(like))
+            | (DownloadEvent.error_message.ilike(like))
+        )
+    total = query.count()
+    items = (
+        query.order_by(DownloadEvent.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": e.id,
+                "created_at": e.created_at.isoformat() if e.created_at else "",
+                "bvid": e.bvid,
+                "kind": e.kind,
+                "qn": e.qn,
+                "host": e.host,
+                "stage": e.stage,
+                "status": e.status,
+                "error_type": e.error_type,
+                "error_message": e.error_message,
+                "http_status": e.http_status,
+                "wx_err_msg": e.wx_err_msg,
+            }
+            for e in items
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# B站 CDN 域名管理
+# ---------------------------------------------------------------------------
+def _domain_item(row: BiliCdnDomain) -> dict:
+    now = utcnow_naive()
+    days_since = (
+        (now - row.last_seen_at).days if row.last_seen_at is not None else 0
+    )
+    if days_since >= 60:
+        suggestion = "建议删除"
+    elif days_since >= 30:
+        suggestion = "可能闲置"
+    elif not row.is_configured:
+        suggestion = "需要配置"
+    else:
+        suggestion = "正常使用"
+    return {
+        "id": row.id,
+        "host": row.host,
+        "is_configured": row.is_configured,
+        "first_seen_at": row.first_seen_at.isoformat() if row.first_seen_at else "",
+        "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else "",
+        "seen_count": row.seen_count,
+        "download_success_count": row.download_success_count,
+        "download_failure_count": row.download_failure_count,
+        "days_since_seen": days_since,
+        "suggestion": suggestion,
+        "notes": row.notes,
+    }
+
+
+@router.get("/download/domains")
+def download_domains(
+    q: str = "",
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(BiliCdnDomain)
+    if q:
+        query = query.filter(BiliCdnDomain.host.ilike(f"%{q}%"))
+    rows = query.order_by(
+        BiliCdnDomain.is_configured.asc(),
+        BiliCdnDomain.last_seen_at.desc(),
+    ).all()
+    items = [_domain_item(r) for r in rows]
+    return {"total": len(items), "items": items}
+
+
+class DomainUpdatePayload(BaseModel):
+    is_configured: bool | None = None
+    notes: str | None = None
+
+
+@router.put("/download/domains/{host}")
+def update_download_domain(
+    host: str,
+    payload: DomainUpdatePayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = db.query(BiliCdnDomain).filter(BiliCdnDomain.host == host).first()
+    if row is None:
+        row = BiliCdnDomain(host=host, is_configured=False, notes="")
+        db.add(row)
+    if payload.is_configured is not None:
+        row.is_configured = payload.is_configured
+    if payload.notes is not None:
+        row.notes = payload.notes
+    db.commit()
+    return _domain_item(row)
 
 
 # ---------------------------------------------------------------------------

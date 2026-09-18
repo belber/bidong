@@ -160,6 +160,9 @@ module.exports = {
     const suffix = qn ? '&qn=' + qn : '';
     return request('GET', '/api/cards/' + id + '/download-url?kind=' + kind + suffix);
   },
+  reportDownloadEvent(payload) {
+    return request('POST', '/api/download-events', payload);
+  },
   mediaSize(id) {
     return request('GET', '/api/cards/' + id + '/media-size');
   },

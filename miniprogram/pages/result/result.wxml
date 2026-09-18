@@ -134,4 +134,36 @@
     <view class="preview-save" catchtap="onSaveCover">保存到相册</view>
     <view class="preview-hint">点空白处关闭</view>
   </view>
+
+  <view wx:if="{{fallbackVisible}}" class="preview-mask" bindtap="onCloseFallback">
+    <view class="fallback-card" catchtap="">
+      <view class="fallback-title">下载失败</view>
+      <view class="fallback-msg">{{fallbackMessage}}</view>
+      <view class="fallback-actions">
+        <button class="btn-ghost small" bindtap="onCopyFallback">复制下载链接</button>
+        <button class="btn-primary small" bindtap="onShowTutorial">查看保存教程</button>
+      </view>
+      <view class="fallback-actions">
+        <button class="btn-ghost small" bindtap="onRetryDownload">重新解析</button>
+        <button class="btn-ghost small" bindtap="onCloseFallback">关闭</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{tutorialVisible}}" class="preview-mask" bindtap="onCloseTutorial">
+    <view class="tutorial-card" catchtap="">
+      <view class="fallback-title">手动保存教程</view>
+      <view class="tutorial-body">
+        <view class="tutorial-step">1. 复制下载链接；</view>
+        <view class="tutorial-step">2. 打开微信，把链接发给「文件传输助手」；</view>
+        <view class="tutorial-step">3. 点击链接，在微信内置浏览器中打开；</view>
+        <view class="tutorial-step">4. 播放或长按视频，选择「保存视频」；</view>
+        <view class="tutorial-step">5. 保存后可在手机相册查看。</view>
+        <view class="tutorial-note">链接会过期，复制后请立即使用；若提示链接失效，请重新解析。</view>
+        <view class="tutorial-note">Android：没有保存按钮时可长按视频；部分浏览器会先存到「文件管理」。</view>
+        <view class="tutorial-note">iOS：保存时需要允许微信访问照片；不行可点「···」在 Safari 中打开再长按保存。</view>
+      </view>
+      <button class="btn-primary small" bindtap="onCloseTutorial">我知道了</button>
+    </view>
+  </view>
 </view>

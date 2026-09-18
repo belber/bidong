@@ -81,12 +81,14 @@
       <a data-view="overview" class="active" href="javascript:void(0)">概览</a>
       <a data-view="follow" href="javascript:void(0)">关注监控</a>
       <a data-view="parse" href="javascript:void(0)">解析监控</a>
+      <a data-view="download" href="javascript:void(0)">下载监控</a>
       <div class="group">运维配置</div>
       <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
       <a data-view="features" href="javascript:void(0)">功能开关</a>
       <a data-view="schedule" href="javascript:void(0)">定时任务</a>
       <a data-view="alert" href="javascript:void(0)">告警邮件</a>
       <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
+      <a data-view="cdn" href="javascript:void(0)">B站域名管理</a>
       <div class="group"></div>
       <a href="javascript:void(0)" onclick="logout()">退出登录</a>
     </nav>
@@ -95,11 +97,13 @@
     <section id="view-overview" class="view"></section>
     <section id="view-follow" class="view hidden"></section>
     <section id="view-parse" class="view hidden"></section>
+    <section id="view-download" class="view hidden"></section>
     <section id="view-cookie" class="view hidden"></section>
     <section id="view-features" class="view hidden"></section>
     <section id="view-schedule" class="view hidden"></section>
     <section id="view-alert" class="view hidden"></section>
     <section id="view-help" class="view hidden"></section>
+    <section id="view-cdn" class="view hidden"></section>
   </main>
 </div>
 
@@ -422,6 +426,46 @@ const renderers = {
         </div>
         <button style="margin-top:8px" onclick="saveHelp()">保存</button> <span id="help-msg" class="muted"></span>
       </div>`;
+  },
+
+  async download(el) {
+    const days = 30;
+    const s = await api("/stats/download?days=" + days);
+    const det = await api("/stats/download/detail" + qs({ days, page: 1, size: 20 }));
+    const failRows = (s.fail_by_error || []).map(r => `<tr><td>${esc(r.error_type)}</td><td>${fmt(r.count)}</td></tr>`).join("");
+    el.innerHTML = `
+      <div class="cards">
+        <div class="card"><div class="label">下载事件总数</div><div class="value">${fmt(s.total)}</div></div>
+        <div class="card"><div class="label">成功</div><div class="value ok">${fmt(s.success)}</div></div>
+        <div class="card"><div class="label">失败</div><div class="value bad">${fmt(s.fail)}</div></div>
+        <div class="card"><div class="label">成功率</div><div class="value">${s.success_rate}%</div></div>
+      </div>
+      <div class="panel"><h3>下载趋势</h3><div id="chart-download" class="chart"></div></div>
+      <div class="panel"><h3>失败原因分布</h3><table><thead><tr><th>错误类型</th><th>数量</th></tr></thead><tbody>${failRows || '<tr><td colspan=2 class="muted">暂无失败</td></tr>'}</tbody></table></div>
+      <div class="panel">
+        <h3>明细</h3>
+        <table><thead><tr><th>时间</th><th>BVID</th><th>类型</th><th>域名</th><th>阶段</th><th>状态</th><th>错误</th></tr></thead>
+        <tbody>${det.items.map(downloadRow).join("")}</tbody></table>
+        <p class="muted">共 ${fmt(det.total)} 条</p>
+      </div>`;
+    drawChart("chart-download", chart => chart.setOption({
+      tooltip: { trigger: "axis" }, grid: { left: 40, right: 20, top: 20, bottom: 30 },
+      xAxis: { type: "category", data: s.trend.map(x => x.date.slice(5)) },
+      yAxis: { type: "value", minInterval: 1 },
+      series: [{ type: "line", smooth: true, areaStyle: {}, data: s.trend.map(x => x.count) }]
+    }));
+  },
+
+  async cdn(el) {
+    const data = await api("/download/domains");
+    const rows = data.items.map(domainRow).join("");
+    el.innerHTML = `
+      <div class="panel">
+        <h3>B站 CDN 域名管理</h3>
+        <p class="muted">这里展示 B站解析结果里出现过的下载域名。请把「需要配置」的域名加到微信小程序后台的 downloadFile 合法域名，并把状态标记为已配置。</p>
+        <p class="muted">「可能闲置」表示 30 天未出现，「建议删除」表示 60 天未出现。系统只提醒，不会自动删除微信后台配置。</p>
+        <table><thead><tr><th>域名</th><th>状态</th><th>是否已配置</th><th>出现次数</th><th>成功/失败</th><th>最近出现</th><th>建议</th><th>操作</th></tr></thead><tbody>${rows || '<tr><td colspan=8 class="muted">暂无域名记录</td></tr>'}</tbody></table>
+      </div>`;
   }
 };
 
@@ -444,6 +488,40 @@ function localRow(i) {
   const result = i.ok ? '<span class="tag ok">成功</span>' : '<span class="tag bad">失败</span>';
   const reason = i.ok ? "—" : (i.reason || "—");
   return `<tr><td>${esc(i.created_at)}</td><td>${esc(i.origin || "—")}</td><td>${esc(i.input) || "—"}</td><td>${esc(i.video_title || "—")}</td><td>${esc(i.bvid || "—")}</td><td>${result}</td><td>${esc(reason)}</td></tr>`;
+}
+
+function downloadRow(i) {
+  const status = i.status === "success"
+    ? '<span class="tag ok">成功</span>'
+    : '<span class="tag bad">失败</span>';
+  const kindMap = { watermarked: "水印视频", clean: "无水印", audio: "音频" };
+  const error = [i.error_type, i.error_message, i.wx_err_msg].filter(Boolean).join(" / ");
+  return `<tr><td>${esc(i.created_at)}</td><td>${esc(i.bvid || "—")}</td><td>${esc(kindMap[i.kind] || i.kind || "—")}</td><td>${esc(i.host || "—")}</td><td>${esc(i.stage || "—")}</td><td>${status}</td><td>${esc(error || "—")}</td></tr>`;
+}
+
+function domainRow(i) {
+  const configTag = i.is_configured
+    ? '<span class="tag ok">已配置</span>'
+    : '<span class="tag bad">未配置</span>';
+  const suggestion = i.suggestion || "";
+  const cls = suggestion === "建议删除" ? "bad" : suggestion === "可能闲置" ? "muted" : suggestion === "需要配置" ? "bad" : "ok";
+  const host = `<span class="host">${esc(i.host)}</span>`;
+  const toggle = i.is_configured
+    ? `<button class="small ghost" onclick="saveDomain('${esc(i.host)}', false)">标记未配置</button>`
+    : `<button class="small" onclick="saveDomain('${esc(i.host)}', true)">标记已配置</button>`;
+  return `<tr><td>${host}</td><td>${configTag}</td><td>${i.is_configured ? "是" : "否"}</td><td>${fmt(i.seen_count)}</td><td>${fmt(i.download_success_count)} / ${fmt(i.download_failure_count)}</td><td>${esc(i.last_seen_at || "—")}</td><td><span class="tag ${cls}">${esc(suggestion)}</span></td><td>${toggle}</td></tr>`;
+}
+
+async function saveDomain(host, configured) {
+  try {
+    await api("/download/domains/" + encodeURIComponent(host), {
+      method: "PUT",
+      body: JSON.stringify({ is_configured: configured })
+    });
+    show("cdn");
+  } catch (e) {
+    showModal("保存失败", e.message, true);
+  }
 }
 
 function followMsg(t) {
