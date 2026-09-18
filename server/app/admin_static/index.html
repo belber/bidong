@@ -433,6 +433,11 @@ const renderers = {
     const s = await api("/stats/download?days=" + days);
     const det = await api("/stats/download/detail" + qs({ days, page: 1, size: 20 }));
     const failRows = (s.fail_by_error || []).map(r => `<tr><td>${esc(r.error_type)}</td><td>${fmt(r.count)}</td></tr>`).join("");
+    const failHostRows = (s.fail_by_host || []).map(r => {
+      const total = r.fail + r.success;
+      const rate = total ? Math.round(r.fail / total * 100) : 0;
+      return `<tr><td>${esc(r.host)}</td><td>${fmt(r.fail)}</td><td>${fmt(r.success)}</td><td>${rate}%</td></tr>`;
+    }).join("");
     el.innerHTML = `
       <div class="cards">
         <div class="card"><div class="label">下载事件总数</div><div class="value">${fmt(s.total)}</div></div>
@@ -442,6 +447,7 @@ const renderers = {
       </div>
       <div class="panel"><h3>下载趋势</h3><div id="chart-download" class="chart"></div></div>
       <div class="panel"><h3>失败原因分布</h3><table><thead><tr><th>错误类型</th><th>数量</th></tr></thead><tbody>${failRows || '<tr><td colspan=2 class="muted">暂无失败</td></tr>'}</tbody></table></div>
+      <div class="panel"><h3>失败域名分布</h3><table><thead><tr><th>域名</th><th>失败</th><th>成功</th><th>失败率</th></tr></thead><tbody>${failHostRows || '<tr><td colspan=4 class="muted">暂无下载</td></tr>'}</tbody></table></div>
       <div class="panel">
         <h3>明细</h3>
         <table><thead><tr><th>时间</th><th>BVID</th><th>类型</th><th>域名</th><th>阶段</th><th>状态</th><th>错误</th></tr></thead>

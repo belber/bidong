@@ -293,6 +293,8 @@ def _domain_item(row: BiliCdnDomain) -> dict:
         suggestion = "需要配置"
     else:
         suggestion = "正常使用"
+    total = row.download_success_count + row.download_failure_count
+    failure_rate = round(row.download_failure_count / total * 100, 1) if total else 0.0
     return {
         "id": row.id,
         "host": row.host,
@@ -302,10 +304,22 @@ def _domain_item(row: BiliCdnDomain) -> dict:
         "seen_count": row.seen_count,
         "download_success_count": row.download_success_count,
         "download_failure_count": row.download_failure_count,
+        "failure_rate": failure_rate,
         "days_since_seen": days_since,
         "suggestion": suggestion,
         "notes": row.notes,
     }
+
+
+def _domain_priority(item: dict) -> tuple[int, float]:
+    suggestion = item.get("suggestion") or ""
+    if not item.get("is_configured"):
+        return (0, item.get("failure_rate") or 0.0)
+    if suggestion == "建议删除":
+        return (1, item.get("failure_rate") or 0.0)
+    if suggestion == "可能闲置":
+        return (2, item.get("failure_rate") or 0.0)
+    return (3, item.get("failure_rate") or 0.0)
 
 
 @router.get("/download/domains")
@@ -317,11 +331,9 @@ def download_domains(
     query = db.query(BiliCdnDomain)
     if q:
         query = query.filter(BiliCdnDomain.host.ilike(f"%{q}%"))
-    rows = query.order_by(
-        BiliCdnDomain.is_configured.asc(),
-        BiliCdnDomain.last_seen_at.desc(),
-    ).all()
+    rows = query.all()
     items = [_domain_item(r) for r in rows]
+    items.sort(key=lambda item: (-_domain_priority(item)[0], -item["failure_rate"], item["host"]))
     return {"total": len(items), "items": items}
 
 
