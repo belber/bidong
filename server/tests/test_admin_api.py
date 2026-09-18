@@ -319,6 +319,16 @@ def test_download_domains_list_and_update(admin_client, db_engine):
     assert put.status_code == 200
     assert put.json()["is_configured"] is True
 
+    created = admin_client.put(
+        "/api/admin/download/domains/upos-sz-mirrorhw.bilivideo.com",
+        json={"is_configured": True},
+        headers=_auth(token),
+    )
+    assert created.status_code == 200
+    assert created.json()["host"] == "upos-sz-mirrorhw.bilivideo.com"
+    assert created.json()["is_configured"] is True
+    assert created.json()["seen_count"] == 0
+
 
 def test_at_summary_includes_parse_breakdown(admin_client, db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)

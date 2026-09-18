@@ -467,6 +467,15 @@ const renderers = {
     const rows = data.items.map(domainRow).join("");
     el.innerHTML = `
       <div class="panel">
+        <h3>手动登记域名</h3>
+        <p class="muted">如果某个域名还没在解析结果中出现过，但你已经配置到微信后台，可以在这里手动补录。输入裸域名即可，不用带 https:// 和路径。</p>
+        <div class="flex">
+          <input id="domain-host" placeholder="例如 upos-sz-mirrorcoso1.bilivideo.com" style="min-width:360px"/>
+          <label class="switch"><input type="checkbox" id="domain-configured" checked/> 已配置到微信后台</label>
+          <button onclick="addDomain()">新增 / 更新</button>
+        </div>
+      </div>
+      <div class="panel">
         <h3>B站 CDN 域名管理</h3>
         <p class="muted">这里展示 B站解析结果里出现过的下载域名。请把「需要配置」的域名加到微信小程序后台的 downloadFile 合法域名，并把状态标记为已配置。</p>
         <p class="muted">「可能闲置」表示 30 天未出现，「建议删除」表示 60 天未出现。系统只提醒，不会自动删除微信后台配置。</p>
@@ -524,6 +533,35 @@ async function saveDomain(host, configured) {
       method: "PUT",
       body: JSON.stringify({ is_configured: configured })
     });
+    show("cdn");
+  } catch (e) {
+    showModal("保存失败", e.message, true);
+  }
+}
+
+function normalizeHost(value) {
+  let text = (value || "").trim().toLowerCase();
+  text = text.replace(/^https?:\/\//, "");
+  text = text.split("/")[0];
+  text = text.replace(/:\d+$/, "");
+  return text;
+}
+
+async function addDomain() {
+  const input = document.getElementById("domain-host");
+  if (!input) return;
+  const host = normalizeHost(input.value);
+  if (!host) {
+    showModal("提示", "请输入域名，例如 upos-sz-mirrorcoso1.bilivideo.com", true);
+    return;
+  }
+  const configured = document.getElementById("domain-configured").checked;
+  try {
+    await api("/download/domains/" + encodeURIComponent(host), {
+      method: "PUT",
+      body: JSON.stringify({ is_configured: configured })
+    });
+    showModal("保存成功", `已登记 ${host}`, false);
     show("cdn");
   } catch (e) {
     showModal("保存失败", e.message, true);
