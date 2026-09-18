@@ -25,7 +25,7 @@
 | 跳回 B站 | 点击卡片跳转原视频 |
 | 微信登录 | openid 登录，数据按用户隔离 |
 | 解析结果页 | 字段化展示解析产物，单字段复制/下载 + 一键导出文本 |
-| 媒体下载 | 有水印视频 / 无水印视频 / 纯音频，三档独立开关、中转流式 |
+| 媒体下载 | 有水印视频 / 纯音频返回 B站 CDN 直链，由小程序前端直接下载；无水印视频暂关闭，待支持音视频合流后再开放 |
 
 **增值（读向、可选、风险低）：** 弹幕读取（本期做）；评论读取（延后）。
 
@@ -250,3 +250,89 @@ Phase 1：机器人触发
 | 机器人风控 | 小号 + 低频 + 可下线（见 §7） |
 | 命名待定 | 代号 bili-collector |
 | 冷启动流量 | 广告需 500 访客后开，前期无收入 |
+
+
+---
+
+## 10. 媒体直连下载与 CDN 域名治理
+
+### 10.1 范围
+
+- 第一期支持 `kind=watermarked`：`fnval=1&platform=html5`，返回完整 MP4，可直接 `wx.downloadFile` 后保存相册。
+- 第一期支持 `kind=audio`：DASH 音频轨 `.m4s`，下载后按 `.m4a` 命名并转发；真机需验证播放兼容性。
+- `kind=clean` 暂不支持：DASH 视频轨不含音频，需要合流，功能开关保持关闭。
+- 后端只负责调用 B站 `playurl`、返回候选直链、记录域名和下载事件，不代理视频/音频流量。
+
+### 10.2 直链响应
+
+`GET /api/cards/:id/download-url?kind=...&qn=...` 返回：
+
+```json
+{
+  "kind": "watermarked",
+  "qn": 16,
+  "expires_at": 1789752728,
+  "candidates": [
+    {
+      "url": "https://upos-sz-mirrorcoso1.bilivideo.com/xxx.mp4?...",
+      "host": "upos-sz-mirrorcoso1.bilivideo.com",
+      "configured": true
+    }
+  ]
+}
+```
+
+- 候选顺序：B站主地址，然后 `backup_url`。
+- 后端按 host 去重，跳过空值和带非 80/443 端口的动态 PCDN 域名。
+- `configured` 来自域名管理表，只用于展示和监控；实际是否放行以微信后台配置为准。
+- 签名 URL 不落库；监控只保存 host 与错误摘要，避免敏感查询参数扩散。
+
+### 10.3 前端下载流程
+
+```
+用户点击下载
+→ 请求 download-url
+→ 依次尝试 candidates
+→ wx.downloadFile
+→ 成功：保存相册（视频）或转发文件（音频）
+→ 失败：上报事件，识别失败类型并展示兜底
+```
+
+- 结果页不再预下载音频，避免进入页面即消耗流量和触发下载。
+- `wx.downloadFile` 失败且错误信息包含 `url not in domain list` 时，判定为微信合法域名未配置。
+- 下载失败弹窗提供：
+  1. 复制下载链接；
+  2. 查看手动保存教程；
+  3. 重新解析。
+- 教程合并写通用步骤，最后补充安卓/iOS 权限与入口差异；链接有过期时间，必须提示立即使用。
+
+### 10.4 下载事件
+
+新增 `download_event`，每次关键阶段成功或失败都上报：
+
+- 字段：`user_id`、`card_id`、`bvid`、`kind`、`qn`、`host`、`candidate_index`、`stage`、`status`、`error_type`、`error_message`、`http_status`、`wx_err_msg`、`created_at`。
+- `stage`：`resolve` / `download` / `save` / `share`。
+- `status`：`success` / `fail`。
+- `error_type` 优先分类为 `domain_not_configured`、`expired`、`http_error`、`permission`、`wx_error`、`unknown`。
+- 管理端展示成功率、失败原因、失败明细、域名分布和最近趋势。
+
+### 10.5 B站 CDN 域名治理
+
+新增 `bili_cdn_domain`：
+
+- 字段：`host`、`is_configured`、`first_seen_at`、`last_seen_at`、`seen_count`、`download_success_count`、`download_failure_count`、`notes`。
+- 后端每次解析 `download-url` 都把候选 host 自动入库并更新 `seen_count`、`last_seen_at`。
+- 管理端可手动标记 host 是否已配置到微信 `downloadFile合法域名`。
+- 排序和提醒：
+  1. 未配置且已出现；
+  2. 下载失败率高；
+  3. 已配置但建议删除；
+  4. 已配置且正常使用。
+- 闲置规则：`30` 天未出现标记「可能闲置」，`60` 天未出现标记「建议删除」。系统只提醒，不自动删除微信后台配置。
+
+### 10.6 微信后台配置
+
+- B站 CDN 直链必须配置在微信小程序后台的 `downloadFile合法域名`，不是 `request合法域名`。
+- 自有 API 仍配置在 `request合法域名`。
+- 首批建议配置实测主域名：`upos-sz-mirrorcoso1.bilivideo.com`、`upos-sz-estgcos.bilivideo.com`、`upos-sz-mirrorcos.bilivideo.com`、`upos-sz-mirrorcosb.bilivideo.com`、`upos-sz-mirrorhwb.bilivideo.com`、`upos-sz-mirrorhw.bilivideo.com`、`upos-sz-mirrorbd.bilivideo.com`、`upos-sz-mirrorali.bilivideo.com`、`upos-sz-mirroralib.bilivideo.com`、`upos-sz-estgoss.bilivideo.com`、`upos-sz-mirrorzos.bilivideo.com`、`upos-sz-mirror14b.bilivideo.com`。
+- 后续以域名管理页「未配置且已出现」为准逐步补充。
