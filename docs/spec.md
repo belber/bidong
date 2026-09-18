@@ -336,3 +336,12 @@ Phase 1：机器人触发
 - 自有 API 仍配置在 `request合法域名`。
 - 首批建议配置实测主域名：`upos-sz-mirrorcoso1.bilivideo.com`、`upos-sz-estgcos.bilivideo.com`、`upos-sz-mirrorcos.bilivideo.com`、`upos-sz-mirrorcosb.bilivideo.com`、`upos-sz-mirrorhwb.bilivideo.com`、`upos-sz-mirrorhw.bilivideo.com`、`upos-sz-mirrorbd.bilivideo.com`、`upos-sz-mirrorali.bilivideo.com`、`upos-sz-mirroralib.bilivideo.com`、`upos-sz-estgoss.bilivideo.com`、`upos-sz-mirrorzos.bilivideo.com`、`upos-sz-mirror14b.bilivideo.com`。
 - 后续以域名管理页「未配置且已出现」为准逐步补充。
+
+### 10.7 运维告警
+
+管理端「告警配置」统一管理告警开关与通道。第一期支持邮件，告警类型：
+
+1. 机器人 Cookie 失效：仅在「曾经校验有效 → 本次失效」时触发，避免首次配置误报。
+2. B站 CDN 未配置域名：`download-url` 登记域名时，若发现 `is_configured=false`，触发告警。
+
+未配置域名告警按 host 去重，同一 host 24 小时内只告警一次；只有邮件发送成功后才记录告警时间，避免告警通道未配置时吞掉后续通知。

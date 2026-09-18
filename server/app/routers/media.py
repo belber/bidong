@@ -11,6 +11,7 @@ from ..models import User, VideoCard
 from ..schemas import DownloadEventReport, MediaOption
 from ..services.bilibili import BiliClient, UA
 from ..services import media_download
+from ..services import notify
 from ..services import config_store
 
 router = APIRouter(tags=["media"])
@@ -141,6 +142,9 @@ def download_url(
         candidates = media_download.build_candidates(db, streams)
         if not candidates:
             raise AppError(502, "无可用下载地址")
+        unconfigured_hosts = sorted({c["host"] for c in candidates if not c["configured"]})
+        for host in unconfigured_hosts:
+            notify.send_unconfigured_domain_alert(db, host, card.bvid)
         chosen_qn = streams[0]["qn"]
         expires_at = media_download.expiry_from_streams(streams)
     finally:

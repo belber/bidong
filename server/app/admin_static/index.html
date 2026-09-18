@@ -86,7 +86,7 @@
       <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
       <a data-view="features" href="javascript:void(0)">功能开关</a>
       <a data-view="schedule" href="javascript:void(0)">定时任务</a>
-      <a data-view="alert" href="javascript:void(0)">告警邮件</a>
+      <a data-view="alert" href="javascript:void(0)">告警配置</a>
       <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
       <a data-view="cdn" href="javascript:void(0)">B站域名管理</a>
       <div class="group"></div>
@@ -400,8 +400,12 @@ const renderers = {
     const a = await api("/config/alert");
     el.innerHTML = `
       <div class="panel">
-        <h3>Cookie 失效告警</h3>
-        <label class="switch"><input type="checkbox" id="alert-on" ${a.alert_enabled ? "checked" : ""}/> 启用告警邮件</label>
+        <h3>告警配置</h3>
+        <p class="muted">当前有两类告警：机器人 Cookie 失效、发现未配置到微信后台的 B站 CDN 域名。下面配置的邮件通道会同时接收这两类告警。</p>
+      </div>
+      <div class="panel">
+        <h3>邮件通道</h3>
+        <label class="switch"><input type="checkbox" id="alert-on" ${a.alert_enabled ? "checked" : ""}/> 启用邮件告警</label>
         <div style="margin:8px 0"><label class="muted">收件邮箱</label><input id="alert-email" value="${esc(a.alert_email)}" style="margin-top:4px"/></div>
         <div><label class="muted">SMTP 主机</label><input id="alert-host" value="${esc(a.smtp_host)}" style="margin-top:4px"/></div>
         <div><label class="muted">SMTP 端口</label><input id="alert-port" type="number" value="${a.smtp_port}" style="margin-top:4px"/></div>

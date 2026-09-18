@@ -164,3 +164,49 @@ def test_report_download_event_and_domain_counters(
     assert domain is not None
     assert domain.download_failure_count == 1
     db.close()
+
+
+def test_unconfigured_domain_alert_dedup(db_engine, monkeypatch):
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services import notify
+
+    calls = []
+    monkeypatch.setattr(
+        notify,
+        "send_alert_email",
+        lambda db, subject, body: calls.append(subject) or True,
+    )
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    assert notify.send_unconfigured_domain_alert(db, "a.example.com", "BV1") is True
+    assert notify.send_unconfigured_domain_alert(db, "a.example.com", "BV1") is False
+    assert len(calls) == 1
+    db.close()
+
+
+@respx.mock
+def test_download_url_triggers_unconfigured_domain_alert(
+    client, auth_headers, monkeypatch
+):
+    from app.config import settings
+    from app.services import notify
+
+    monkeypatch.setattr(settings, "enable_watermarked_video", True)
+    calls = []
+    monkeypatch.setattr(
+        notify,
+        "send_unconfigured_domain_alert",
+        lambda db, host, bvid="": calls.append(host) or True,
+    )
+    _mock_watermarked_playurl()
+    card = _make_card(client, auth_headers)
+
+    resp = client.get(
+        f"/api/cards/{card['id']}/download-url",
+        params={"kind": "watermarked"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert "upos-sz-mirrorcoso1.bilivideo.com" in calls
+    assert "upos-sz-estgcos.bilivideo.com" in calls
