@@ -298,7 +298,14 @@ Phase 1：机器人触发
 → 失败：上报事件，识别失败类型并展示兜底
 ```
 
-- 结果页不再预下载音频，避免进入页面即消耗流量和触发下载。
+- 结果页不预下载视频/音频/字幕/弹幕/评论；所有导出项都按需触发，避免进入页面即消耗流量和后端计算。
+- 字幕、弹幕、评论、音频使用统一的导出状态机：`idle` / `downloading` / `ready` / `failed`。
+  - `idle`：按钮显示「下载」；
+  - `downloading`：按钮禁点并显示百分比，同一行展示下载进度；
+  - `ready`：按钮变成「保存」，并 toast「已下载，请点击保存」；由于 `shareFileMessage` 必须由用户 TAP 手势直接触发，下载完成后不能自动唤起分享；
+  - `failed`：按钮显示「重试」，保留失败原因上报；
+  - 保存成功后按钮显示「再次保存」，支持重复分享。
+- 切换到另一张卡片时清空导出项的本地路径和状态。
 - `wx.downloadFile` 失败且错误信息包含 `url not in domain list` 时，判定为微信合法域名未配置。
 - 下载失败弹窗提供：
   1. 复制下载链接；
@@ -311,7 +318,7 @@ Phase 1：机器人触发
 新增 `download_event`，每次关键阶段成功或失败都上报：
 
 - 字段：`user_id`、`card_id`、`bvid`、`kind`、`qn`、`host`、`candidate_index`、`stage`、`status`、`error_type`、`error_message`、`http_status`、`wx_err_msg`、`created_at`。
-- `stage`：`resolve` / `download` / `save` / `share`。
+- `stage`：`resolve` / `download` / `prepare` / `save` / `share`。
 - `status`：`success` / `fail`。
 - `error_type` 优先分类为 `domain_not_configured`、`expired`、`http_error`、`permission`、`wx_error`、`unknown`。
 - 管理端展示成功率、失败原因、失败明细、域名分布和最近趋势。
@@ -354,7 +361,7 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 
 - 用户：今日新增、累计用户、500 目标进度、今日访问 UV/PV。
 - 解析：手动解析、机器人解析的成功/失败次数、新增收藏卡片。
-- 下载：下载请求、成功、失败、成功率、视频/音频分布、失败原因 Top、失败域名 Top、失败后复制链接次数。
+- 下载：下载请求、成功、失败、成功率、视频/音频分布、失败原因 Top、失败域名 Top、失败后复制链接次数；音频 / 评论 / 弹幕按去重用户统计成功与失败。
 - 机器人与域名：新增关注、发码成功、绑定成功、未配置域名总数、新出现的未配置域名、Cookie 状态。
 
 访问 UV 由 `visit_event` 统计，小程序首页每天最多上报一次访问；失败后复制链接通过 `download_event(stage=fallback, status=copy_link)` 统计。
