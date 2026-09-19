@@ -174,8 +174,9 @@ def test_unconfigured_domain_alert_dedup(db_engine, monkeypatch):
     calls = []
     monkeypatch.setattr(
         notify,
-        "send_alert_email",
-        lambda db, subject, body: calls.append(subject) or True,
+        "send_notification",
+        lambda db, subject, body, kind="": calls.append(subject)
+        or {"email": True, "serverchan": False},
     )
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()

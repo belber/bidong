@@ -237,3 +237,14 @@ class DownloadEvent(Base):
     http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     wx_err_msg: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+
+
+class VisitEvent(Base):
+    """小程序访问事件，用于统计每日活跃/访问用户。"""
+
+    __tablename__ = "visit_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
+    path: Mapped[str] = mapped_column(String(128), default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive, index=True)

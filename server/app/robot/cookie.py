@@ -47,10 +47,11 @@ def check_cookie(db: Session) -> dict:
 
     # 仅在「曾经校验过且由有效转失效」时告警，避免首次启动/未配置就误发。
     if prev_valid and prev_checked and not valid:
-        notify.send_alert_email(
+        notify.send_notification(
             db,
             "小破站机器人 Cookie 失效",
             f"检测时间：{checked}\n机器人 UID：{cookie.get('robot_uid')}\n原因：{error}",
+            kind="cookie_alert",
         )
 
     return {

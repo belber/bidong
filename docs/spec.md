@@ -337,11 +337,24 @@ Phase 1：机器人触发
 - 首批建议配置实测主域名：`upos-sz-mirrorcoso1.bilivideo.com`、`upos-sz-estgcos.bilivideo.com`、`upos-sz-mirrorcos.bilivideo.com`、`upos-sz-mirrorcosb.bilivideo.com`、`upos-sz-mirrorhwb.bilivideo.com`、`upos-sz-mirrorhw.bilivideo.com`、`upos-sz-mirrorbd.bilivideo.com`、`upos-sz-mirrorali.bilivideo.com`、`upos-sz-mirroralib.bilivideo.com`、`upos-sz-estgoss.bilivideo.com`、`upos-sz-mirrorzos.bilivideo.com`、`upos-sz-mirror14b.bilivideo.com`。
 - 后续以域名管理页「未配置且已出现」为准逐步补充。
 
-### 10.7 运维告警
+### 10.7 运营管理
 
-管理端「告警配置」统一管理告警开关与通道。第一期支持邮件，告警类型：
+管理端「运营管理」统一管理通知通道、告警和每日运营报告。通知通道支持邮件与 Server 酱。
+
+告警类型：
 
 1. 机器人 Cookie 失效：仅在「曾经校验有效 → 本次失效」时触发，避免首次配置误报。
 2. B站 CDN 未配置域名：`download-url` 登记域名时，若发现 `is_configured=false`，触发告警。
 
-未配置域名告警按 host 去重，同一 host 24 小时内只告警一次；只有邮件发送成功后才记录告警时间，避免告警通道未配置时吞掉后续通知。
+未配置域名告警按 host 去重，同一 host 24 小时内只告警一次；只有任一通道发送成功后才记录告警时间，避免通道未配置时吞掉后续通知。
+
+Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send`，参数 `title` 和 `desp`。
+
+每日运营报告由 API 进程的后台任务每分钟检查一次，到达配置时间后发送前一天的数据，发送成功后记录 `report_last_sent_date` 防止重复。报告内容：
+
+- 用户：今日新增、累计用户、500 目标进度、今日访问 UV/PV。
+- 解析：手动解析、机器人解析的成功/失败次数、新增收藏卡片。
+- 下载：下载请求、成功、失败、成功率、视频/音频分布、失败原因 Top、失败域名 Top、失败后复制链接次数。
+- 机器人与域名：新增关注、发码成功、绑定成功、未配置域名总数、新出现的未配置域名、Cookie 状态。
+
+访问 UV 由 `visit_event` 统计，小程序首页每天最多上报一次访问；失败后复制链接通过 `download_event(stage=fallback, status=copy_link)` 统计。

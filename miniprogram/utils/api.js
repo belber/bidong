@@ -163,6 +163,9 @@ module.exports = {
   reportDownloadEvent(payload) {
     return request('POST', '/api/download-events', payload);
   },
+  reportVisit(path) {
+    return request('POST', '/api/visit-events', { path });
+  },
   mediaSize(id) {
     return request('GET', '/api/cards/' + id + '/media-size');
   },

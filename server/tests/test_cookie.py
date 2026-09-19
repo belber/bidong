@@ -28,7 +28,11 @@ class FakeClient:
 def test_check_cookie_valid_first_time_no_alert(db_engine, monkeypatch):
     monkeypatch.setattr(cookie, "build_client", lambda *a, **k: FakeClient(info={"isLogin": True}))
     sent = []
-    monkeypatch.setattr(cookie.notify, "send_alert_email", lambda *a, **k: sent.append(a))
+    monkeypatch.setattr(
+        cookie.notify,
+        "send_notification",
+        lambda *a, **k: sent.append(a) or {"email": True, "serverchan": False},
+    )
     db = _db(db_engine)
 
     result = cookie.check_cookie(db)
@@ -51,7 +55,11 @@ def test_check_cookie_transition_sends_alert(db_engine, monkeypatch):
         lambda *a, **k: FakeClient(error=AppError(502, "B站机器人接口请求失败")),
     )
     sent = []
-    monkeypatch.setattr(cookie.notify, "send_alert_email", lambda *a, **k: sent.append(a))
+    monkeypatch.setattr(
+        cookie.notify,
+        "send_notification",
+        lambda *a, **k: sent.append(a) or {"email": True, "serverchan": False},
+    )
 
     result = cookie.check_cookie(db)
 

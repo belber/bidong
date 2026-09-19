@@ -54,9 +54,14 @@ class Settings(BaseSettings):
     admin_port: int = 8081
     admin_password: str = "admin-dev-password"
 
-    # Cookie 失效告警
+    # 运营通知与告警
     alert_enabled: bool = False
     alert_email: str = ""
+    serverchan_sendkey: str = ""
+    alert_cookie_enabled: bool = True
+    alert_domain_enabled: bool = True
+    report_enabled: bool = False
+    report_time: str = "09:00"
     cookie_check_interval_seconds: int = 1800
 
     # SMTP（告警邮件）

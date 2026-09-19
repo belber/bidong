@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 import time
@@ -9,17 +10,39 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .db import Base, engine
+from .db import Base, SessionLocal, engine
 from .errors import AppError
 from . import models  # noqa: F401  # 注册模型到 metadata
-from .routers import auth, binding, cards, help, media, meta, parse, tags
+from .routers import auth, binding, cards, help, media, meta, parse, tags, tracking
+from .services import daily_report
+
+
+async def _daily_report_loop() -> None:
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                daily_report.maybe_send_daily_report(db)
+            finally:
+                db.close()
+        except Exception:
+            logging.getLogger("bidong").exception("daily report failed")
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.dev_mode:
         Base.metadata.create_all(bind=engine)
-    yield
+    task = asyncio.create_task(_daily_report_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -54,6 +77,7 @@ for router in (
     binding.router,
     help.router,
     meta.router,
+    tracking.router,
 ):
     app.include_router(router)
 

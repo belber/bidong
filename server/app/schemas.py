@@ -79,6 +79,10 @@ class DownloadEventReport(BaseModel):
     wx_err_msg: str = ""
 
 
+class VisitEventRequest(BaseModel):
+    path: str = ""
+
+
 class CardOut(BaseModel):
     id: int
     bvid: str

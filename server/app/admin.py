@@ -667,6 +667,11 @@ def set_schedule(
 class AlertPayload(BaseModel):
     alert_enabled: bool | None = None
     alert_email: str | None = None
+    serverchan_sendkey: str | None = None
+    alert_cookie_enabled: bool | None = None
+    alert_domain_enabled: bool | None = None
+    report_enabled: bool | None = None
+    report_time: str | None = None
     smtp_host: str | None = None
     smtp_port: int | None = None
     smtp_user: str | None = None
@@ -691,6 +696,11 @@ def set_alert(
         db,
         alert_enabled=payload.alert_enabled,
         alert_email=payload.alert_email,
+        serverchan_sendkey=payload.serverchan_sendkey,
+        alert_cookie_enabled=payload.alert_cookie_enabled,
+        alert_domain_enabled=payload.alert_domain_enabled,
+        report_enabled=payload.report_enabled,
+        report_time=payload.report_time,
         smtp_host=payload.smtp_host,
         smtp_port=payload.smtp_port,
         smtp_user=payload.smtp_user,
@@ -706,10 +716,39 @@ def alert_test(
 ):
     from .services import notify
 
-    sent = notify.send_alert_email(db, "小破站管理端测试", "这是一封来自后台管理端的测试邮件。")
+    sent = notify.send_alert_email(db, "壁咚咚运营管理测试", "这是一封来自后台管理端的测试邮件。")
     if not sent:
         raise HTTPException(status_code=400, detail="未启用告警或 SMTP 未配置")
     return {"ok": True}
+
+
+@router.post("/config/serverchan/test")
+def serverchan_test(
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    from .services import notify
+
+    sent = notify.send_serverchan(db, "壁咚咚 Server酱测试", "如果你收到这条消息，说明 Server 酱通道配置成功。")
+    if not sent:
+        raise HTTPException(status_code=400, detail="发送失败，请检查 SendKey")
+    return {"ok": True}
+
+
+@router.post("/config/report/test")
+def report_test(
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    from datetime import timedelta
+
+    from .services import daily_report
+
+    day = daily_report.now_shanghai().date() - timedelta(days=1)
+    sent = daily_report.send_daily_report(db, day)
+    if not (sent["email"] or sent["serverchan"]):
+        raise HTTPException(status_code=400, detail="没有可用通道，或发送失败")
+    return {"ok": True, "channels": sent}
 
 
 class HelpPayload(BaseModel):

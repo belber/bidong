@@ -410,6 +410,7 @@ Page({
       toast('没有可复制的链接');
       return;
     }
+    this.reportDownload('fallback', 'copy_link', {});
     wx.setClipboardData({ data: url, success() { toast('已复制，请立即使用'); } });
   },
 

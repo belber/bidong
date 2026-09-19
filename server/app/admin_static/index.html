@@ -86,7 +86,7 @@
       <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
       <a data-view="features" href="javascript:void(0)">功能开关</a>
       <a data-view="schedule" href="javascript:void(0)">定时任务</a>
-      <a data-view="alert" href="javascript:void(0)">告警配置</a>
+      <a data-view="operations" href="javascript:void(0)">运营管理</a>
       <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
       <a data-view="cdn" href="javascript:void(0)">B站域名管理</a>
       <div class="group"></div>
@@ -101,7 +101,7 @@
     <section id="view-cookie" class="view hidden"></section>
     <section id="view-features" class="view hidden"></section>
     <section id="view-schedule" class="view hidden"></section>
-    <section id="view-alert" class="view hidden"></section>
+    <section id="view-operations" class="view hidden"></section>
     <section id="view-help" class="view hidden"></section>
     <section id="view-cdn" class="view hidden"></section>
   </main>
@@ -396,12 +396,21 @@ const renderers = {
       </div>`;
   },
 
-  async alert(el) {
+  async operations(el) {
     const a = await api("/config/alert");
     el.innerHTML = `
       <div class="panel">
-        <h3>告警配置</h3>
-        <p class="muted">当前有两类告警：机器人 Cookie 失效、发现未配置到微信后台的 B站 CDN 域名。下面配置的邮件通道会同时接收这两类告警。</p>
+        <h3>运营管理</h3>
+        <p class="muted">统一管理通知通道、告警和每日运营报告。Server 酱和邮件通道可以同时使用，日报会发送到所有已配置通道。</p>
+      </div>
+      <div class="panel">
+        <h3>Server 酱通道</h3>
+        <p class="muted">在 Server 酱后台创建 SendKey 后填入。告警和每日运营报告都会通过它推送。</p>
+        <div><label class="muted">SendKey</label><input id="serverchan-key" value="${esc(a.serverchan_sendkey)}" style="margin-top:4px" placeholder="SCT..."/></div>
+        <div class="flex" style="margin-top:12px">
+          <button class="ghost" onclick="testServerchan()">发送测试</button>
+          <span id="serverchan-msg" class="muted"></span>
+        </div>
       </div>
       <div class="panel">
         <h3>邮件通道</h3>
@@ -412,10 +421,29 @@ const renderers = {
         <div><label class="muted">SMTP 用户</label><input id="alert-user" value="${esc(a.smtp_user)}" style="margin-top:4px"/></div>
         <div><label class="muted">SMTP 密码</label><input id="alert-pass" value="${esc(a.smtp_pass)}" style="margin-top:4px"/></div>
         <div class="flex" style="margin-top:12px">
-          <button onclick="saveAlert()">保存</button>
           <button class="ghost" onclick="testAlert()">发送测试邮件</button>
           <span id="alert-msg" class="muted"></span>
         </div>
+      </div>
+      <div class="panel">
+        <h3>告警设置</h3>
+        <label class="switch"><input type="checkbox" id="alert-cookie" ${a.alert_cookie_enabled ? "checked" : ""}/> Cookie 失效告警</label>
+        <label class="switch"><input type="checkbox" id="alert-domain" ${a.alert_domain_enabled ? "checked" : ""}/> 未配置域名告警</label>
+        <p class="muted">未配置域名告警按域名去重，同一域名 24 小时内只提醒一次。</p>
+      </div>
+      <div class="panel">
+        <h3>每日运营报告</h3>
+        <label class="switch"><input type="checkbox" id="report-on" ${a.report_enabled ? "checked" : ""}/> 启用每日运营报告</label>
+        <div style="margin:8px 0"><label class="muted">发送时间</label><input id="report-time" type="time" value="${esc(a.report_time || "09:00")}" style="margin-top:4px"/></div>
+        <p class="muted">统计前一天的完整数据，内容包含用户增长、访问 UV、解析、下载、失败原因、兜底复制、机器人和域名状态。</p>
+        <div class="flex" style="margin-top:12px">
+          <button class="ghost" onclick="testReport()">立即发送测试日报</button>
+          <span id="report-msg" class="muted"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <button onclick="saveOperations()">保存全部配置</button>
+        <span id="operations-msg" class="muted"></span>
       </div>`;
   },
 
@@ -706,17 +734,49 @@ async function saveSchedule() {
     document.getElementById("sched-msg").textContent = "已保存（以服务端为准）";
   } catch (e) { document.getElementById("sched-msg").textContent = e.message; }
 }
-async function saveAlert() {
-  const body = {
+function operationsBody() {
+  return {
     alert_enabled: document.getElementById("alert-on").checked,
     alert_email: document.getElementById("alert-email").value,
+    serverchan_sendkey: document.getElementById("serverchan-key").value.trim(),
+    alert_cookie_enabled: document.getElementById("alert-cookie").checked,
+    alert_domain_enabled: document.getElementById("alert-domain").checked,
+    report_enabled: document.getElementById("report-on").checked,
+    report_time: document.getElementById("report-time").value || "09:00",
     smtp_host: document.getElementById("alert-host").value,
     smtp_port: parseInt(document.getElementById("alert-port").value || "465", 10),
     smtp_user: document.getElementById("alert-user").value,
     smtp_pass: document.getElementById("alert-pass").value
   };
-  try { await api("/config/alert", { method: "PUT", body: JSON.stringify(body) }); document.getElementById("alert-msg").textContent = "已保存"; }
-  catch (e) { document.getElementById("alert-msg").textContent = e.message; }
+}
+async function saveOperations() {
+  const msg = document.getElementById("operations-msg");
+  try {
+    await api("/config/alert", { method: "PUT", body: JSON.stringify(operationsBody()) });
+    if (msg) msg.textContent = "已保存";
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+  }
+}
+async function testServerchan() {
+  const msg = document.getElementById("serverchan-msg");
+  try {
+    await api("/config/alert", { method: "PUT", body: JSON.stringify(operationsBody()) });
+    await api("/config/serverchan/test", { method: "POST" });
+    if (msg) msg.textContent = "发送成功，请查看微信";
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+  }
+}
+async function testReport() {
+  const msg = document.getElementById("report-msg");
+  try {
+    await api("/config/alert", { method: "PUT", body: JSON.stringify(operationsBody()) });
+    await api("/config/report/test", { method: "POST" });
+    if (msg) msg.textContent = "已发送，请查看微信/邮件";
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+  }
 }
 async function saveHelp() {
   const input = document.getElementById("help-qq");

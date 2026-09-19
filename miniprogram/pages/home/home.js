@@ -21,6 +21,18 @@ Page(Object.assign({
       this.getTabBar().setData({ selected: 0 });
     }
     this.loadUiConfig();
+    this.trackVisit();
+  },
+
+  trackVisit() {
+    const d = new Date();
+    const today = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    if (wx.getStorageSync('visit_reported_date') === today) {
+      return;
+    }
+    api.reportVisit('pages/home/home').then(() => {
+      wx.setStorageSync('visit_reported_date', today);
+    }).catch(() => {});
   },
 
   loadUiConfig() {

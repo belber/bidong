@@ -1,6 +1,8 @@
 import tempfile
 
+import httpx
 import pytest
+import respx
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
@@ -328,6 +330,54 @@ def test_download_domains_list_and_update(admin_client, db_engine):
     assert created.json()["host"] == "upos-sz-mirrorhw.bilivideo.com"
     assert created.json()["is_configured"] is True
     assert created.json()["seen_count"] == 0
+
+
+@respx.mock
+def test_operations_config_and_serverchan_test(admin_client):
+    token = _login(admin_client).json()["token"]
+    put = admin_client.put(
+        "/api/admin/config/alert",
+        json={
+            "serverchan_sendkey": "SCTtestkey",
+            "alert_cookie_enabled": False,
+            "alert_domain_enabled": True,
+            "report_enabled": True,
+            "report_time": "08:30",
+        },
+        headers=_auth(token),
+    )
+    assert put.status_code == 200
+    data = put.json()
+    assert data["serverchan_sendkey"] == "SCTtestkey"
+    assert data["alert_cookie_enabled"] is False
+    assert data["report_enabled"] is True
+    assert data["report_time"] == "08:30"
+
+    route = respx.post("https://sctapi.ftqq.com/SCTtestkey.send").mock(
+        return_value=httpx.Response(200, json={"code": 0})
+    )
+    resp = admin_client.post(
+        "/api/admin/config/serverchan/test", headers=_auth(token)
+    )
+    assert resp.status_code == 200
+    assert route.called
+
+
+@respx.mock
+def test_report_test_sends_serverchan(admin_client):
+    token = _login(admin_client).json()["token"]
+    admin_client.put(
+        "/api/admin/config/alert",
+        json={"serverchan_sendkey": "SCTtestkey"},
+        headers=_auth(token),
+    )
+    route = respx.post("https://sctapi.ftqq.com/SCTtestkey.send").mock(
+        return_value=httpx.Response(200, json={"code": 0})
+    )
+    resp = admin_client.post("/api/admin/config/report/test", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["channels"]["serverchan"] is True
+    assert route.called
 
 
 def test_at_summary_includes_parse_breakdown(admin_client, db_engine):

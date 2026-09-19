@@ -43,6 +43,9 @@ def seed_defaults(db: Session) -> None:
         "enable_robot_guide": settings.enable_robot_guide,
         "enable_share": settings.enable_share,
         "alert_enabled": settings.alert_enabled,
+        "alert_cookie_enabled": settings.alert_cookie_enabled,
+        "alert_domain_enabled": settings.alert_domain_enabled,
+        "report_enabled": settings.report_enabled,
         "cookie_valid": True,
     }
     int_defaults = {
@@ -55,6 +58,8 @@ def seed_defaults(db: Session) -> None:
     }
     str_defaults = {
         "alert_email": settings.alert_email,
+        "serverchan_sendkey": settings.serverchan_sendkey,
+        "report_time": settings.report_time,
         "smtp_host": settings.smtp_host,
         "smtp_user": settings.smtp_user,
         "smtp_pass": settings.smtp_pass,
@@ -266,6 +271,18 @@ def alert_config(db: Session) -> dict[str, Any]:
             get_bool(db, "alert_enabled", default=settings.alert_enabled)
         ),
         "alert_email": get_raw(db, "alert_email") or settings.alert_email,
+        "serverchan_sendkey": get_raw(db, "serverchan_sendkey")
+        or settings.serverchan_sendkey,
+        "alert_cookie_enabled": bool(
+            get_bool(db, "alert_cookie_enabled", default=settings.alert_cookie_enabled)
+        ),
+        "alert_domain_enabled": bool(
+            get_bool(db, "alert_domain_enabled", default=settings.alert_domain_enabled)
+        ),
+        "report_enabled": bool(
+            get_bool(db, "report_enabled", default=settings.report_enabled)
+        ),
+        "report_time": get_raw(db, "report_time") or settings.report_time,
         "smtp_host": get_raw(db, "smtp_host") or settings.smtp_host,
         "smtp_port": int(get_int(db, "smtp_port", default=settings.smtp_port)),
         "smtp_user": get_raw(db, "smtp_user") or settings.smtp_user,
@@ -278,6 +295,11 @@ def set_alert_config(
     *,
     alert_enabled: bool | None = None,
     alert_email: str | None = None,
+    serverchan_sendkey: str | None = None,
+    alert_cookie_enabled: bool | None = None,
+    alert_domain_enabled: bool | None = None,
+    report_enabled: bool | None = None,
+    report_time: str | None = None,
     smtp_host: str | None = None,
     smtp_port: int | None = None,
     smtp_user: str | None = None,
@@ -286,6 +308,15 @@ def set_alert_config(
     mapping = {
         "alert_enabled": (None if alert_enabled is None else str(alert_enabled)),
         "alert_email": alert_email,
+        "serverchan_sendkey": serverchan_sendkey,
+        "alert_cookie_enabled": (
+            None if alert_cookie_enabled is None else str(alert_cookie_enabled)
+        ),
+        "alert_domain_enabled": (
+            None if alert_domain_enabled is None else str(alert_domain_enabled)
+        ),
+        "report_enabled": (None if report_enabled is None else str(report_enabled)),
+        "report_time": report_time,
         "smtp_host": smtp_host,
         "smtp_port": (None if smtp_port is None else str(int(smtp_port))),
         "smtp_user": smtp_user,
