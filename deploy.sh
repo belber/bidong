@@ -1,15 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ================= 部署配置（按需修改） =================
-REMOTE_USER="ubuntu"
-REMOTE_HOST="118.89.23.215"
-REMOTE_PORT="2222"
-REMOTE_DIR="/opt/bidong/server"
-ENV_FILE=".env.prod"
-# =======================================================
-
 cd "$(dirname "$0")"
+
+# ================= 部署配置 =================
+# 真实地址不进仓库：从本目录未跟踪的 deploy.env 读取（已在 .gitignore）。
+# 首次使用先创建 deploy.env，内容示例：
+#   REMOTE_USER=ubuntu
+#   REMOTE_HOST=1.2.3.4
+#   REMOTE_PORT=22
+#   REMOTE_DIR=/opt/bidong/server
+if [[ -f deploy.env ]]; then
+  # shellcheck disable=SC1091
+  source ./deploy.env
+fi
+
+REMOTE_USER="${REMOTE_USER:-ubuntu}"
+REMOTE_HOST="${REMOTE_HOST:-}"
+REMOTE_PORT="${REMOTE_PORT:-22}"
+REMOTE_DIR="${REMOTE_DIR:-/opt/bidong/server}"
+ENV_FILE="${ENV_FILE:-.env.prod}"
+
+if [[ -z "$REMOTE_HOST" ]]; then
+  echo "缺少 REMOTE_HOST：请在本目录创建 deploy.env 并填写服务器地址，例如 REMOTE_HOST=1.2.3.4" >&2
+  exit 1
+fi
+# ===========================================
 
 # 参数：--up 远端重建启动；--env 顺带上传密钥文件 .env.prod
 DO_UP=0
