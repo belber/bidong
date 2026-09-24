@@ -103,7 +103,7 @@ video_card (
   source_url    text,        -- 原始 B站链接（跳转用）
   duration      int,         -- 时长（秒），用于卡片角标
   pubdate       int,         -- B站发布时间（unix 秒）
-  source        text,        -- 收藏来源：local（本机）| robot（@小破站）
+  source        text,        -- 收藏来源：local（本机）| robot（@壁咚咚）
   collected_at  timestamp,   -- 收藏时间
   month         text         -- 冗余 'YYYY-MM'，分组索引
 )
@@ -142,7 +142,7 @@ robot_cursor (                  -- Phase 1：worker 轮询游标，重启不重�
 - **月份分组**：由 `collected_at` 派生，`month` 冗余存储便于查询，**与标签正交**。
 - **B站分区**（tname）是视频元数据，存 `partition`，与用户自定义标签分开。`view` 接口近期可能不再返回 `tname`/`tname_v2`，后端用 `tid_v2` 反查主分区（频道）名兜底（见 `services/partition.py`）。
 - **幂等**：`video_card` 以 `(user_id, bvid)` 建唯一约束，同一用户重复解析同一视频不重复建卡。
-- **来源**：`source` 只有 `local` / `robot` 两个值，对应前端「本机 / @小破站」来源筛选；Phase 0 全部为 `local`。
+- **来源**：`source` 只有 `local` / `robot` 两个值，对应前端「本机 / @壁咚咚」来源筛选；Phase 0 全部为 `local`。
 - **B站 ID 决策**：库表用 `bvid` 作为 `(user_id, bvid)` 唯一键，不存 `aid`。B站小程序跳转直接用 `bvid`；若未来某接口要求数字 ID，按 BV→AV 算法在本地换算，不额外请求 B站接口。
 - **媒体下载**：统计数（点赞/评论/收藏/投币）与弹幕条数来自 `view` 接口，不落库、解析时现取；视频/音频下载走中转流式、不落库本体，由三个后台开关控制。
 
@@ -192,7 +192,7 @@ Phase 1：机器人触发
 
 > 公开配置中的 `robot_guide` 同时控制首页引导、我的页引导以及「关于」页的机器人亮点文案展示。
 
-> **收藏夹前端交互**：卡片数据量小，筛选/搜索先在前端本地完成。顶部依次为「搜索框（标题 / UP主 / 分区 / 标签关键字）」「来源分段（全部 / 本机 / @小破站）」「分区 chips（全部 + 去重后的 B站分区）」。标签不再作为一级筛选维度（标签数量不可控、横向 chip 过长），仅保留为卡片元数据并可被搜索命中。
+> **收藏夹前端交互**：卡片数据量小，筛选/搜索先在前端本地完成。顶部依次为「搜索框（标题 / UP主 / 分区 / 标签关键字）」「来源分段（全部 / 本机 / @壁咚咚）」「分区 chips（全部 + 去重后的 B站分区）」。标签不再作为一级筛选维度（标签数量不可控、横向 chip 过长），仅保留为卡片元数据并可被搜索命中。
 
 ### 6.1 跳转 B站小程序
 
@@ -284,21 +284,34 @@ Phase 1：机器人触发
 
 - 候选顺序：B站主地址，然后 `backup_url`。
 - 后端按 host 去重，跳过空值和带非 80/443 端口的动态 PCDN 域名。
-- `configured` 来自域名管理表，只用于展示和监控；实际是否放行以微信后台配置为准。
+- `configured` 来自域名管理表，表示「是否已经登记到微信后台」，供前端决定自动下载策略。
+- `download-url` 返回所有合法候选和各自的 `configured` 标记；后端不因「没有已配置域名」返回错误。
+- 音频仍由后端中转下载，小程序直接请求 `/api/cards/:id/download?kind=audio`，不经过 `download-url` 候选与手动保存弹窗。
+- 前端自动下载只尝试 `configured=true` 的候选；如果没有任何已配置候选，前端直接打开「自动下载失败，手动保存」弹窗，让用户复制链接，不上报为后端错误。
+- 前端下载视频时，对多个已配置候选并发下载（`downloadMediaParallel`），任一候选成功即返回，并取消其余任务，减少单个慢速节点或过期链接导致的卡死与超时。
+- 实际是否放行仍以微信后台配置为准。
 - 签名 URL 不落库；监控只保存 host 与错误摘要，避免敏感查询参数扩散。
 
 ### 10.3 前端下载流程
 
 ```
-用户点击下载
+用户点击下载视频
 → 请求 download-url
-→ 依次尝试 candidates
+→ 并发尝试所有已配置 candidates（任一成功即取消其余）
 → wx.downloadFile
-→ 成功：保存相册（视频）或转发文件（音频）
+→ 成功：保存相册
 → 失败：上报事件，识别失败类型并展示兜底
 ```
 
+音频下载走后端中转：`/api/cards/:id/download?kind=audio` 直接 `wx.downloadFile`，成功后转发文件，失败时按钮显示「重试」。
+
+- 音频文件可能很大（如整场演唱会 Hi-Res），下载成功后直接用 `wx.downloadFile` 返回的临时文件路径分享，不复制到 `wx.env.USER_DATA_PATH`（该本地用户目录有 200MB 总大小上限，复制大音频会报 `the maximum size of the file storage limit is exceeded`）。字幕、弹幕、评论等小文本仍复制到本地用户目录以便「再次保存」。
+
 - 结果页不预下载视频/音频/字幕/弹幕/评论；所有导出项都按需触发，避免进入页面即消耗流量和后端计算。
+- 水印视频下载时，前端通过 `DownloadTask.onProgressUpdate` 更新 0-100% 进度，并展示已下载/总大小。
+- 无已配置候选时，前端记录 `resolve` 阶段 `domain_not_registered` 事件，并展示手动保存弹窗，不弹普通错误提示。
+- 字幕、弹幕、评论、音频下载时，按钮显示百分比，并在对应字段下方展示全宽进度条。
+- 字幕、弹幕、评论、音频下载时，进度条下方展示「已下载/总大小 · 实时速度」，速度由 `onProgressUpdate` 两次回调的字节差与时间差计算。
 - 字幕、弹幕、评论、音频使用统一的导出状态机：`idle` / `downloading` / `ready` / `failed`。
   - `idle`：按钮显示「下载」；
   - `downloading`：按钮禁点并显示百分比，同一行展示下载进度；
@@ -307,20 +320,22 @@ Phase 1：机器人触发
   - 保存成功后按钮显示「再次保存」，支持重复分享。
 - 切换到另一张卡片时清空导出项的本地路径和状态。
 - `wx.downloadFile` 失败且错误信息包含 `url not in domain list` 时，判定为微信合法域名未配置。
-- 下载失败弹窗提供：
-  1. 复制下载链接；
-  2. 查看手动保存教程；
-  3. 重新解析。
-- 教程合并写通用步骤，最后补充安卓/iOS 权限与入口差异；链接有过期时间，必须提示立即使用。
+- 视频无可用候选或下载失败时，弹出「备用保存方式」弹窗，不使用「失败 / 错误 / 异常」等负面词。
+- 音频下载失败时按钮显示「重试」，不弹备用保存弹窗。
+- 弹窗结构：标题「换一种方式保存」；副标题「当前视频链接暂不支持在小程序内直接保存，复制链接后，用手机浏览器打开即可保存视频」；中间为 iOS / Android 双平台简洁步骤卡片（iPhone：复制链接 → 用 Safari 打开 → 保存到「文件」；Android：复制链接 → 用 Chrome 打开 → 点击下载）；底部提示「链接可能有时效，请及时保存」与「复制链接」主按钮。不使用教程长图，定位为「另一种保存方式」而非错误提示。
 
 ### 10.4 下载事件
 
 新增 `download_event`，每次关键阶段成功或失败都上报：
 
-- 字段：`user_id`、`card_id`、`bvid`、`kind`、`qn`、`host`、`candidate_index`、`stage`、`status`、`error_type`、`error_message`、`http_status`、`wx_err_msg`、`created_at`。
+- 字段：`user_id`、`card_id`、`bvid`、`video_title`、`source_url`、`kind`、`qn`、`host`、`candidate_index`、`stage`、`status`、`error_type`、`error_message`、`http_status`、`wx_err_msg`、`created_at`。
+- `video_title` / `source_url` 由后端在上报时从**该用户自己的卡片**冗余落库（不采信客户端传值），卡片删除后明细仍可读。
+- 「下载视频链接」存的是 **B站原视频链接**，不是 CDN 直链：签名直链数小时内即失效、复现不了，且按 §10.2 的规则不落库，避免敏感查询参数扩散。CDN 侧只保留 `host`。
+- 下载监控明细按「用户 openid + 视频名称 + 视频链接」展示：`openid` 由 `user_id` 关联查出，`q` 支持按 bvid / 视频标题 / openid / 域名 / 错误信息搜索。
 - `stage`：`resolve` / `download` / `prepare` / `save` / `share`。
 - `status`：`success` / `fail`。
-- `error_type` 优先分类为 `domain_not_configured`、`expired`、`http_error`、`permission`、`wx_error`、`unknown`。
+- `error_type` 优先分类为 `domain_not_configured`、`domain_not_registered`、`expired`、`http_error`、`permission`、`wx_error`、`unknown`。
+- 区分规则：`domain_not_configured` 表示微信 `downloadFile` 真实返回 `url not in domain list`；`domain_not_registered` 表示后端在返回候选前检查数据库，未找到任何 `is_configured=true` 的 CDN 域名。
 - 管理端展示成功率、失败原因、失败明细、域名分布和最近趋势。
 
 ### 10.5 B站 CDN 域名治理
@@ -330,6 +345,7 @@ Phase 1：机器人触发
 - 字段：`host`、`is_configured`、`first_seen_at`、`last_seen_at`、`seen_count`、`download_success_count`、`download_failure_count`、`notes`。
 - 后端每次解析 `download-url` 都把候选 host 自动入库并更新 `seen_count`、`last_seen_at`。
 - 管理端可手动标记 host 是否已配置到微信 `downloadFile合法域名`。
+- 管理端支持批量粘贴微信后台域名串（`https://a;https://b`、每行一个或 Markdown 链接），自动规范化、去重并导入：新域名直接登记为已配置，已在库但未配置的更新为已配置，已配置的跳过；完成后提示新增、更新、跳过和无效项。
 - 排序和提醒：
   1. 未配置且已出现；
   2. 下载失败率高；
@@ -365,3 +381,14 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 - 机器人与域名：新增关注、发码成功、绑定成功、未配置域名总数、新出现的未配置域名、Cookie 状态。
 
 访问 UV 由 `visit_event` 统计，小程序首页每天最多上报一次访问；失败后复制链接通过 `download_event(stage=fallback, status=copy_link)` 统计。
+
+### 10.8 访问监控
+
+管理端「访问监控」用来看**有哪些用户访问过小程序**，数据源是 `visit_event`（`user_id`、`path`、`created_at`），由小程序首页每天最多上报一次。
+
+- **汇总**：今日 UV / 上报次数、近 N 天 UV / 上报次数、累计去重用户数。
+- **趋势**：按上海时区日期给出每日 UV 与上报次数。
+- **口径提醒**：埋点是"每个用户每天最多上报一次"，所以「上报次数」实际等于访问天数，不是点击量；UV 才是真实用户数。管理端文案按此表述，避免误读。
+- **明细**：按访问时间倒序，每行展示访问时间（上海时区）、用户 openid、昵称（有则显示）、页面 `path`；`q` 支持按 openid / 昵称 / 页面搜索，支持分页。
+- **口径**：UV 为 `visit_event.user_id` 去重数——只有登录用户才会上报，因此 UV 等于"访问过的微信用户数"；「累计去重用户」不受天数区间限制，用于对齐 500 访客目标。
+- **已知限制**：`path` 目前恒为 `pages/home/home`（只在首页上报）；若以后要在其他页面补埋点，明细无需改动即可区分。

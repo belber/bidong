@@ -4,7 +4,7 @@ set -euo pipefail
 # ================= 部署配置（按需修改） =================
 REMOTE_USER="ubuntu"
 REMOTE_HOST="118.89.23.215"
-REMOTE_PORT="22"
+REMOTE_PORT="2222"
 REMOTE_DIR="/opt/bidong/server"
 ENV_FILE=".env.prod"
 # =======================================================
