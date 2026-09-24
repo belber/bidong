@@ -1,4 +1,12 @@
 <view class="page">
+  <view class="section card group" wx:if="{{showGroup}}">
+    <view class="sec-title">QQ 群</view>
+    <view class="group-row">
+      <text class="group-no">{{groupNo}}</text>
+      <text class="copy" bindtap="onCopyGroup">复制群号</text>
+    </view>
+    <view class="group-tip">使用指引见下方。遇到使用问题、Bug、功能建议或其他需求，欢迎复制群号，加入 QQ 群交流反馈。</view>
+  </view>
   <view class="section card">
     <view class="sec-title">使用指引</view>
     <view class="step">① 首页粘贴 B站链接，点「解析视频」自动收藏</view>
@@ -41,14 +49,5 @@
       <view class="q">@壁咚咚私藏 没反应？</view>
       <view class="a">确认已关注，并在评论区正确 @它，稍等后台解析。</view>
     </view>
-  </view>
-
-  <view class="section card group" wx:if="{{showGroup}}">
-    <view class="sec-title">QQ 群</view>
-    <view class="group-row">
-      <text class="group-no">{{groupNo}}</text>
-      <text class="copy" bindtap="onCopyGroup">复制群号</text>
-    </view>
-    <view class="group-tip">复制后去 QQ 搜索群号申请加入</view>
   </view>
 </view>

@@ -44,6 +44,13 @@ function ensureToken() {
   return login();
 }
 
+function requestError(statusCode, data, fallback) {
+  const err = new Error((data && data.message) || fallback || ('请求失败 ' + statusCode));
+  err.statusCode = statusCode;
+  err.data = data || null;
+  return err;
+}
+
 function request(method, path, data) {
   const doRequest = (token) =>
     new Promise((resolve, reject) => {
@@ -63,7 +70,7 @@ function request(method, path, data) {
           if (r.statusCode >= 200 && r.statusCode < 300) {
             resolve(r.data);
           } else {
-            reject(new Error((r.data && r.data.message) || ('请求失败 ' + r.statusCode)));
+            reject(requestError(r.statusCode, r.data));
           }
         },
         fail(err) {
@@ -90,6 +97,11 @@ function fileDownload(path) {
     url: baseUrl() + path,
     header: token ? { Authorization: 'Bearer ' + token } : {}
   }));
+}
+
+function authHeader() {
+  const token = wx.getStorageSync(TOKEN_KEY);
+  return token ? { Authorization: 'Bearer ' + token } : {};
 }
 
 function publicRequest(method, path, data) {
@@ -155,6 +167,9 @@ module.exports = {
   download(id, kind, qn) {
     const suffix = qn ? '&qn=' + qn : '';
     return fileDownload('/api/cards/' + id + '/download?kind=' + kind + suffix);
+  },
+  authHeader() {
+    return authHeader();
   },
   downloadUrl(id, kind, qn) {
     const suffix = qn ? '&qn=' + qn : '';

@@ -71,10 +71,18 @@
       <text class="action" bindtap="onDownloadVideo" data-kind="clean">下载</text>
     </view>
 
-    <view class="field" wx:if="{{media.audio}}">
+    <view class="field export-field" wx:if="{{media.audio}}">
       <text class="label">纯音频</text>
       <view class="content muted">{{mediaSize.audio || '音频轨'}}</view>
-      <text class="action" bindtap="onDownloadAudio">转发</text>
+      <text
+        class="action {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
+        bindtap="onExportTap"
+        data-kind="audio"
+      >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
+      <view class="export-progress" wx:if="{{exports.audio.state === 'downloading'}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{exports.audio.progress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{exports.audio.sizeText}}">{{exports.audio.sizeText}}</text>
+      </view>
     </view>
 
     <!-- 下载进度 -->
@@ -92,34 +100,58 @@
   <view class="card">
     <view class="sec-title"><text class="bar"></text><text>文本</text></view>
 
-    <view class="field">
+    <view class="field export-field">
       <text class="label">字幕</text>
       <view class="content" wx:if="{{subtitles.length}}">
         <view wx:for="{{showAllSub ? subtitles : subPreview}}" wx:key="t" class="sub">{{item.timeText}} {{item.text}}</view>
         <view class="ops">
           <text class="action" bindtap="onToggleSub">{{showAllSub ? '收起' : '展开'}}</text>
           <text class="action" bindtap="onCopySub">复制</text>
-          <text class="action" bindtap="onDownloadSrt">转发</text>
+          <text
+            class="action {{exports.subtitle.state === 'downloading' ? 'disabled' : exports.subtitle.state === 'ready' ? 'primary' : ''}}"
+            bindtap="onExportTap"
+            data-kind="subtitle"
+          >{{exports.subtitle.state === 'downloading' ? exports.subtitle.progress + '%' : exports.subtitle.state === 'ready' ? '保存' : exports.subtitle.state === 'saved' ? '再次保存' : exports.subtitle.state === 'failed' ? '重试' : '下载'}}</text>
         </view>
       </view>
       <view class="content muted" wx:else>无字幕</view>
+      <view class="export-progress" wx:if="{{exports.subtitle.state === 'downloading'}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{exports.subtitle.progress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{exports.subtitle.sizeText}}">{{exports.subtitle.sizeText}}</text>
+      </view>
     </view>
 
-    <view class="field" wx:if="{{features.danmaku}}">
+    <view class="field export-field" wx:if="{{features.danmaku}}">
       <text class="label">弹幕</text>
       <view class="content" wx:if="{{danmakuCount}}">共 {{danmakuCount}} 条</view>
       <view class="content muted" wx:else>无弹幕</view>
       <view class="ops" wx:if="{{danmakuCount}}">
-        <text class="action" bindtap="onDownloadDanmaku">转发</text>
+        <text
+          class="action {{exports.danmaku.state === 'downloading' ? 'disabled' : exports.danmaku.state === 'ready' ? 'primary' : ''}}"
+          bindtap="onExportTap"
+          data-kind="danmaku"
+        >{{exports.danmaku.state === 'downloading' ? exports.danmaku.progress + '%' : exports.danmaku.state === 'ready' ? '保存' : exports.danmaku.state === 'saved' ? '再次保存' : exports.danmaku.state === 'failed' ? '重试' : '下载'}}</text>
+      </view>
+      <view class="export-progress" wx:if="{{exports.danmaku.state === 'downloading'}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{exports.danmaku.progress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{exports.danmaku.sizeText}}">{{exports.danmaku.sizeText}}</text>
       </view>
     </view>
 
-    <view class="field" wx:if="{{features.comment}}">
+    <view class="field export-field" wx:if="{{features.comment}}">
       <text class="label">评论</text>
       <view class="content" wx:if="{{stats.reply}}">共 {{stats.reply}} 条</view>
       <view class="content muted" wx:else>无评论</view>
       <view class="ops" wx:if="{{stats.reply}}">
-        <text class="action" bindtap="onDownloadComments">转发</text>
+        <text
+          class="action {{exports.comment.state === 'downloading' ? 'disabled' : exports.comment.state === 'ready' ? 'primary' : ''}}"
+          bindtap="onExportTap"
+          data-kind="comment"
+        >{{exports.comment.state === 'downloading' ? exports.comment.progress + '%' : exports.comment.state === 'ready' ? '保存' : exports.comment.state === 'saved' ? '再次保存' : exports.comment.state === 'failed' ? '重试' : '下载'}}</text>
+      </view>
+      <view class="export-progress" wx:if="{{exports.comment.state === 'downloading'}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{exports.comment.progress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{exports.comment.sizeText}}">{{exports.comment.sizeText}}</text>
       </view>
     </view>
   </view>
@@ -135,35 +167,41 @@
     <view class="preview-hint">点空白处关闭</view>
   </view>
 
-  <view wx:if="{{fallbackVisible}}" class="preview-mask" bindtap="onCloseFallback">
+  <view wx:if="{{fallbackVisible}}" class="preview-mask guide-mask">
     <view class="fallback-card" catchtap="">
-      <view class="fallback-title">下载失败</view>
-      <view class="fallback-msg">{{fallbackMessage}}</view>
-      <view class="fallback-actions">
-        <button class="btn-ghost small" bindtap="onCopyFallback">复制下载链接</button>
-        <button class="btn-primary small" bindtap="onShowTutorial">查看保存教程</button>
+      <view class="fallback-close" catchtap="onCloseFallback">✕</view>
+
+      <view class="fallback-title">换一种方式保存</view>
+      <view class="fallback-sub">当前视频链接暂不支持在小程序内直接保存</view>
+      <view class="fallback-sub">复制链接后，用手机浏览器打开即可保存视频。</view>
+
+      <view class="platform-row">
+        <view class="platform-card">
+          <view class="platform-head">
+            <text class="platform-icon">🍎</text>
+            <text class="platform-name">iPhone</text>
+          </view>
+          <view class="step"><text class="step-idx">1</text><text class="step-txt">复制链接</text></view>
+          <view class="step"><text class="step-idx">2</text><text class="step-txt">Safari 打开</text></view>
+          <view class="step"><text class="step-idx">3</text><text class="step-txt">保存到「文件」</text></view>
+        </view>
+        <view class="platform-card">
+          <view class="platform-head">
+            <text class="platform-icon">🤖</text>
+            <text class="platform-name">Android</text>
+          </view>
+          <view class="step"><text class="step-idx">1</text><text class="step-txt">复制链接</text></view>
+          <view class="step"><text class="step-idx">2</text><text class="step-txt">Chrome 打开</text></view>
+          <view class="step"><text class="step-idx">3</text><text class="step-txt">点击下载</text></view>
+        </view>
       </view>
-      <view class="fallback-actions">
-        <button class="btn-ghost small" bindtap="onRetryDownload">重新解析</button>
-        <button class="btn-ghost small" bindtap="onCloseFallback">关闭</button>
-      </view>
+
+      <view class="fallback-tip">链接可能有时效，请及时保存</view>
+      <button class="btn-primary fallback-button" bindtap="onCopyFallback">复制链接</button>
     </view>
   </view>
 
-  <view wx:if="{{tutorialVisible}}" class="preview-mask" bindtap="onCloseTutorial">
-    <view class="tutorial-card" catchtap="">
-      <view class="fallback-title">手动保存教程</view>
-      <view class="tutorial-body">
-        <view class="tutorial-step">1. 复制下载链接；</view>
-        <view class="tutorial-step">2. 打开微信，把链接发给「文件传输助手」；</view>
-        <view class="tutorial-step">3. 点击链接，在微信内置浏览器中打开；</view>
-        <view class="tutorial-step">4. 播放或长按视频，选择「保存视频」；</view>
-        <view class="tutorial-step">5. 保存后可在手机相册查看。</view>
-        <view class="tutorial-note">链接会过期，复制后请立即使用；若提示链接失效，请重新解析。</view>
-        <view class="tutorial-note">Android：没有保存按钮时可长按视频；部分浏览器会先存到「文件管理」。</view>
-        <view class="tutorial-note">iOS：保存时需要允许微信访问照片；不行可点「···」在 Safari 中打开再长按保存。</view>
-      </view>
-      <button class="btn-primary small" bindtap="onCloseTutorial">我知道了</button>
-    </view>
-  </view>
+
+
+
 </view>

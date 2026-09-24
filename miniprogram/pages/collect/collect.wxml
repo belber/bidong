@@ -17,7 +17,7 @@
   <view class="seg">
     <view class="seg-it {{sourceFilter === 'all' ? 'on' : ''}}" data-source="all" bindtap="onSourceTap">全部</view>
     <view class="seg-it {{sourceFilter === 'local' ? 'on' : ''}}" data-source="local" bindtap="onSourceTap">本机</view>
-    <view class="seg-it {{sourceFilter === 'robot' ? 'on' : ''}}" data-source="robot" bindtap="onSourceTap">@小破站</view>
+    <view class="seg-it {{sourceFilter === 'robot' ? 'on' : ''}}" data-source="robot" bindtap="onSourceTap">@壁咚咚</view>
   </view>
 
   <scroll-view class="filter-scroll" wx:if="{{!showRobotGuide}}" scroll-x enhanced show-scrollbar="{{false}}">
@@ -75,7 +75,7 @@
           <view wx:if="{{editing}}" class="check {{card.selected ? 'on' : ''}}"></view>
           <view class="thumb">
             <image class="thumb-img" src="{{card.cover_url}}" mode="aspectFill" />
-            <text class="src {{card.source === 'robot' ? 'bot' : ''}}">{{card.source === 'robot' ? '@小破站' : '本机'}}</text>
+            <text class="src {{card.source === 'robot' ? 'bot' : ''}}">{{card.source === 'robot' ? '@壁咚咚' : '本机'}}</text>
             <text class="dur">{{card.dur}}</text>
           </view>
           <view class="meta">
