@@ -48,9 +48,11 @@ def build_report(db: Session, day: date) -> dict:
     new_cards = db.query(VideoCard).filter(VideoCard.collected_at >= start, VideoCard.collected_at < end).count()
 
     events = db.query(DownloadEvent).filter(DownloadEvent.created_at >= start, DownloadEvent.created_at < end).all()
-    resolve_ok = [e for e in events if e.stage == "resolve" and e.status == "success"]
-    download_ok = [e for e in events if e.stage == "download" and e.status == "success"]
-    download_fail = [e for e in events if e.stage == "download" and e.status == "fail"]
+    # 评论/弹幕是文本导出，单独统计，不混入视频/音频下载成功率。
+    core_events = [e for e in events if e.kind not in ("comment", "danmaku")]
+    resolve_ok = [e for e in core_events if e.stage == "resolve" and e.status == "success"]
+    download_ok = [e for e in core_events if e.stage == "download" and e.status == "success"]
+    download_fail = [e for e in core_events if e.stage == "download" and e.status == "fail"]
     fallback_copy = [e for e in events if e.stage == "fallback" and e.status == "copy_link"]
     video_ok = [e for e in download_ok if e.kind == "watermarked"]
     audio_ok = [e for e in download_ok if e.kind == "audio"]
@@ -62,6 +64,24 @@ def build_report(db: Session, day: date) -> dict:
         fail_reasons[e.error_type or "unknown"] = fail_reasons.get(e.error_type or "unknown", 0) + 1
         if e.host:
             fail_hosts[e.host] = fail_hosts.get(e.host, 0) + 1
+
+    def kind_stats(kind: str) -> dict:
+        kind_events = [e for e in events if e.kind == kind and e.status in ("success", "fail")]
+        ok_users = {e.user_id for e in kind_events if e.status == "success"}
+        fail_events = [e for e in kind_events if e.status == "fail"]
+        fail_users = {e.user_id for e in fail_events}
+        kind_reasons: dict[str, int] = {}
+        for e in fail_events:
+            name = e.error_type or "unknown"
+            kind_reasons[name] = kind_reasons.get(name, 0) + 1
+        return {
+            "users": len({e.user_id for e in kind_events if e.user_id is not None}),
+            "success_users": len(ok_users),
+            "fail_users": len(fail_users),
+            "fail_reasons": _top(kind_reasons),
+        }
+
+    by_kind = {kind: kind_stats(kind) for kind in ("audio", "comment", "danmaku")}
 
     new_follows = db.query(FollowEvent).filter(FollowEvent.created_at >= start, FollowEvent.created_at < end).count()
     activation_sent = (
@@ -105,6 +125,7 @@ def build_report(db: Session, day: date) -> dict:
             "fail_reasons": _top(fail_reasons),
             "fail_hosts": _top(fail_hosts),
             "fallback_copy": len(fallback_copy),
+            "by_kind": by_kind,
         },
         "robot": {
             "new_follows": new_follows,
@@ -129,6 +150,18 @@ def render_report(data: dict) -> str:
     reason_lines = "\n".join(
         f"- {name}：{count}" for name, count in d["fail_reasons"]
     ) or "- 无"
+
+    def kind_line(label: str, stats: dict) -> str:
+        result = []
+        if stats["success_users"]:
+            result.append(f"成功 {stats['success_users']} 人")
+        if stats["fail_users"]:
+            result.append(f"失败 {stats['fail_users']} 人")
+        return f"{label}：{stats['users']} 人（{' / '.join(result) or '无成功/失败记录'}）"
+
+    audio_stats = d["by_kind"]["audio"]
+    comment_stats = d["by_kind"]["comment"]
+    danmaku_stats = d["by_kind"]["danmaku"]
     host_lines = "\n".join(
         f"- {name}：{count}" for name, count in d["fail_hosts"]
     ) or "- 无"
@@ -157,6 +190,11 @@ def render_report(data: dict) -> str:
 - 视频下载：{d['video']}
 - 音频转发：{d['audio']}
 - 失败后复制链接：{d['fallback_copy']}
+
+### 音频 / 评论 / 弹幕
+{kind_line('音频下载', audio_stats)}
+{kind_line('评论下载', comment_stats)}
+{kind_line('弹幕下载', danmaku_stats)}
 
 失败原因 Top：
 {reason_lines}

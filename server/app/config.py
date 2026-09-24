@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./var/bili.db"
 
     parse_cache_seconds: int = 60
+    download_debug_fail: bool = False
 
     jwt_secret: str = "dev-secret-change-me-0123456789abcdef"
     jwt_algorithm: str = "HS256"

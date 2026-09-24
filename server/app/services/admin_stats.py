@@ -11,6 +11,7 @@ from ..models import (
     ParseLog,
     User,
     VideoCard,
+    VisitEvent,
 )
 from ..time import utcnow_naive
 
@@ -469,6 +470,88 @@ def _user_origin(user: User | None) -> str:
     if user is None:
         return ""
     return (user.nickname or "") or (user.openid or "")
+
+
+def visit_summary(db: Session, days: int = 30) -> dict:
+    """访问汇总：UV 按 visit_event.user_id 去重（只有登录用户才会上报）。"""
+    start = _range_start_utc(days)
+    rows = (
+        db.query(VisitEvent.user_id, VisitEvent.created_at)
+        .filter(VisitEvent.created_at >= start)
+        .all()
+    )
+    today = _today_shanghai()
+    today_pv = 0
+    today_users: set[int] = set()
+    per_day: dict[str, dict] = {}
+    for user_id, created_at in rows:
+        date = _shanghai_date(created_at)
+        bucket = per_day.setdefault(date.isoformat(), {"pv": 0, "users": set()})
+        bucket["pv"] += 1
+        bucket["users"].add(user_id)
+        if date == today:
+            today_pv += 1
+            today_users.add(user_id)
+
+    trend = []
+    for label in _date_labels(days):
+        bucket = per_day.get(label) or {"pv": 0, "users": set()}
+        trend.append({"date": label, "pv": bucket["pv"], "uv": len(bucket["users"])})
+
+    return {
+        "days": days,
+        "pv": len(rows),
+        "uv": len({user_id for user_id, _ in rows}),
+        "today_pv": today_pv,
+        "today_uv": len(today_users),
+        # 累计去重用户不受天数区间限制，用于对齐 500 访客目标
+        "total_uv": db.query(func.count(func.distinct(VisitEvent.user_id))).scalar() or 0,
+        "trend": trend,
+    }
+
+
+def visit_detail(
+    db: Session,
+    q: str = "",
+    days: int = 30,
+    page: int = 1,
+    size: int = 20,
+) -> dict:
+    filters = [VisitEvent.created_at >= _range_start_utc(days)]
+    if q:
+        like = f"%{q}%"
+        filters.append(
+            (User.openid.like(like))
+            | (User.nickname.like(like))
+            | (VisitEvent.path.like(like))
+        )
+    total = (
+        db.query(VisitEvent)
+        .outerjoin(User, User.id == VisitEvent.user_id)
+        .filter(*filters)
+        .count()
+    )
+    rows = (
+        db.query(VisitEvent, User)
+        .outerjoin(User, User.id == VisitEvent.user_id)
+        .filter(*filters)
+        .order_by(VisitEvent.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    return {
+        "total": total,
+        "items": [
+            {
+                "created_at": _fmt_dt_sh(event.created_at),
+                "openid": (user.openid if user else "") or "",
+                "nickname": (user.nickname if user else "") or "",
+                "path": event.path,
+            }
+            for event, user in rows
+        ],
+    }
 
 
 def overview(db: Session, days: int = 30) -> dict:

@@ -74,6 +74,27 @@ def _seed(db):
         DownloadEvent(
             user_id=user.id,
             bvid="BV1xx411c7mD",
+            kind="comment",
+            stage="download",
+            status="success",
+            created_at=at,
+        )
+    )
+    db.add(
+        DownloadEvent(
+            user_id=user.id,
+            bvid="BV1xx411c7mD",
+            kind="danmaku",
+            stage="download",
+            status="fail",
+            error_type="download_error",
+            created_at=at,
+        )
+    )
+    db.add(
+        DownloadEvent(
+            user_id=user.id,
+            bvid="BV1xx411c7mD",
             kind="audio",
             host="b.example.com",
             stage="download",
@@ -132,6 +153,13 @@ def test_build_report_counts_daily_metrics(db_engine):
     assert data["download"]["success_rate"] == 50.0
     assert data["download"]["fallback_copy"] == 1
     assert data["download"]["fail_reasons"] == [("domain_not_configured", 1)]
+    assert data["download"]["by_kind"]["audio"]["users"] == 1
+    assert data["download"]["by_kind"]["audio"]["success_users"] == 0
+    assert data["download"]["by_kind"]["audio"]["fail_users"] == 1
+    assert data["download"]["by_kind"]["comment"]["users"] == 1
+    assert data["download"]["by_kind"]["comment"]["success_users"] == 1
+    assert data["download"]["by_kind"]["comment"]["fail_users"] == 0
+    assert data["download"]["by_kind"]["danmaku"]["fail_reasons"] == [("download_error", 1)]
     assert data["robot"]["new_follows"] == 1
     assert data["robot"]["activation_sent"] == 1
     assert data["robot"]["bound"] == 1
@@ -149,6 +177,9 @@ def test_render_report_contains_sections(db_engine):
     assert "下载成功率：50.0%" in text
     assert "失败后复制链接：1" in text
     assert "domain_not_configured：1" in text
+    assert "音频下载：1 人（失败 1 人）" in text
+    assert "评论下载：1 人（成功 1 人）" in text
+    assert "弹幕下载：1 人（失败 1 人）" in text
     db.close()
 
 

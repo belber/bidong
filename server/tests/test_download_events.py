@@ -12,6 +12,22 @@ def _make_card(client, auth_headers):
     return resp.json()
 
 
+def _mark_configured(db_engine, host):
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models import BiliCdnDomain
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    row = db.query(BiliCdnDomain).filter_by(host=host).first()
+    if row is None:
+        row = BiliCdnDomain(host=host)
+    row.is_configured = True
+    db.add(row)
+    db.commit()
+    db.close()
+
+
 def _mock_watermarked_playurl():
     respx.get(
         url__regex=r"https://api\.bilibili\.com/x/player/wbi/playurl.*fnval=1.*"
@@ -73,14 +89,15 @@ def test_is_allowed_url_skips_dynamic_pcdn_and_ports():
 
 
 @respx.mock
-def test_download_url_returns_candidates_and_records_domains(
-    client, auth_headers, monkeypatch
+def test_download_url_returns_all_candidates_with_configured_flags(
+    client, auth_headers, db_engine, monkeypatch
 ):
     from app.config import settings
 
     monkeypatch.setattr(settings, "enable_watermarked_video", True)
     _mock_watermarked_playurl()
     card = _make_card(client, auth_headers)
+    _mark_configured(db_engine, "upos-sz-estgcos.bilivideo.com")
 
     resp = client.get(
         f"/api/cards/{card['id']}/download-url",
@@ -96,7 +113,55 @@ def test_download_url_returns_candidates_and_records_domains(
         "upos-sz-mirrorcoso1.bilivideo.com",
         "upos-sz-estgcos.bilivideo.com",
     ]
-    assert all(c["configured"] is False for c in data["candidates"])
+    assert [c["configured"] for c in data["candidates"]] == [False, True]
+
+
+@respx.mock
+def test_download_url_returns_all_unconfigured_candidates_without_error(
+    client, auth_headers, monkeypatch
+):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "enable_watermarked_video", True)
+    _mock_watermarked_playurl()
+    card = _make_card(client, auth_headers)
+
+    resp = client.get(
+        f"/api/cards/{card['id']}/download-url",
+        params={"kind": "watermarked"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [c["host"] for c in data["candidates"]] == [
+        "upos-sz-mirrorcoso1.bilivideo.com",
+        "upos-sz-estgcos.bilivideo.com",
+    ]
+    assert [c["configured"] for c in data["candidates"]] == [False, False]
+    assert "error_type" not in data
+
+
+@respx.mock
+def test_download_url_debug_fail_returns_failing_candidate(client, auth_headers, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "enable_watermarked_video", True)
+    monkeypatch.setattr(settings, "download_debug_fail", True)
+    _mock_watermarked_playurl()
+    card = _make_card(client, auth_headers)
+
+    resp = client.get(
+        f"/api/cards/{card['id']}/download-url",
+        params={"kind": "watermarked"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["candidates"] == [{
+        "url": "https://debug.invalid/download-debug-fail",
+        "host": "debug.invalid",
+        "configured": False,
+    }]
 
 
 @respx.mock
@@ -116,7 +181,10 @@ def test_download_url_audio_uses_normal_dash(client, auth_headers, monkeypatch):
     data = resp.json()
     assert data["kind"] == "audio"
     assert data["qn"] == 30280
-    assert data["candidates"][0]["host"] == "upos-sz-mirrorcos.bilivideo.com"
+    candidate = data["candidates"][0]
+    assert candidate["host"] == "testserver"
+    assert candidate["configured"] is True
+    assert candidate["url"] == f"http://testserver/api/cards/{card['id']}/download?kind=audio&qn=30280"
 
 
 @respx.mock
@@ -131,6 +199,7 @@ def test_report_download_event_and_domain_counters(
     monkeypatch.setattr(settings, "enable_watermarked_video", True)
     _mock_watermarked_playurl()
     card = _make_card(client, auth_headers)
+    _mark_configured(db_engine, "upos-sz-mirrorcoso1.bilivideo.com")
     client.get(
         f"/api/cards/{card['id']}/download-url",
         params={"kind": "watermarked"},
@@ -188,7 +257,7 @@ def test_unconfigured_domain_alert_dedup(db_engine, monkeypatch):
 
 @respx.mock
 def test_download_url_triggers_unconfigured_domain_alert(
-    client, auth_headers, monkeypatch
+    client, auth_headers, db_engine, monkeypatch
 ):
     from app.config import settings
     from app.services import notify
@@ -202,6 +271,7 @@ def test_download_url_triggers_unconfigured_domain_alert(
     )
     _mock_watermarked_playurl()
     card = _make_card(client, auth_headers)
+    _mark_configured(db_engine, "upos-sz-mirrorcoso1.bilivideo.com")
 
     resp = client.get(
         f"/api/cards/{card['id']}/download-url",
@@ -209,5 +279,39 @@ def test_download_url_triggers_unconfigured_domain_alert(
         headers=auth_headers,
     )
     assert resp.status_code == 200
-    assert "upos-sz-mirrorcoso1.bilivideo.com" in calls
+    assert "upos-sz-mirrorcoso1.bilivideo.com" not in calls
     assert "upos-sz-estgcos.bilivideo.com" in calls
+
+
+@respx.mock
+def test_download_event_fills_video_title_and_link_from_own_card(
+    client, auth_headers, db_engine
+):
+    """后端从该用户自己的卡片回填标题与 B站链接，客户端传值不作数。"""
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models import DownloadEvent
+
+    card = _make_card(client, auth_headers)
+    payload = {
+        "card_id": card["id"],
+        "bvid": card["bvid"],
+        "kind": "watermarked",
+        "qn": 16,
+        "host": "upos-sz-mirrorcoso1.bilivideo.com",
+        "stage": "download",
+        "status": "success",
+        "video_title": "伪造标题",
+        "source_url": "https://evil.example/x",
+    }
+    resp = client.post("/api/download-events", json=payload, headers=auth_headers)
+    assert resp.status_code == 200
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    event = db.query(DownloadEvent).first()
+    assert event is not None
+    assert event.video_title == card["title"] == "测试标题"
+    assert event.source_url == card["source_url"]
+    assert "evil.example" not in event.source_url
+    db.close()

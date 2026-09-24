@@ -26,3 +26,4 @@ def decode_user_id(token: str) -> int | None:
     except Exception:
         return None
 
+

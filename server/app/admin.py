@@ -1,4 +1,7 @@
+import re
 import time
+from datetime import timezone
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -7,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .admin_security import create_admin_token, decode_admin_token, verify_password
 from .db import get_db
-from .models import Binding, BiliCdnDomain, DownloadEvent
+from .models import Binding, BiliCdnDomain, DownloadEvent, User
 from .robot.cookie import check_cookie, build_client
 from .robot.worker import activation_message
 from .services import config_store
@@ -236,7 +239,7 @@ def download_detail(
 ):
     from datetime import timedelta
 
-    query = db.query(DownloadEvent)
+    query = db.query(DownloadEvent).outerjoin(User, User.id == DownloadEvent.user_id)
     start = utcnow_naive() - timedelta(days=days)
     query = query.filter(DownloadEvent.created_at >= start)
     if status:
@@ -245,12 +248,15 @@ def download_detail(
         like = f"%{q}%"
         query = query.filter(
             (DownloadEvent.bvid.ilike(like))
+            | (DownloadEvent.video_title.ilike(like))
             | (DownloadEvent.host.ilike(like))
             | (DownloadEvent.error_message.ilike(like))
+            | (User.openid.ilike(like))
         )
     total = query.count()
-    items = (
-        query.order_by(DownloadEvent.created_at.desc())
+    rows = (
+        query.add_columns(User.openid)
+        .order_by(DownloadEvent.created_at.desc())
         .offset((page - 1) * size)
         .limit(size)
         .all()
@@ -260,8 +266,11 @@ def download_detail(
         "items": [
             {
                 "id": e.id,
-                "created_at": e.created_at.isoformat() if e.created_at else "",
+                "created_at": _iso_utc(e.created_at),
+                "openid": openid or "",
                 "bvid": e.bvid,
+                "video_title": e.video_title or "",
+                "source_url": e.source_url or "",
                 "kind": e.kind,
                 "qn": e.qn,
                 "host": e.host,
@@ -272,9 +281,44 @@ def download_detail(
                 "http_status": e.http_status,
                 "wx_err_msg": e.wx_err_msg,
             }
-            for e in items
+            for e, openid in rows
         ],
     }
+
+
+def _iso_utc(dt) -> str:
+    """把数据库里的 naive UTC 时间序列化成带 Z 的 ISO 字符串。"""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+# ---------------------------------------------------------------------------
+# 访问监控
+# ---------------------------------------------------------------------------
+@router.get("/stats/visit")
+def visit_stats(
+    days: int = Query(30),
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    return stats.visit_summary(db, days)
+
+
+@router.get("/stats/visit/detail")
+def visit_detail_api(
+    q: str = "",
+    days: int = Query(30),
+    page: int = Query(1),
+    size: int = Query(20),
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    return stats.visit_detail(db, q, days, page, size)
 
 
 # ---------------------------------------------------------------------------
@@ -299,8 +343,8 @@ def _domain_item(row: BiliCdnDomain) -> dict:
         "id": row.id,
         "host": row.host,
         "is_configured": row.is_configured,
-        "first_seen_at": row.first_seen_at.isoformat() if row.first_seen_at else "",
-        "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else "",
+        "first_seen_at": _iso_utc(row.first_seen_at),
+        "last_seen_at": _iso_utc(row.last_seen_at),
         "seen_count": row.seen_count,
         "download_success_count": row.download_success_count,
         "download_failure_count": row.download_failure_count,
@@ -340,6 +384,85 @@ def download_domains(
 class DomainUpdatePayload(BaseModel):
     is_configured: bool | None = None
     notes: str | None = None
+
+
+class DomainBulkPayload(BaseModel):
+    text: str
+
+
+_HOST_RE = re.compile(
+    r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+)
+
+
+def _parse_domain_input(text: str) -> tuple[list[str], list[str]]:
+    """从微信后台粘贴的链接串里提取去重后的 host。"""
+    raw = (text or "").strip()
+    if not raw:
+        return [], []
+
+    candidates = re.findall(r"https?://[^\s;,)\]" + r"]+", raw)
+    if not candidates:
+        candidates = re.split(r"[\s,;]+", raw)
+
+    hosts: list[str] = []
+    invalid: list[str] = []
+    for candidate in candidates:
+        token = candidate.strip().strip("[]()")
+        token = token.replace("\\", "")
+        if not token:
+            continue
+        if not re.match(r"^[a-z][a-z0-9+.-]*://", token, re.I):
+            token = "https://" + token
+        try:
+            host = (urlparse(token).hostname or "").lower().strip(".")
+        except ValueError:
+            invalid.append(candidate)
+            continue
+        if (
+            not host
+            or host == "localhost"
+            or re.fullmatch(r"\d+(?:\.\d+){3}", host)
+            or not _HOST_RE.match(host)
+        ):
+            invalid.append(candidate)
+            continue
+        if host not in hosts:
+            hosts.append(host)
+    return hosts, invalid
+
+
+@router.post("/download/domains/bulk")
+def bulk_import_domains(
+    payload: DomainBulkPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    hosts, invalid = _parse_domain_input(payload.text)
+    inserted: list[str] = []
+    updated: list[str] = []
+    already_configured: list[str] = []
+
+    for host in hosts:
+        row = db.query(BiliCdnDomain).filter(BiliCdnDomain.host == host).first()
+        if row is None:
+            db.add(BiliCdnDomain(host=host, is_configured=True))
+            inserted.append(host)
+        elif row.is_configured:
+            already_configured.append(host)
+        else:
+            row.is_configured = True
+            updated.append(host)
+
+    db.commit()
+    return {
+        "parsed": len(hosts),
+        "inserted": inserted,
+        "updated": updated,
+        "already_configured": already_configured,
+        "invalid": invalid,
+    }
 
 
 @router.put("/download/domains/{host}")

@@ -2,7 +2,7 @@ from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy.orm import Session
 
-from ..models import BiliCdnDomain, DownloadEvent, User
+from ..models import BiliCdnDomain, DownloadEvent, User, VideoCard
 from ..time import utcnow_naive
 
 
@@ -84,11 +84,32 @@ def build_candidates(db: Session, streams: list[dict]) -> list[dict]:
     return candidates
 
 
+def _card_title_and_url(
+    db: Session, user: User | None, card_id, bvid: str
+) -> tuple[str, str]:
+    """从该用户自己的卡片回填标题与 B站链接；找不到就留空，不采信客户端传值。"""
+    if user is None:
+        return "", ""
+    query = db.query(VideoCard).filter(VideoCard.user_id == user.id)
+    card = None
+    if card_id:
+        card = query.filter(VideoCard.id == card_id).first()
+    if card is None and bvid:
+        card = query.filter(VideoCard.bvid == bvid).first()
+    if card is None:
+        return "", ""
+    return card.title or "", card.source_url or ""
+
+
 def report_event(db: Session, user: User, payload: dict) -> DownloadEvent:
+    bvid = (payload.get("bvid") or "").strip()
+    video_title, source_url = _card_title_and_url(db, user, payload.get("card_id"), bvid)
     event = DownloadEvent(
         user_id=user.id if user is not None else None,
         card_id=payload.get("card_id"),
-        bvid=(payload.get("bvid") or "").strip(),
+        bvid=bvid,
+        video_title=video_title,
+        source_url=source_url,
         kind=(payload.get("kind") or "").strip(),
         qn=payload.get("qn"),
         host=(payload.get("host") or "").strip(),

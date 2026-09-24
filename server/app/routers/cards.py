@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import get_current_user
 from ..errors import AppError
-from ..models import Tag, User, VideoCard
+from ..models import DownloadEvent, Tag, User, VideoCard
 from ..schemas import CardOut
 from ..services.collect import card_to_out
 
@@ -59,6 +59,9 @@ def delete_card(
     )
     if card is None:
         raise AppError(404, "卡片不存在")
+    db.query(DownloadEvent).filter(DownloadEvent.card_id == card_id).update(
+        {DownloadEvent.card_id: None}, synchronize_session=False
+    )
     db.delete(card)
     db.commit()
     return Response(status_code=204)

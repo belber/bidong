@@ -21,6 +21,7 @@ from app.models import (
     ParseLog,
     User,
     VideoCard,
+    VisitEvent,
 )
 from app.time import utcnow_naive
 
@@ -296,6 +297,130 @@ def test_download_stats_and_detail(admin_client, db_engine):
     ).json()
     assert detail["total"] == 1
     assert detail["items"][0]["bvid"] == "BV1xx411c7mD"
+    assert detail["items"][0]["created_at"].endswith("Z")
+
+
+def test_download_detail_shows_openid_video_title_and_link(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    user = User(openid="openid-dl-a", nickname="下载用户")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    card = VideoCard(
+        user_id=user.id,
+        bvid="BV1xx411c7mD",
+        title="帅哥合集 01",
+        cover_url="",
+        up_name="UP",
+        partition="",
+        desc="",
+        source_url="https://www.bilibili.com/video/BV1xx411c7mD",
+        source="local",
+        collected_at=utcnow_naive(),
+        month="2026-09",
+    )
+    db.add(card)
+    db.commit()
+    db.refresh(card)
+    db.add(
+        DownloadEvent(
+            user_id=user.id,
+            card_id=card.id,
+            bvid=card.bvid,
+            video_title=card.title,
+            source_url=card.source_url,
+            kind="watermarked",
+            qn=16,
+            host="upos-sz-mirrorcoso1.bilivideo.com",
+            stage="download",
+            status="success",
+            created_at=utcnow_naive(),
+        )
+    )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    detail = admin_client.get(
+        "/api/admin/stats/download/detail", headers=_auth(token)
+    ).json()
+    item = detail["items"][0]
+    assert item["openid"] == "openid-dl-a"
+    assert item["video_title"] == "帅哥合集 01"
+    assert item["source_url"] == "https://www.bilibili.com/video/BV1xx411c7mD"
+
+    by_user = admin_client.get(
+        "/api/admin/stats/download/detail",
+        params={"q": "openid-dl-a"},
+        headers=_auth(token),
+    ).json()
+    assert by_user["total"] == 1
+
+    by_title = admin_client.get(
+        "/api/admin/stats/download/detail",
+        params={"q": "帅哥合集"},
+        headers=_auth(token),
+    ).json()
+    assert by_title["total"] == 1
+
+
+def test_visit_monitor_lists_openid_and_counts(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    u1 = User(openid="openid-v1", nickname="小明")
+    u2 = User(openid="openid-v2")
+    db.add_all([u1, u2])
+    db.commit()
+    db.refresh(u1)
+    db.refresh(u2)
+    now = utcnow_naive()
+    db.add_all(
+        [
+            VisitEvent(user_id=u1.id, path="pages/home/home", created_at=now),
+            VisitEvent(user_id=u1.id, path="pages/home/home", created_at=now),
+            VisitEvent(user_id=u2.id, path="pages/home/home", created_at=now),
+        ]
+    )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    summary = admin_client.get(
+        "/api/admin/stats/visit?days=30", headers=_auth(token)
+    ).json()
+    assert summary["pv"] == 3
+    assert summary["uv"] == 2
+    assert summary["today_pv"] == 3
+    assert summary["today_uv"] == 2
+    assert summary["total_uv"] == 2
+    assert sum(point["pv"] for point in summary["trend"]) == 3
+    assert sum(point["uv"] for point in summary["trend"]) == 2
+
+    detail = admin_client.get(
+        "/api/admin/stats/visit/detail?days=30", headers=_auth(token)
+    ).json()
+    assert detail["total"] == 3
+    by_openid = {i["openid"]: i for i in detail["items"]}
+    assert set(by_openid) == {"openid-v1", "openid-v2"}
+    assert by_openid["openid-v1"]["nickname"] == "小明"
+    assert by_openid["openid-v1"]["path"] == "pages/home/home"
+    assert by_openid["openid-v2"]["nickname"] == ""
+    assert detail["items"][0]["created_at"]
+
+    only_v2 = admin_client.get(
+        "/api/admin/stats/visit/detail",
+        params={"q": "openid-v2"},
+        headers=_auth(token),
+    ).json()
+    assert only_v2["total"] == 1
+
+    by_nickname = admin_client.get(
+        "/api/admin/stats/visit/detail",
+        params={"q": "小明"},
+        headers=_auth(token),
+    ).json()
+    assert by_nickname["total"] == 2
 
 
 def test_download_domains_list_and_update(admin_client, db_engine):
@@ -330,6 +455,37 @@ def test_download_domains_list_and_update(admin_client, db_engine):
     assert created.json()["host"] == "upos-sz-mirrorhw.bilivideo.com"
     assert created.json()["is_configured"] is True
     assert created.json()["seen_count"] == 0
+
+
+def test_bulk_import_domains(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    db.add(BiliCdnDomain(host="upos-sz-mirrorcoso1.bilivideo.com", is_configured=False))
+    db.add(BiliCdnDomain(host="upos-sz-estgcos.bilivideo.com", is_configured=True))
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    text = "[https://upos-sz-mirrorcoso1.bilivideo.com;https://upos-sz-estgcos.bilivideo.com;https://cn-jstz-cu-01-02.bilivideo.com;https://cn-jstz-cu-01-02.bilivideo.com](https://upos-sz-mirrorcoso1.bilivideo.com)"
+    resp = admin_client.post(
+        "/api/admin/download/domains/bulk",
+        json={"text": text},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["inserted"] == ["cn-jstz-cu-01-02.bilivideo.com"]
+    assert data["updated"] == ["upos-sz-mirrorcoso1.bilivideo.com"]
+    assert data["already_configured"] == ["upos-sz-estgcos.bilivideo.com"]
+    assert data["invalid"] == []
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    rows = {r.host: r.is_configured for r in db.query(BiliCdnDomain).all()}
+    db.close()
+    assert rows["upos-sz-mirrorcoso1.bilivideo.com"] is True
+    assert rows["upos-sz-estgcos.bilivideo.com"] is True
+    assert rows["cn-jstz-cu-01-02.bilivideo.com"] is True
 
 
 @respx.mock

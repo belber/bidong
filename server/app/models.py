@@ -223,9 +223,11 @@ class DownloadEvent(Base):
         ForeignKey("user.id"), nullable=True, index=True
     )
     card_id: Mapped[int | None] = mapped_column(
-        ForeignKey("video_card.id"), nullable=True, index=True
+        ForeignKey("video_card.id", ondelete="SET NULL"), nullable=True, index=True
     )
     bvid: Mapped[str] = mapped_column(String(32), default="", index=True)
+    video_title: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(Text, default="")
     kind: Mapped[str] = mapped_column(String(16), default="", index=True)
     qn: Mapped[int | None] = mapped_column(Integer, nullable=True)
     host: Mapped[str] = mapped_column(String(255), default="", index=True)

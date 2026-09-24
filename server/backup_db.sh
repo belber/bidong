@@ -11,6 +11,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ENV_FILE=".env.prod"
+
+# compose 读取的环境文件名；备份脚本默认给生产环境用
+export APP_ENV_FILE="${APP_ENV_FILE:-${ENV_FILE}}"
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "找不到 ${ENV_FILE}，请在 server/ 目录下运行"
   exit 1

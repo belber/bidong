@@ -17,6 +17,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        # SQLite 是动态类型，INTEGER / BIGINT 没有区别，且不支持 ALTER COLUMN
+        return
     op.alter_column(
         "video_card",
         "cid",
@@ -28,6 +31,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        return
     op.alter_column(
         "video_card",
         "cid",

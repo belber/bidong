@@ -1,3 +1,4 @@
+import re
 import time
 
 from sqlalchemy.orm import sessionmaker
@@ -12,7 +13,14 @@ from app.models import (
     ParseLog,
     User,
 )
-from app.robot.worker import activation_message, process_at, process_follow, run_once
+from app.robot.worker import (
+    activation_message,
+    already_bound_message,
+    log_message,
+    process_at,
+    process_follow,
+    run_once,
+)
 from app.services.activation import bind, issue_activation
 from app.services.tracking import classify_error
 from app.time import utcnow_naive
@@ -61,6 +69,44 @@ def test_process_follow_skips_old_follower(db_engine):
 
     assert client.sent == []
     assert db.query(Binding).filter(Binding.bili_uid == "111").count() == 0
+    db.close()
+
+
+def test_process_follow_logs_send_success(db_engine, capsys):
+    settings.robot_send_interval_seconds = 0
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    client = FakeClient(
+        followers=[{"mid": "222", "uname": "B", "mtime": int(time.time()) - 60}]
+    )
+
+    process_follow(db, client)
+
+    out = capsys.readouterr().out
+    assert "已向 222（B）发送激活码" in out
+    assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ", out)
+    db.close()
+
+
+def test_process_follow_sends_already_bound_message_once(db_engine):
+    settings.robot_send_interval_seconds = 0
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    user = User(openid="bound-follow-user", created_at=utcnow_naive())
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    issued = issue_activation(db, "222", "B")
+    bind(db, user.id, issued.activation_code)
+
+    mtime = int(time.time()) - 60
+    client = FakeClient(followers=[{"mid": "222", "uname": "B", "mtime": mtime}])
+    process_follow(db, client)
+    assert client.sent == [("222", already_bound_message())]
+
+    client2 = FakeClient(followers=[{"mid": "222", "uname": "B", "mtime": mtime}])
+    process_follow(db, client2)
+    assert client2.sent == []
     db.close()
 
 
@@ -255,6 +301,18 @@ def test_process_at_logs_parse_failure(db_engine):
     parse_log = db.query(ParseLog).filter(ParseLog.source == "robot").one()
     assert parse_log.ok is False
     db.close()
+
+
+def test_robot_messages_do_not_contain_platform_names():
+    messages = [activation_message("ABC123"), already_bound_message()]
+    for message in messages:
+        assert "微信" not in message
+        assert "wx" not in message.lower()
+
+
+def test_worker_log_message_has_beijing_timestamp():
+    line = log_message("测试日志")
+    assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} 测试日志$", line)
 
 
 def test_classify_error_types():

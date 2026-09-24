@@ -1,5 +1,6 @@
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -15,10 +16,29 @@ from ..time import utcnow_naive
 from .cookie import build_client, check_cookie
 
 
+_LOG_TZ = timezone(timedelta(hours=8))
+
+
+def log_message(message: str) -> str:
+    """给 worker 日志加北京时间前缀。"""
+    return f"{datetime.now(_LOG_TZ).strftime('%Y-%m-%d %H:%M:%S')} {message}"
+
+
+def log(message: str) -> None:
+    print(log_message(message), flush=True)
+
+
 def activation_message(code: str) -> str:
     return (
         f"你的激活码：{code}\n"
-        "复制整条消息，打开wx「壁咚咚藏链阁」粘贴即可绑定 ✨"
+        "复制整条消息，打开「壁咚咚藏链阁」小程序粘贴即可绑定 ✨"
+    )
+
+
+def already_bound_message() -> str:
+    return (
+        "你已经绑定过「壁咚咚藏链阁」啦，无需重复绑定。\n"
+        "打开「壁咚咚藏链阁」小程序，即可查看收藏的视频。"
     )
 
 
@@ -80,33 +100,48 @@ def process_follow(db: Session, client: BiliRobotClient) -> None:
         binding = issue_activation(db, mid, uname)
         bound = binding.bound_at is not None
         sent_code = bound or binding.code_sent_at is not None
-        if binding.bound_at is None and mtime > (binding.last_follow_mtime or 0):
-            try:
-                client.send_msg(mid, activation_message(binding.activation_code))
-            except AppError as exc:
-                tracking.log_activation(
-                    db,
-                    mid,
-                    uname,
-                    binding.activation_code,
-                    sent_ok=False,
-                    send_reason=tracking.classify_send_error(exc),
-                    bound=bound,
-                )
+        if mtime > (binding.last_follow_mtime or 0):
+            if bound:
+                try:
+                    client.send_msg(mid, already_bound_message())
+                except AppError as exc:
+                    reason = tracking.classify_send_error(exc)
+                    log(f"已绑定用户 {mid}（{uname}）发送提示失败：{reason}")
+                else:
+                    binding.last_follow_mtime = mtime
+                    db.commit()
+                    sent_code = True
+                    log(f"已向 {mid}（{uname}）发送已绑定提示")
             else:
-                binding.code_sent_at = utcnow_naive()
-                binding.last_follow_mtime = mtime
-                db.commit()
-                sent_code = True
-                tracking.log_activation(
-                    db,
-                    mid,
-                    uname,
-                    binding.activation_code,
-                    sent_ok=True,
-                    send_reason="",
-                    bound=bound,
-                )
+                try:
+                    client.send_msg(mid, activation_message(binding.activation_code))
+                except AppError as exc:
+                    reason = tracking.classify_send_error(exc)
+                    log(f"新粉丝 {mid}（{uname}）发送激活码失败：{reason}")
+                    tracking.log_activation(
+                        db,
+                        mid,
+                        uname,
+                        binding.activation_code,
+                        sent_ok=False,
+                        send_reason=reason,
+                        bound=bound,
+                    )
+                else:
+                    binding.code_sent_at = utcnow_naive()
+                    binding.last_follow_mtime = mtime
+                    db.commit()
+                    sent_code = True
+                    log(f"已向 {mid}（{uname}）发送激活码")
+                    tracking.log_activation(
+                        db,
+                        mid,
+                        uname,
+                        binding.activation_code,
+                        sent_ok=True,
+                        send_reason="",
+                        bound=bound,
+                    )
             if settings.robot_send_interval_seconds > 0:
                 time.sleep(settings.robot_send_interval_seconds)
         tracking.log_follow_event(
@@ -228,12 +263,13 @@ def main(argv: list[str] | None = None) -> None:
         argv = sys.argv[1:]
     once = "--once" in argv
     if not settings.robot_enabled:
-        print("机器人未启用（ROBOT_ENABLED=false）")
+        log("机器人未启用（ROBOT_ENABLED=false）")
         return
     if settings.dev_mode:
         Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        log("worker 已启动，开始轮询")
         last_follow = 0.0
         last_at = 0.0
         last_cookie = 0.0
@@ -245,7 +281,7 @@ def main(argv: list[str] | None = None) -> None:
                 try:
                     process_follow(db, client)
                 except AppError as exc:
-                    print(f"关注轮询出错：{exc}")
+                    log(f"关注轮询出错：{exc}")
                 finally:
                     client.close()
                 last_follow = now
@@ -254,7 +290,7 @@ def main(argv: list[str] | None = None) -> None:
                 try:
                     process_at(db, client)
                 except AppError as exc:
-                    print(f"@轮询出错：{exc}")
+                    log(f"@轮询出错：{exc}")
                 finally:
                     client.close()
                 last_at = now
@@ -262,7 +298,7 @@ def main(argv: list[str] | None = None) -> None:
                 try:
                     check_cookie(db)
                 except Exception as exc:  # noqa: BLE001
-                    print(f"Cookie 检测出错：{exc}")
+                    log(f"Cookie 检测出错：{exc}")
                 last_cookie = now
             if once:
                 break

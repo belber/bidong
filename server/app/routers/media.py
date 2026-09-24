@@ -9,6 +9,7 @@ from ..deps import get_current_user
 from ..errors import AppError
 from ..models import User, VideoCard
 from ..schemas import DownloadEventReport, MediaOption
+from ..config import settings
 from ..services.bilibili import BiliClient, UA
 from ..services import media_download
 from ..services import notify
@@ -100,7 +101,10 @@ def download(
     suffix = "m4a" if kind == "audio" else "mp4"
 
     def gen():
-        with httpx.stream("GET", url, headers=MEDIA_HEADERS, timeout=30, follow_redirects=True) as resp:
+        # 中转下载要「慢没关系、但不能断」：只限制连接超时，读取超时禁用，
+        # 避免 B站源 30 秒无数据就把整条下载链路掐断。
+        timeout = httpx.Timeout(connect=15.0, read=None, write=60.0, pool=15.0)
+        with httpx.stream("GET", url, headers=MEDIA_HEADERS, timeout=timeout, follow_redirects=True) as resp:
             resp.raise_for_status()
             yield from resp.iter_bytes(chunk_size=65536)
 
@@ -139,14 +143,39 @@ def download_url(
             streams = [s for s in streams if s["qn"] == qn]
         if not streams:
             raise AppError(404, "无可用清晰度")
-        candidates = media_download.build_candidates(db, streams)
-        if not candidates:
-            raise AppError(502, "无可用下载地址")
-        unconfigured_hosts = sorted({c["host"] for c in candidates if not c["configured"]})
-        for host in unconfigured_hosts:
-            notify.send_unconfigured_domain_alert(db, host, card.bvid)
         chosen_qn = streams[0]["qn"]
+        if settings.download_debug_fail:
+            # 本地 UI 调试开关：返回必然失败候选，让前端走真实失败弹窗流程。
+            return {
+                "kind": kind,
+                "qn": chosen_qn,
+                "expires_at": None,
+                "candidates": [{
+                    "url": "https://debug.invalid/download-debug-fail",
+                    "host": "debug.invalid",
+                    "configured": False,
+                }],
+            }
         expires_at = media_download.expiry_from_streams(streams)
+        if kind == "audio":
+            # DASH 音频 CDN 强制校验 Referer，小程序 downloadFile 无法携带，
+            # 必须由后端中转并注入 MEDIA_HEADERS。
+            proxy_url = (
+                f"{settings.public_base_url.rstrip('/')}"
+                f"/api/cards/{card_id}/download?kind=audio&qn={chosen_qn}"
+            )
+            candidates = [{
+                "url": proxy_url,
+                "host": media_download.url_host(settings.public_base_url),
+                "configured": True,
+            }]
+        else:
+            candidates = media_download.build_candidates(db, streams)
+            if not candidates:
+                raise AppError(502, "无可用下载地址")
+            unconfigured_hosts = sorted({c["host"] for c in candidates if not c["configured"]})
+            for host in unconfigured_hosts:
+                notify.send_unconfigured_domain_alert(db, host, card.bvid)
     finally:
         client.close()
     return {
