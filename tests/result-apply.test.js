@@ -76,6 +76,7 @@ describe('解析结果页 applyResult', () => {
     expect(ctx.data.origin.platformText).toBe('抖音');
     expect(ctx.data.origin.authorText).toBe('@李不然');
     expect(ctx.data.origin.hasAuthor).toBe(true);
+    expect(ctx.data.origin.copyText).toBe('李不然');
     expect(ctx.data.origin.pending).toBe(false);
   });
 

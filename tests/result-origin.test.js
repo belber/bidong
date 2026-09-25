@@ -27,13 +27,15 @@ describe('解析结果页 · 视频出处区块', () => {
     expect(wxml).toContain('{{origin.authorText}}');
   });
 
-  test('复制主页和现有「复制」用同一处理方式', () => {
+  test('复制原up账号和现有「复制」用同一处理方式', () => {
     expect(wxml).toContain('class="action"');
-    expect(wxml).toContain('bindtap="onCopyAuthorHome"');
-    expect(wxml).toContain('复制主页');
-    expect(js).toContain('onCopyAuthorHome');
+    expect(wxml).toContain('bindtap="onCopyAuthorName"');
+    expect(wxml).toContain('复制原up账号');
+    expect(js).toContain('onCopyAuthorName');
     expect(js).toContain('wx.setClipboardData');
-    expect(js).toContain('authorUrl');
+    expect(js).toContain('copyText');
+    // 复制的是昵称，不是主页链接
+    expect(js).not.toContain('authorUrl');
   });
 
   test('查不到出处时给出「整理中」提示', () => {

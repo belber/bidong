@@ -240,17 +240,19 @@ Page({
     this.copy(e.currentTarget.dataset.field);
   },
 
-  // 只复制原作者主页：抖音/X 的链接在小程序里打不开，复制到浏览器看
-  onCopyAuthorHome() {
+  // 复制原作者昵称：粉丝拿到手机上最顺手的动作是去抖音/微博搜索框粘贴查人，
+  // 直接粘主页链接在 App 里查不到
+  onCopyAuthorName() {
     const origin = this.data.origin;
-    const url = origin && origin.authorUrl;
-    if (!url) {
-      toast('没有可复制的主页');
+    const name = origin && origin.copyText;
+    if (!name) {
+      toast('没有可复制的账号');
       return;
     }
+    const platform = origin.platformText && origin.platformText !== '—' ? origin.platformText : '';
     wx.setClipboardData({
-      data: url,
-      success() { toast('主页链接已复制'); }
+      data: name,
+      success() { toast(platform ? '已复制，去' + platform + '搜索' : '已复制'); }
     });
   },
 

@@ -14,7 +14,9 @@ function mapOrigin(origin) {
     platformText: platformLabel || '—',
     authorText: authorName ? '@' + authorName : (platformLabel ? '待补充' : '—'),
     hasAuthor: !!authorName,
-    authorUrl: origin.author_url || '',
+    // 复制按钮用的值：昵称才是能在抖音/微博搜索框里粘贴查人的东西，
+    // 主页链接在手机上粘不进去（抖音 App 搜索框不认 URL）
+    copyText: authorName,
     pending: !platformLabel && !authorName
   };
 }

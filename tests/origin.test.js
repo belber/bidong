@@ -20,7 +20,8 @@ describe('mapOrigin', () => {
     expect(view.platformText).toBe('抖音');
     expect(view.authorText).toBe('@小山坡');
     expect(view.hasAuthor).toBe(true);
-    expect(view.authorUrl).toBe('https://www.douyin.com/user/MS4w');
+    // 复制按钮复制的是能直接在抖音搜索框里粘贴查人的昵称，不是主页链接
+    expect(view.copyText).toBe('小山坡');
     expect(view.pending).toBe(false);
   });
 
@@ -29,6 +30,7 @@ describe('mapOrigin', () => {
     expect(view.platformText).toBe('抖音');
     expect(view.authorText).toBe('待补充');
     expect(view.hasAuthor).toBe(false);
+    expect(view.copyText).toBe('');
     expect(view.pending).toBe(false);
   });
 
