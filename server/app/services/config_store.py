@@ -361,12 +361,15 @@ def set_help_config(db: Session, qq_group: str) -> None:
 # 视频出处（原up主）
 # ---------------------------------------------------------------------------
 def repost_config(db: Session) -> dict[str, str]:
+    # up_mid 是白名单：显式存成空串 = 关掉这个功能（空名单谁也不匹配），
+    # 所以这里只在「没有这一行」时才回退到 env；展示用的名字/头像仍按空值回退。
+    stored_mid = get_raw(db, "repost_up_mid")
     return {
         "account_name": get_raw(db, "repost_account_name")
         or settings.repost_account_name,
         "account_avatar_url": get_raw(db, "repost_account_avatar_url")
         or settings.repost_account_avatar_url,
-        "up_mid": get_raw(db, "repost_up_mid") or settings.repost_up_mid,
+        "up_mid": settings.repost_up_mid if stored_mid is None else stored_mid,
     }
 
 

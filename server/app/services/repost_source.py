@@ -144,7 +144,11 @@ def upsert_items(db: Session, raw_items: list[dict]) -> dict:
 # 读取
 # ---------------------------------------------------------------------------
 def repost_up_mids(db: Session) -> set[str]:
-    raw = config_store.get_raw(db, "repost_up_mid") or settings.repost_up_mid
+    # 白名单语义：显式存空串 = 关掉这个功能（空名单谁也不匹配），
+    # 只有「没有这一行配置」时才回退到 env 默认值。
+    raw = config_store.get_raw(db, "repost_up_mid")
+    if raw is None:
+        raw = settings.repost_up_mid
     return {part.strip() for part in (raw or "").split(",") if part.strip()}
 
 
