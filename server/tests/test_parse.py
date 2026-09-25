@@ -2,8 +2,11 @@ import respx
 from sqlalchemy.orm import sessionmaker
 
 from app.models import VideoCard
+from app.services import repost_source
 from app.services.parse_cache import parse_cache
 from helpers import BVID, mock_bili
+
+UP_MID = "3707052465589015"
 
 
 @respx.mock
@@ -80,3 +83,77 @@ def test_parse_returns_feature_switches(client, auth_headers, monkeypatch):
     parse_cache.clear()
     again = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
     assert again.json()["features"] == {"comment": True, "danmaku": False}
+
+
+def _add_source_record(db, bvid=BVID, **over):
+    repost_source.upsert_items(
+        db,
+        [
+            {
+                "bvid": bvid,
+                "platform": "douyin",
+                "author_name": "小山坡",
+                "author_url": "https://www.douyin.com/user/MS4w",
+                **over,
+            }
+        ],
+    )
+
+
+@respx.mock
+def test_parse_returns_origin_for_repost_channel(client, db_engine, auth_headers):
+    mock_bili(up_mid=UP_MID)
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    _add_source_record(db)
+
+    resp = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert resp.status_code == 200
+    origin = resp.json()["origin"]
+    assert origin is not None
+    assert origin["account_name"] == "帅哥录屏"
+    assert origin["platform_label"] == "抖音"
+    assert origin["author_name"] == "小山坡"
+    assert origin["author_url"] == "https://www.douyin.com/user/MS4w"
+
+    card = db.query(VideoCard).one()
+    assert card.up_mid == UP_MID
+    db.close()
+
+
+@respx.mock
+def test_parse_origin_null_for_other_up(client, auth_headers):
+    mock_bili(up_mid="99999999")
+    resp = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["origin"] is None
+
+
+@respx.mock
+def test_parse_origin_shows_placeholder_when_channel_has_no_record(
+    client, auth_headers
+):
+    """台账漏记过的稿件：区块要出现，但内容是空的（前端显示「整理中」）。"""
+    mock_bili(up_mid=UP_MID)
+    resp = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    origin = resp.json()["origin"]
+    assert origin is not None
+    assert origin["platform_label"] == ""
+    assert origin["author_name"] == ""
+
+
+@respx.mock
+def test_parse_origin_is_recomputed_on_cache_hit(client, db_engine, auth_headers):
+    """解析结果有 60 秒缓存，但出处不能跟着缓存变旧。"""
+    mock_bili(up_mid=UP_MID)
+    first = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert first.json()["origin"]["platform_label"] == ""
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    _add_source_record(db)
+    db.close()
+
+    again = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert again.status_code == 200
+    assert again.json()["origin"]["platform_label"] == "抖音"

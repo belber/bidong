@@ -4,7 +4,7 @@ import respx
 BVID = "BV1xx411c7mD"
 
 
-def mock_bili(bvid=BVID):
+def mock_bili(bvid=BVID, up_mid=""):
     respx.get(f"https://api.bilibili.com/x/web-interface/view?bvid={bvid}").mock(
         return_value=httpx.Response(
             200,
@@ -14,7 +14,7 @@ def mock_bili(bvid=BVID):
                     "bvid": bvid,
                     "title": "测试标题",
                     "pic": "//i0.hdslb.com/bfs/archive/a.jpg",
-                    "owner": {"name": "测试UP"},
+                    "owner": {"name": "测试UP", "mid": up_mid},
                     "tname": "知识",
                     "desc": "测试简介",
                     "duration": 123,

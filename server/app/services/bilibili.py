@@ -44,6 +44,7 @@ class VideoMeta:
     title: str
     cover_url: str
     up_name: str
+    up_mid: str
     partition: str
     desc: str
     duration: int
@@ -117,6 +118,7 @@ class BiliClient:
             title=d.get("title") or "",
             cover_url=pic,
             up_name=owner.get("name") or "",
+            up_mid=str(owner.get("mid") or ""),
             partition=partition or "",
             desc=d.get("desc") or "",
             duration=int(d.get("duration") or 0),

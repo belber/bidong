@@ -51,8 +51,15 @@ def collect_video_by_bvid(
         if existing is not None:
             meta = client.get_video(existing.bvid)
             subtitles = client.get_subtitles(existing.bvid, existing.cid)
+            dirty = False
             if meta.partition:
                 existing.partition = meta.partition
+                dirty = True
+            if meta.up_mid and existing.up_mid != meta.up_mid:
+                # 老卡片建卡时还没存 up_mid，重新解析时补上
+                existing.up_mid = meta.up_mid
+                dirty = True
+            if dirty:
                 db.commit()
             stats = {
                 "like": meta.like,
@@ -77,6 +84,7 @@ def collect_video_by_bvid(
         title=meta.title[:200],
         cover_url=cover_url,
         up_name=meta.up_name,
+        up_mid=meta.up_mid,
         partition=meta.partition,
         desc=meta.desc[:500],
         source_url=f"https://www.bilibili.com/video/{bvid}",
