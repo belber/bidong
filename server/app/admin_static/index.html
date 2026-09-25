@@ -220,22 +220,26 @@ const renderers = {
 
     // 需要动一下手的事放最上面，其余只看数字
     const alerts = [];
+    const hostsToday = (domains.new_unconfigured_today_hosts || []).map(h => esc(h.host)).join("、");
     alerts.push(cookie.cookie_valid === false
       ? `<div class="alert">⚠ 机器人 Cookie 已失效（${esc(cookie.cookie_last_error || "")}）—— 私信发码和评论 @ 监听都会停</div>`
       : `<div class="alert ok">◎ 机器人 Cookie 正常（最近检查 ${esc(cookie.cookie_last_checked || "—")}）</div>`);
     if (domains.unconfigured) {
       const hosts = (domains.recent_unconfigured || []).map(h => esc(h.host)).join("、");
       const newToday = domains.new_unconfigured_today || 0;
-      const todayHosts = (domains.new_unconfigured_today_hosts || []).map(h => esc(h.host)).join("、");
       alerts.push(`<div class="alert">⚠ ${fmt(domains.unconfigured)} 个下载域名还没配置到微信后台，用户会下载失败`
-        + `${newToday ? `，其中 <b>${fmt(newToday)} 个是今天新出现的</b>${todayHosts ? `（${todayHosts}）` : ""}` : ""}`
+        + `${newToday ? `，其中 <b>${fmt(newToday)} 个是今天新出现的</b>${hostsToday ? `（${hostsToday}）` : ""}` : ""}`
         + `${hosts ? `（最近出现：${hosts}）` : ""} · <a href="javascript:void(0)" onclick="show('cdn')">去处理</a></div>`);
     }
 
-    const failReasons = (dl.fail_by_error || []).slice(0, 3)
+    const parseFailReasons = (parse.today_fail_by_reason || []).slice(0, 3)
+      .map(x => `${esc(x.reason || "其他")} ${fmt(x.count)}`).join(" · ");
+    const todayFailReasons = (dl.today_fail_by_error || []).slice(0, 3)
       .map(x => `${esc(errorLabel(x.error_type))} ${fmt(x.count)}`).join(" · ");
-    const parseOk = (parse.local_ok || 0) + (parse.robot_ok || 0);
-    const parseFail = (parse.local_fail || 0) + (parse.robot_fail || 0);
+    const todaySuccess = (dl.today_saved || 0) + (dl.today_copied || 0);
+    const todayRate = dl.today_total
+      ? Math.round(todaySuccess / dl.today_total * 1000) / 10
+      : 0;
 
     el.innerHTML = `
       ${alerts.join("")}
@@ -262,38 +266,35 @@ const renderers = {
       </div>
 
       <div class="panel">
-        <h3>视频解析</h3>
-        <p class="note">去重用户数：贴链接按小程序用户算，评论 @ 按 B站 UID 算（机器人链路没有小程序用户）</p>
+        <h3>视频解析 <span class="tag muted">只看今天</span></h3>
+        <p class="note">今天的解析次数；括号里是去重人数（贴链接按小程序用户、评论 @ 按 B站 UID）</p>
         <div class="metric-row">
-          <div class="metric"><b class="blue">${fmt(parse.local_users_today)}</b><span>今日贴链接触发</span></div>
-          <div class="metric"><b class="blue">${fmt(parse.robot_users_today)}</b><span>今日评论 @ 触发</span></div>
-          <div class="metric"><b>${fmt((parse.local_users || 0) + (parse.robot_users || 0))}</b><span>近 30 天解析用户</span></div>
-          <div class="metric"><b class="ok">${fmt(parseOk)}</b><span>成功（失败 ${fmt(parseFail)}）</span></div>
+          <div class="metric"><b class="blue">${fmt(parse.today_total)}</b><span>今日解析次数（成功 ${fmt(parse.today_ok)} · 失败 ${fmt(parse.today_fail)}）</span></div>
+          <div class="metric"><b>${fmt(parse.today_local_total)}</b><span>贴链接触发（${fmt(parse.local_users_today)} 人）</span></div>
+          <div class="metric"><b>${fmt(parse.today_robot_total)}</b><span>评论 @ 触发（${fmt(parse.robot_users_today)} 人）</span></div>
         </div>
+        <p class="note" style="margin:10px 0 0">失败原因：${parseFailReasons || "无"}</p>
       </div>
 
       <div class="panel">
-        <h3>视频下载</h3>
-        <p class="note">一次下载算一次；用户改用"复制链接到浏览器保存"也算成功</p>
+        <h3>视频下载 <span class="tag muted">只看今天</span></h3>
+        <p class="note">今天的下载；用户改用"复制链接到浏览器保存"也算成功</p>
         <div class="metric-row">
-          <div class="metric"><b class="blue">${fmt(dl.today_total)}</b><span>今日下载（成功 ${fmt((dl.today_saved || 0) + (dl.today_copied || 0))} · 失败 ${fmt(dl.today_fail)}）</span></div>
-          <div class="metric"><b>${fmt(dl.total)}</b><span>近 30 天下载</span></div>
-          <div class="metric"><b class="ok">${fmt(dl.success)}</b><span>成功（保存 ${fmt(dl.saved)} + 复制链接 ${fmt(dl.copied)}）</span></div>
-          <div class="metric"><b class="bad">${fmt(dl.fail)}</b><span>失败</span></div>
-          <div class="metric"><b>${fmt(dl.success_rate)}%</b><span>成功率</span></div>
+          <div class="metric"><b class="blue">${fmt(dl.today_total)}</b><span>今日下载次数</span></div>
+          <div class="metric"><b class="ok">${fmt((dl.today_saved || 0) + (dl.today_copied || 0))}</b><span>成功（保存 ${fmt(dl.today_saved)} + 复制链接 ${fmt(dl.today_copied)}）</span></div>
+          <div class="metric"><b class="bad">${fmt(dl.today_fail)}</b><span>失败</span></div>
+          <div class="metric"><b>${fmt(todayRate)}%</b><span>成功率</span></div>
         </div>
-        <p class="note" style="margin:10px 0 0">失败原因：${failReasons || "无"}</p>
+        <p class="note" style="margin:10px 0 0">失败原因：${todayFailReasons || "无"}</p>
       </div>
 
       <div class="panel">
-        <h3>B站 CDN 域名</h3>
-        <p class="note">下载直链用到的域名；没配置到微信后台的域名，用户点下载会失败</p>
+        <h3>B站 CDN 域名 <span class="tag muted">只看今天</span></h3>
+        <p class="note">今天落地下载碰到过的域名；没配置到微信后台的域名，用户点下载会失败</p>
         <div class="metric-row">
-          <div class="metric"><b class="${domains.new_unconfigured_today ? 'bad' : 'ok'}">${fmt(domains.new_unconfigured_today)}</b><span>今日新增未配置</span></div>
-          <div class="metric"><b>${fmt(domains.total)}</b><span>已登记域名</span></div>
-          <div class="metric"><b class="ok">${fmt(domains.configured)}</b><span>已配置</span></div>
-          <div class="metric"><b class="warn">${fmt(domains.unconfigured)}</b><span>未配置</span></div>
-          <div class="metric"><b>${fmt(domains.hits)}</b><span>累计命中次数</span></div>
+          <div class="metric"><b class="${domains.new_unconfigured_today ? 'bad' : 'ok'}">${fmt(domains.new_unconfigured_today)}</b><span>今日新增未配置${hostsToday ? `（${hostsToday}）` : ""}</span></div>
+          <div class="metric"><b>${fmt(domains.seen_today)}</b><span>今日命中域名</span></div>
+          <div class="metric"><b class="warn">${fmt(domains.unconfigured)}</b><span>当前未配置（待处理）</span></div>
         </div>
       </div>
 

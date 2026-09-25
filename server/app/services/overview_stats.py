@@ -38,6 +38,8 @@ def parse_users(db: Session, days: int = 30) -> dict:
 
     local = admin_stats.parse_summary(db, "local", days)
     robot = admin_stats.parse_summary(db, "robot", days)
+    today_local = admin_stats.parse_summary(db, "local", 1)
+    today_robot = admin_stats.parse_summary(db, "robot", 1)
     return {
         "local_users": distinct_users("local", start),
         "local_users_today": distinct_users("local", today),
@@ -48,6 +50,14 @@ def parse_users(db: Session, days: int = 30) -> dict:
         "robot_ok": robot["ok"],
         "robot_fail": robot["fail"],
         "fail_by_reason": local["fail_by_reason"] + robot["fail_by_reason"],
+        # 今日口径：概览的解析面板只看今天
+        "today_total": today_local["total"] + today_robot["total"],
+        "today_ok": today_local["ok"] + today_robot["ok"],
+        "today_fail": today_local["fail"] + today_robot["fail"],
+        "today_local_total": today_local["total"],
+        "today_robot_total": today_robot["total"],
+        "today_fail_by_reason": today_local["fail_by_reason"]
+        + today_robot["fail_by_reason"],
     }
 
 
@@ -65,6 +75,7 @@ def download_outcomes(db: Session, days: int = 30) -> dict:
     today_saved = today_copied = today_fail = 0
     today_label = admin_stats._today_shanghai().isoformat()
     by_error: dict[str, int] = {}
+    today_by_error: dict[str, int] = {}
 
     for session in sessions:
         is_today = (session["started_at"] or "").startswith(today_label)
@@ -79,6 +90,8 @@ def download_outcomes(db: Session, days: int = 30) -> dict:
             today_fail += is_today
             key = session["fail_error_type"] or "unknown"
             by_error[key] = by_error.get(key, 0) + 1
+            if is_today:
+                today_by_error[key] = today_by_error.get(key, 0) + 1
 
     success = saved + copied
     today_total = today_saved + today_copied + today_fail
@@ -93,6 +106,10 @@ def download_outcomes(db: Session, days: int = 30) -> dict:
         "today_saved": today_saved,
         "today_copied": today_copied,
         "today_fail": today_fail,
+        "today_fail_by_error": [
+            {"error_type": key, "count": value}
+            for key, value in sorted(today_by_error.items(), key=lambda item: -item[1])
+        ],
         "fail_by_error": [
             {"error_type": key, "count": value}
             for key, value in sorted(by_error.items(), key=lambda item: -item[1])
@@ -111,11 +128,18 @@ def domain_summary(db: Session) -> dict:
         if row.first_seen_at is not None and row.first_seen_at >= today_start
     ]
     new_today.sort(key=lambda row: row.first_seen_at or datetime.min, reverse=True)
+    seen_today = [
+        row
+        for row in rows
+        if row.last_seen_at is not None and row.last_seen_at >= today_start
+    ]
     return {
         "total": len(rows),
         "configured": len(rows) - len(unconfigured),
         "unconfigured": len(unconfigured),
         "hits": sum(int(row.seen_count or 0) for row in rows),
+        # 今天落地下载时实际碰到过几个域名
+        "seen_today": len(seen_today),
         # 今天新冒出来、还没配置到微信后台的域名——需要当天处理的事
         "new_unconfigured_today": len(new_today),
         "new_unconfigured_today_hosts": [

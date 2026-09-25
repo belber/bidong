@@ -14,7 +14,7 @@ def _db(db_engine):
     return Session()
 
 
-def _parse_log(db, source, *, user_id=None, bili_uid=None, ok=True, count=1):
+def _parse_log(db, source, *, user_id=None, bili_uid=None, ok=True, count=1, days_ago=0):
     for _ in range(count):
         db.add(
             ParseLog(
@@ -23,6 +23,7 @@ def _parse_log(db, source, *, user_id=None, bili_uid=None, ok=True, count=1):
                 bili_uid=bili_uid,
                 ok=ok,
                 reason="" if ok else "network",
+                created_at=utcnow_naive() - timedelta(days=days_ago),
             )
         )
     db.commit()
@@ -45,6 +46,27 @@ def test_parse_users_counts_distinct_users(db_engine):
     assert result["local_ok"] == 4
     assert result["local_fail"] == 1
     assert result["robot_ok"] == 4
+    db.close()
+
+
+def test_parse_users_splits_today(db_engine):
+    """解析面板只看今天：今天多少条、成功失败怎么分、失败原因是什么。"""
+    db = _db(db_engine)
+    _parse_log(db, "local", user_id=1, count=2)               # 今天成功
+    _parse_log(db, "local", user_id=2, ok=False, count=1)     # 今天失败
+    _parse_log(db, "robot", bili_uid="111", count=1)          # 今天成功
+    _parse_log(db, "local", user_id=3, count=5, days_ago=3)   # 3 天前，不该算今天
+    db.commit()
+
+    result = overview_stats.parse_users(db)
+    assert result["today_total"] == 4
+    assert result["today_ok"] == 3
+    assert result["today_fail"] == 1
+    assert result["today_local_total"] == 3
+    assert result["today_robot_total"] == 1
+    assert result["local_users_today"] == 2
+    assert result["robot_users_today"] == 1
+    assert result["today_fail_by_reason"] == [{"reason": "network", "count": 1}]
     db.close()
 
 
@@ -137,6 +159,7 @@ def test_download_outcomes_splits_today(db_engine):
     assert result["today_saved"] == 1
     assert result["today_copied"] == 0
     assert result["today_fail"] == 1
+    assert result["today_fail_by_error"] == [{"error_type": "wx_error", "count": 1}]
     db.close()
 
 
@@ -148,6 +171,7 @@ def test_domain_summary_counts_new_unconfigured_today(db_engine):
             is_configured=False,
             seen_count=1,
             first_seen_at=utcnow_naive() - timedelta(days=5),
+            last_seen_at=utcnow_naive() - timedelta(days=5),
         )
     )
     db.add(
@@ -169,6 +193,8 @@ def test_domain_summary_counts_new_unconfigured_today(db_engine):
     assert result["new_unconfigured_today"] == 1
     assert [h["host"] for h in result["new_unconfigured_today_hosts"]] == ["new.example"]
     assert result["unconfigured"] == 2
+    # 今天下载实际命中过 2 个域名（old.example 是 5 天前的）
+    assert result["seen_today"] == 2
     db.close()
 
 
