@@ -21,3 +21,4 @@ miniprogram/project.private.config.json
 # IDE
 .idea/
 .vscode/
+.superpowers/
