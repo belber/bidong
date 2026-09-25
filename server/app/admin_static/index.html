@@ -91,6 +91,7 @@
       <a data-view="operations" href="javascript:void(0)">运营管理</a>
       <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
       <a data-view="cdn" href="javascript:void(0)">B站域名管理</a>
+      <a data-view="sources" href="javascript:void(0)">视频出处</a>
       <div class="group"></div>
       <a href="javascript:void(0)" onclick="logout()">退出登录</a>
     </nav>
@@ -107,6 +108,7 @@
     <section id="view-operations" class="view hidden"></section>
     <section id="view-help" class="view hidden"></section>
     <section id="view-cdn" class="view hidden"></section>
+    <section id="view-sources" class="view hidden"></section>
   </main>
 </div>
 
@@ -468,6 +470,46 @@ const renderers = {
           <input id="help-qq" value="${esc(h.qq_group)}" style="margin-top:4px" placeholder="例如 123456789"/>
         </div>
         <button style="margin-top:8px" onclick="saveHelp()">保存</button> <span id="help-msg" class="muted"></span>
+      </div>`;
+  },
+
+  async sources(el) {
+    el.innerHTML = "加载中…";
+    const [s, cfg] = await Promise.all([api("/sources/stats"), api("/config/repost")])
+      .catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return [null, null]; });
+    if (!s || !cfg) return;
+    el.innerHTML = `
+      <div class="panel">
+        <h3>视频出处（原up主）</h3>
+        <p class="muted">小程序解析「帅哥录屏」的稿件时，结果页会多出一块「原up主是谁」。
+          数据由家里小主机上报，按 bvid 幂等；这里只服务白名单账号，其他 UP 主的视频解析页不受影响。</p>
+        <div class="cards" style="margin:12px 0">
+          <div class="card"><div class="label">已收录稿件</div><div class="value">${fmt(s.total)}</div></div>
+          <div class="card"><div class="label">有原作者</div><div class="value">${fmt(s.with_author)}</div><div class="sub">缺作者 ${fmt(s.without_author)} 条（前端显示「待补充」）</div></div>
+          <div class="card"><div class="label">最近一次上报</div><div class="value" style="font-size:15px">${esc(fmtTime(s.last_updated_at))}</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>账号与上报配置</h3>
+        <div style="margin:10px 0"><label class="muted">账号 UID 白名单（逗号分隔；留空 = 关闭该功能）</label>
+          <input id="repost-mid" value="${esc(cfg.up_mid)}" style="margin-top:4px" placeholder="3707052465589015"/></div>
+        <div style="margin:10px 0"><label class="muted">块上显示的账号名</label>
+          <input id="repost-name" value="${esc(cfg.account_name)}" style="margin-top:4px" placeholder="帅哥录屏"/></div>
+        <div style="margin:10px 0"><label class="muted">账号头像 URL（转存 COS 后的地址）</label>
+          <input id="repost-avatar" value="${esc(cfg.account_avatar_url)}" style="margin-top:4px" placeholder="https://.../avatar.jpg"/></div>
+        <div style="margin:10px 0"><label class="muted">上报接口 token（给小主机用，对应请求头 X-Ingest-Token）</label>
+          <input id="repost-token" value="${esc(cfg.source_ingest_token)}" style="margin-top:4px" placeholder="留空则关闭上报接口"/></div>
+        <button style="margin-top:8px" onclick="saveRepost()">保存</button> <span id="repost-msg" class="muted"></span>
+      </div>
+
+      <div class="panel">
+        <h3>批量导入 CSV</h3>
+        <p class="muted">表头需包含 bvid 列（其余列可缺）：bvid,title,platform,author_name,author_id,author_url,source_url,source_video_id,bili_published_at,note。
+          按 bvid 幂等、空值不覆盖，重复导入安全。</p>
+        <textarea id="source-csv" rows="8" style="width:100%;margin:10px 0;font-family:ui-monospace,monospace;font-size:12px"
+          placeholder="bvid,platform,author_name,author_url,source_url,bili_published_at,note"></textarea>
+        <button onclick="importSources()">导入</button> <span id="source-import-msg" class="muted"></span>
       </div>`;
   },
 
@@ -839,6 +881,30 @@ async function saveHelp() {
     input.value = (h && h.qq_group) || "";
     document.getElementById("help-msg").textContent = "已保存（以服务端为准）";
   } catch (e) { document.getElementById("help-msg").textContent = e.message; }
+}
+async function saveRepost() {
+  const body = {
+    up_mid: document.getElementById("repost-mid").value.trim(),
+    account_name: document.getElementById("repost-name").value.trim(),
+    account_avatar_url: document.getElementById("repost-avatar").value.trim(),
+    source_ingest_token: document.getElementById("repost-token").value.trim(),
+  };
+  try {
+    const cfg = await api("/config/repost", { method: "PUT", body: JSON.stringify(body) });
+    document.getElementById("repost-mid").value = cfg.up_mid || "";
+    document.getElementById("repost-token").value = cfg.source_ingest_token || "";
+    document.getElementById("repost-msg").textContent = "已保存（以服务端为准）";
+  } catch (e) { document.getElementById("repost-msg").textContent = e.message; }
+}
+async function importSources() {
+  const csv = document.getElementById("source-csv").value;
+  const msg = document.getElementById("source-import-msg");
+  try {
+    const r = await api("/sources/import", { method: "POST", body: JSON.stringify({ csv }) });
+    const rejected = r.rejected || [];
+    msg.textContent = `新增 ${r.created} / 更新 ${r.updated} / 拒收 ${rejected.length}`
+      + (rejected.length ? `（${rejected.slice(0, 3).map(x => x.bvid || "空 bvid").join("、")}…）` : "");
+  } catch (e) { msg.textContent = e.message; }
 }
 async function testAlert() {
   try { await api("/config/alert/test", { method: "POST" }); document.getElementById("alert-msg").textContent = "测试邮件已发送"; }

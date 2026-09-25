@@ -5,6 +5,8 @@
 """
 
 import re
+from csv import DictReader
+from io import StringIO
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -138,6 +140,26 @@ def upsert_items(db: Session, raw_items: list[dict]) -> dict:
 
     db.commit()
     return {"ok": True, "created": created, "updated": updated, "rejected": rejected}
+
+
+def parse_csv(text: str) -> list[dict]:
+    """解析管理端粘贴/上传的 CSV。表头必须是英文列名（见设计 §4.1）。
+
+    只认 bvid 一列必需；其余列缺了就当空值，交给 `_clean_item` 统一处理。
+    """
+    content = (text or "").lstrip("\ufeff")
+    if not content.strip():
+        raise ValueError("CSV 内容为空")
+    reader = DictReader(StringIO(content))
+    fields = [name.strip() for name in (reader.fieldnames or [])]
+    if "bvid" not in fields:
+        raise ValueError("CSV 缺少 bvid 列")
+    items: list[dict] = []
+    for row in reader:
+        items.append({(k or "").strip(): v for k, v in row.items() if k})
+    if not items:
+        raise ValueError("CSV 没有数据行")
+    return items
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ from .robot.cookie import check_cookie, build_client
 from .robot.worker import activation_message
 from .services import config_store
 from .services import admin_stats as stats
+from .services import repost_source
 from .services.activation import issue_activation
 from .time import utcnow_naive
 
@@ -894,3 +895,72 @@ def set_help(
 ):
     config_store.set_help_config(db, payload.qq_group)
     return config_store.get_help_config(db)
+
+
+# ---------------------------------------------------------------------------
+# 视频出处（原up主）
+# ---------------------------------------------------------------------------
+class RepostConfigPayload(BaseModel):
+    account_name: str | None = None
+    account_avatar_url: str | None = None
+    up_mid: str | None = None
+    source_ingest_token: str | None = None
+
+
+class SourceImportPayload(BaseModel):
+    csv: str = ""
+
+
+def _repost_config_out(db: Session) -> dict:
+    payload = config_store.repost_config(db)
+    payload["source_ingest_token"] = config_store.source_ingest_token(db)
+    return payload
+
+
+@router.get("/config/repost")
+def get_repost_config(
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    return _repost_config_out(db)
+
+
+@router.put("/config/repost")
+def set_repost_config(
+    payload: RepostConfigPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    config_store.set_repost_config(
+        db,
+        account_name=payload.account_name,
+        account_avatar_url=payload.account_avatar_url,
+        up_mid=payload.up_mid,
+    )
+    if payload.source_ingest_token is not None:
+        config_store.set_source_ingest_token(db, payload.source_ingest_token)
+    return _repost_config_out(db)
+
+
+@router.get("/sources/stats")
+def sources_stats(
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    data = repost_source.summary(db)
+    last = data.get("last_updated_at")
+    data["last_updated_at"] = _iso_utc(last) if last else ""
+    return data
+
+
+@router.post("/sources/import")
+def sources_import(
+    payload: SourceImportPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        items = repost_source.parse_csv(payload.csv)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return repost_source.upsert_items(db, items)
