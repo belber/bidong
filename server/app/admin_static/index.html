@@ -519,8 +519,8 @@ const renderers = {
           <button class="ghost" onclick="resetSources()">重置</button>
         </div>
         <table>
-          <thead><tr><th>B站发布日</th><th>BVID</th><th>标题</th><th>原平台</th><th>原up主</th><th>备注</th><th>最近更新</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="7" class="muted">没有符合条件的记录</td></tr>'}</tbody>
+          <thead><tr><th>B站发布日</th><th>BVID</th><th>标题</th><th>原平台</th><th>原up主</th><th>账号ID</th><th>备注</th><th>最近更新</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="8" class="muted">没有符合条件的记录</td></tr>'}</tbody>
         </table>
         <div class="toolbar" style="justify-content:flex-end">
           <span class="muted">共 ${fmt(list.total)} 条 · 第 ${list.page} / ${list.pages || 1} 页</span>
@@ -709,6 +709,7 @@ function sourceRow(i) {
     <td>${esc(i.title || "—")}</td>
     <td>${platformCell}</td>
     <td>${authorCell}</td>
+    <td>${i.author_handle ? `<span class="host">${esc(i.author_handle)}</span>` : '<span class="tag muted">无</span>'}</td>
     <td>${esc(i.note || "—")}</td>
     <td>${esc(fmtTime(i.updated_at))}</td>
   </tr>`;

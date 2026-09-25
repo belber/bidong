@@ -433,7 +433,9 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 |:--|:--|
 | `bvid` | 唯一键 |
 | `platform` | `douyin` / `x` / `youtube` / … 只能从源链接域名推断 |
-| `author_name` / `author_id` / `author_url` | 原作者昵称 / 稳定 ID / 主页 |
+| `author_name` | 原作者昵称（**会改，不能当唯一标识**） |
+| `author_handle` | 平台上唯一可搜索的账号标识：抖音号 / X 的 screen_name / YouTube 的 @handle |
+| `author_id` / `author_url` | 稳定 ID / 主页 |
 | `source_url` / `source_video_id` | 源视频链接与 ID |
 | `bili_published_at` | B站发布日；**源站发布时间拿不到** |
 | `note` | 拿不到时的原因，如 `parse失败 404` |
@@ -484,6 +486,8 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 
 - `origin = null` → 前端**整块不渲染**。
 - `origin` 有值但字段为空 → 显示「整理中 / 待补充」。
+- 「复制原up账号」复制的是 `author_handle`（唯一、可搜索），没有才退回昵称；
+  X / YouTube 的 handle 服务端可从主页链接推导，抖音号必须由上报方提供。
 
 ### 11.6 前端展示
 

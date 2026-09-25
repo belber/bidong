@@ -250,9 +250,10 @@ Page({
       return;
     }
     const platform = origin.platformText && origin.platformText !== '—' ? origin.platformText : '';
+    const what = origin.copyKind === 'handle' ? '账号' : '昵称';
     wx.setClipboardData({
       data: name,
-      success() { toast(platform ? '已复制，去' + platform + '搜索' : '已复制'); }
+      success() { toast(platform ? '已复制' + what + '，去' + platform + '搜索' : '已复制' + what); }
     });
   },
 

@@ -198,6 +198,21 @@ def test_ingest_truncates_overlong_fields(client, db_engine):
     db.close()
 
 
+def test_ingest_stores_author_handle(client, db_engine):
+    """昵称会改，抖音号 / 账号 ID 才能搜到人，所以要能存下来。"""
+    _configure_token(db_engine)
+    resp = client.post(
+        ENDPOINT,
+        json={"items": [_item(author_handle="luke0123")]},
+        headers=_headers(),
+    )
+    assert resp.status_code == 200
+
+    db = _db(db_engine)
+    assert db.query(VideoSource).one().author_handle == "luke0123"
+    db.close()
+
+
 @respx.mock
 def test_ingested_source_shows_up_in_parse_result(client, db_engine, auth_headers):
     """端到端：小主机上报 → 小程序解析结果页能看到出处。"""

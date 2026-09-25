@@ -8,6 +8,7 @@ import re
 from csv import DictReader
 from io import StringIO
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
@@ -43,6 +44,7 @@ FIELD_LIMITS = {
     "title": 500,
     "platform": 32,
     "author_name": 128,
+    "author_handle": 128,
     "author_id": 128,
     "author_url": 500,
     "source_url": 500,
@@ -55,6 +57,7 @@ VALUE_FIELDS = (
     "title",
     "platform",
     "author_name",
+    "author_handle",
     "author_id",
     "author_url",
     "source_url",
@@ -68,6 +71,58 @@ def platform_label(platform: str) -> str:
     key = (platform or "").strip().lower()
     label = PLATFORM_LABELS.get(key)
     return label if label is not None else key
+
+
+# 这些是 X 的功能路径，不是账号名
+X_RESERVED_PATHS = {
+    "i", "home", "search", "explore", "intent", "hashtag", "settings",
+    "notifications", "messages", "compose", "login", "signup", "share",
+}
+
+
+def derive_handle(platform: str, author_url: str) -> str:
+    """从主页链接里推导「可搜索的账号标识」；推不出来就返回空，不要编。
+
+    抖音主页链接里是 sec_uid（MS4wLjABAAAA…），粘到抖音搜索框搜不到，
+    所以抖音只能靠上报方给抖音号，这里一律返回空。
+    """
+    key = (platform or "").strip().lower()
+    url = (author_url or "").strip()
+    if not url:
+        return ""
+
+    parsed = urlparse(url if "://" in url else "https://" + url)
+    host = (parsed.netloc or "").lower()
+    if host.startswith("www.") or host.startswith("m."):
+        host = host.split(".", 1)[1]
+    parts = host.split(".")
+    root = ".".join(parts[-2:]) if len(parts) >= 2 else host
+    segments = [s for s in (parsed.path or "").split("/") if s]
+
+    if key in ("x", "twitter") and root in ("x.com", "twitter.com"):
+        if not segments:
+            return ""
+        first = segments[0]
+        return "" if first.lower() in X_RESERVED_PATHS else first
+
+    if key == "youtube" and root in ("youtube.com", "youtu.be"):
+        if not segments:
+            return ""
+        first = segments[0]
+        if first.startswith("@"):
+            return first[1:]
+        if first in ("c", "user") and len(segments) > 1:
+            return segments[1]
+        # /channel/UCxxx、/shorts/xxx、/watch?v= 都不是可搜索的账号名
+        return ""
+
+    return ""
+
+
+def effective_handle(row: VideoSource) -> str:
+    """上报方给的优先；没给就从主页链接推导（只对 X / YouTube 有效）。"""
+    stored = (row.author_handle or "").strip()
+    return stored or derive_handle(row.platform, row.author_url)
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +255,7 @@ def get_origin(db: Session, *, bvid: str, up_mid: str | int | None) -> OriginOut
         platform=row.platform,
         platform_label=platform_label(row.platform),
         author_name=row.author_name,
+        author_handle=effective_handle(row),
         author_url=row.author_url,
     )
 
@@ -234,6 +290,7 @@ def _source_item(row: VideoSource) -> dict:
         "platform": row.platform,
         "platform_label": platform_label(row.platform),
         "author_name": row.author_name,
+        "author_handle": effective_handle(row),
         "author_id": row.author_id,
         "author_url": row.author_url,
         "source_url": row.source_url,
@@ -265,6 +322,7 @@ def list_sources(
                 VideoSource.bvid.ilike(like),
                 VideoSource.title.ilike(like),
                 VideoSource.author_name.ilike(like),
+                VideoSource.author_handle.ilike(like),
                 VideoSource.author_id.ilike(like),
                 VideoSource.author_url.ilike(like),
                 VideoSource.source_url.ilike(like),

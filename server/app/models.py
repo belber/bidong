@@ -267,6 +267,7 @@ class VideoSource(Base):
     title: Mapped[str] = mapped_column(Text, default="")
     platform: Mapped[str] = mapped_column(String(32), default="")
     author_name: Mapped[str] = mapped_column(String(128), default="")
+    author_handle: Mapped[str] = mapped_column(String(128), default="")
     author_id: Mapped[str] = mapped_column(String(128), default="")
     author_url: Mapped[str] = mapped_column(Text, default="")
     source_url: Mapped[str] = mapped_column(Text, default="")

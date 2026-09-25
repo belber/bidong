@@ -273,3 +273,29 @@ def test_admin_sources_stats_breaks_down_by_platform(admin_client):
     assert by_platform["douyin"]["label"] == "抖音"
     assert by_platform["youtube"]["count"] == 1
     assert stats["total"] == 4
+
+
+def test_admin_sources_list_exposes_handle(admin_client):
+    token = _login(admin_client).json()["token"]
+    _import(
+        admin_client,
+        token,
+        "bvid,platform,author_name,author_handle,author_url\n"
+        "BV1txaT6nEz3,x,大D少年,big_diao2002,https://x.com/big_diao2002\n"
+        "BV15Pbj6yEKg,douyin,小山坡,,https://www.douyin.com/user/MS4wA\n",
+    )
+    data = admin_client.get(
+        "/api/admin/sources/list", params={"size": 10}, headers=_auth(token)
+    ).json()
+    by_bvid = {i["bvid"]: i for i in data["items"]}
+    # 上报里给的抖音号/账号 ID 原样展示
+    assert by_bvid["BV1txaT6nEz3"]["author_handle"] == "big_diao2002"
+    # 抖音没给抖音号、主页链接里只有 sec_uid，不能编，展示为空
+    assert by_bvid["BV15Pbj6yEKg"]["author_handle"] == ""
+
+    # 搜索结果里也能按账号 ID 找到
+    found = admin_client.get(
+        "/api/admin/sources/list", params={"q": "big_diao"}, headers=_auth(token)
+    ).json()
+    assert found["total"] == 1
+    assert found["items"][0]["bvid"] == "BV1txaT6nEz3"

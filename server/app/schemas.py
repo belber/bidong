@@ -116,6 +116,7 @@ class OriginOut(BaseModel):
     platform: str = ""
     platform_label: str = ""
     author_name: str = ""
+    author_handle: str = ""
     author_url: str = ""
 
 

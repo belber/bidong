@@ -8,15 +8,17 @@ function mapOrigin(origin) {
   }
   const platformLabel = (origin.platform_label || '').trim();
   const authorName = (origin.author_name || '').trim();
+  const authorHandle = (origin.author_handle || '').trim();
   return {
     accountName: (origin.account_name || '').trim() || '帅哥录屏',
     accountAvatarUrl: origin.account_avatar_url || '',
     platformText: platformLabel || '—',
     authorText: authorName ? '@' + authorName : (platformLabel ? '待补充' : '—'),
     hasAuthor: !!authorName,
-    // 复制按钮用的值：昵称才是能在抖音/微博搜索框里粘贴查人的东西，
-    // 主页链接在手机上粘不进去（抖音 App 搜索框不认 URL）
-    copyText: authorName,
+    // 复制按钮用的值：优先抖音号这类唯一账号标识（昵称会改，改了可能搜不到或搜错人），
+    // 没有就退回昵称。主页链接在手机上粘不进去（抖音 App 搜索框不认 URL）。
+    copyText: authorHandle || authorName,
+    copyKind: authorHandle ? 'handle' : (authorName ? 'name' : ''),
     pending: !platformLabel && !authorName
   };
 }
