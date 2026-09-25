@@ -42,6 +42,7 @@ class VideoCard(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
     bvid: Mapped[str] = mapped_column(String(32), index=True)
+    up_mid: Mapped[str] = mapped_column(String(32), default="")
     title: Mapped[str] = mapped_column(Text)
     cover_url: Mapped[str] = mapped_column(Text)
     up_name: Mapped[str] = mapped_column(String(128))
@@ -250,3 +251,29 @@ class VisitEvent(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
     path: Mapped[str] = mapped_column(String(128), default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow_naive, index=True)
+
+
+class VideoSource(Base):
+    """「帅哥录屏」稿件的出处。
+
+    全局共用一张表，不按用户冗余——同一条视频的出处对所有用户都一样。
+    由小主机（Hermes）上报，按 bvid 幂等 upsert。
+    """
+
+    __tablename__ = "video_source"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bvid: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    title: Mapped[str] = mapped_column(Text, default="")
+    platform: Mapped[str] = mapped_column(String(32), default="")
+    author_name: Mapped[str] = mapped_column(String(128), default="")
+    author_id: Mapped[str] = mapped_column(String(128), default="")
+    author_url: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(Text, default="")
+    source_video_id: Mapped[str] = mapped_column(String(64), default="")
+    bili_published_at: Mapped[str] = mapped_column(String(10), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=utcnow_naive, onupdate=utcnow_naive
+    )
