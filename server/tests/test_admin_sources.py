@@ -133,3 +133,29 @@ def test_admin_page_exposes_sources_view(admin_client):
     assert 'data-view="sources"' in html
     assert 'id="view-sources"' in html
     assert "视频出处" in html
+
+
+def test_admin_uploads_repost_avatar(admin_client):
+    token = _login(admin_client).json()["token"]
+    resp = admin_client.post(
+        "/api/admin/sources/avatar",
+        content=b"fake-jpeg-bytes",
+        headers={**_auth(token), "Content-Type": "image/jpeg"},
+    )
+    assert resp.status_code == 200
+    url = resp.json()["account_avatar_url"]
+    assert "repost-avatar" in url
+    assert url.endswith(".jpg")
+
+    cfg = admin_client.get("/api/admin/config/repost", headers=_auth(token)).json()
+    assert cfg["account_avatar_url"] == url
+
+
+def test_admin_avatar_upload_rejects_non_image(admin_client):
+    token = _login(admin_client).json()["token"]
+    resp = admin_client.post(
+        "/api/admin/sources/avatar",
+        content=b"not-an-image",
+        headers={**_auth(token), "Content-Type": "text/plain"},
+    )
+    assert resp.status_code == 400

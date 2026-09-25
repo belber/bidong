@@ -496,6 +496,16 @@ const renderers = {
           <input id="repost-mid" value="${esc(cfg.up_mid)}" style="margin-top:4px" placeholder="3707052465589015"/></div>
         <div style="margin:10px 0"><label class="muted">块上显示的账号名</label>
           <input id="repost-name" value="${esc(cfg.account_name)}" style="margin-top:4px" placeholder="帅哥录屏"/></div>
+        <div style="margin:10px 0"><label class="muted">账号头像</label>
+          <div class="toolbar" style="margin-top:6px;align-items:center">
+            <img id="repost-avatar-preview" src="${esc(cfg.account_avatar_url)}" alt=""
+              style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid var(--line)"
+              onerror="this.style.visibility='hidden'"/>
+            <input id="repost-avatar-file" type="file" accept="image/*" />
+            <button onclick="uploadRepostAvatar()">上传并保存</button>
+            <span id="repost-avatar-msg" class="muted"></span>
+          </div>
+        </div>
         <div style="margin:10px 0"><label class="muted">账号头像 URL（转存 COS 后的地址）</label>
           <input id="repost-avatar" value="${esc(cfg.account_avatar_url)}" style="margin-top:4px" placeholder="https://.../avatar.jpg"/></div>
         <div style="margin:10px 0"><label class="muted">上报接口 token（给小主机用，对应请求头 X-Ingest-Token）</label>
@@ -904,6 +914,27 @@ async function importSources() {
     const rejected = r.rejected || [];
     msg.textContent = `新增 ${r.created} / 更新 ${r.updated} / 拒收 ${rejected.length}`
       + (rejected.length ? `（${rejected.slice(0, 3).map(x => x.bvid || "空 bvid").join("、")}…）` : "");
+  } catch (e) { msg.textContent = e.message; }
+}
+async function uploadRepostAvatar() {
+  const input = document.getElementById("repost-avatar-file");
+  const msg = document.getElementById("repost-avatar-msg");
+  if (!input || !input.files || !input.files.length) { msg.textContent = "请先选择图片"; return; }
+  const file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) { msg.textContent = "图片需小于 2MB"; return; }
+  try {
+    // 直接发原始字节，避免为一次上传引入 multipart 依赖
+    const res = await fetch(API + "/sources/avatar", {
+      method: "POST",
+      headers: { "Content-Type": file.type || "image/jpeg", Authorization: "Bearer " + token },
+      body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.message || ("上传失败 " + res.status));
+    document.getElementById("repost-avatar").value = data.account_avatar_url || "";
+    const preview = document.getElementById("repost-avatar-preview");
+    if (preview) { preview.src = data.account_avatar_url; preview.style.visibility = "visible"; }
+    msg.textContent = "已上传";
   } catch (e) { msg.textContent = e.message; }
 }
 async function testAlert() {

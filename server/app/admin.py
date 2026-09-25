@@ -3,7 +3,7 @@ import time
 from datetime import timezone
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from .services import config_store
 from .services import admin_stats as stats
 from .services import repost_source
 from .services.activation import issue_activation
+from .services.storage import get_storage
 from .time import utcnow_naive
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -964,3 +965,33 @@ def sources_import(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return repost_source.upsert_items(db, items)
+
+
+AVATAR_CONTENT_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif")
+AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+
+@router.post("/sources/avatar")
+async def upload_repost_avatar(
+    request: Request,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """上传账号头像：跟封面一样转存（COS 或本地），不硬编码在小程序里。
+
+    直接收原始字节，避免为一次上传引入 multipart 依赖。
+    """
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip()
+    if content_type not in AVATAR_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="只支持 jpg / png / webp / gif")
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="图片内容为空")
+    if len(body) > AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="图片需小于 2MB")
+
+    # 文件名带时间戳：换头像后 URL 变化，绕开微信/CDN 的图片缓存
+    key = f"repost-avatar-{int(time.time())}"
+    url = get_storage().save_cover(key, body, content_type)
+    config_store.set_repost_config(db, account_avatar_url=url)
+    return {"account_avatar_url": url}
