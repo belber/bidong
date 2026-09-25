@@ -74,5 +74,11 @@ class Settings(BaseSettings):
     # 帮助与反馈页展示的 QQ 群号（默认为空，可后台配置）
     help_qq_group: str = ""
 
+    # 视频出处（原up主）：只服务 B站账号「帅哥录屏」的粉丝溯源
+    repost_up_mid: str = "3707052465589015"
+    repost_account_name: str = "帅哥录屏"
+    repost_account_avatar_url: str = ""
+    source_ingest_token: str = ""
+
 
 settings = Settings()

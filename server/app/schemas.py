@@ -105,12 +105,27 @@ class SubtitleLine(BaseModel):
     text: str
 
 
+class OriginOut(BaseModel):
+    """解析结果页的「帅哥录屏 · 原up主是谁」区块数据。
+
+    出现即代表这条视频属于白名单账号；字段为空表示还在整理。
+    """
+
+    account_name: str = ""
+    account_avatar_url: str = ""
+    platform: str = ""
+    platform_label: str = ""
+    author_name: str = ""
+    author_url: str = ""
+
+
 class ParseResult(CardOut):
     subtitles: list[SubtitleLine] = Field(default_factory=list)
     stats: VideoStats = Field(default_factory=VideoStats)
     danmaku_count: int = 0
     media: MediaAvailability = Field(default_factory=MediaAvailability)
     features: ParseFeatures = Field(default_factory=ParseFeatures)
+    origin: OriginOut | None = None
 
 
 class BindingRequest(BaseModel):

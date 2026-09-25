@@ -355,3 +355,41 @@ def get_help_config(db: Session) -> dict[str, str]:
 
 def set_help_config(db: Session, qq_group: str) -> None:
     set_raw(db, "help_qq_group", (qq_group or "").strip())
+
+
+# ---------------------------------------------------------------------------
+# 视频出处（原up主）
+# ---------------------------------------------------------------------------
+def repost_config(db: Session) -> dict[str, str]:
+    return {
+        "account_name": get_raw(db, "repost_account_name")
+        or settings.repost_account_name,
+        "account_avatar_url": get_raw(db, "repost_account_avatar_url")
+        or settings.repost_account_avatar_url,
+        "up_mid": get_raw(db, "repost_up_mid") or settings.repost_up_mid,
+    }
+
+
+def set_repost_config(
+    db: Session,
+    *,
+    account_name: str | None = None,
+    account_avatar_url: str | None = None,
+    up_mid: str | None = None,
+) -> None:
+    mapping = {
+        "repost_account_name": account_name,
+        "repost_account_avatar_url": account_avatar_url,
+        "repost_up_mid": up_mid,
+    }
+    for key, value in mapping.items():
+        if value is not None:
+            set_raw(db, key, value.strip())
+
+
+def source_ingest_token(db: Session) -> str:
+    return get_raw(db, "source_ingest_token") or settings.source_ingest_token
+
+
+def set_source_ingest_token(db: Session, token: str) -> None:
+    set_raw(db, "source_ingest_token", (token or "").strip())

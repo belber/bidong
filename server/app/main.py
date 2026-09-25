@@ -13,7 +13,18 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .errors import AppError
 from . import models  # noqa: F401  # 注册模型到 metadata
-from .routers import auth, binding, cards, help, media, meta, parse, tags, tracking
+from .routers import (
+    auth,
+    binding,
+    cards,
+    help,
+    media,
+    meta,
+    parse,
+    sources,
+    tags,
+    tracking,
+)
 from .services import daily_report
 
 
@@ -81,6 +92,7 @@ for router in (
     help.router,
     meta.router,
     tracking.router,
+    sources.router,
 ):
     app.include_router(router)
 
