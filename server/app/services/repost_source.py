@@ -119,6 +119,33 @@ def derive_handle(platform: str, author_url: str) -> str:
     return ""
 
 
+# 源链接域名 -> 平台代号（平台空缺时兜底用）
+DOMAIN_PLATFORMS = (
+    (("douyin.com",), "douyin"),
+    (("x.com", "twitter.com"), "x"),
+    (("youtube.com", "youtu.be"), "youtube"),
+    (("b23.tv", "bilibili.com"), "bilibili"),
+    (("kuaishou.com",), "kuaishou"),
+    (("xiaohongshu.com", "xhslink.com"), "xiaohongshu"),
+    (("weibo.com", "weibo.cn"), "weibo"),
+)
+
+
+def infer_platform(source_url: str) -> str:
+    """从源链接推断平台；不是链接（比如「(用户上传视频)」这种备注）就返回空。"""
+    url = (source_url or "").strip()
+    if not re.match(r"^https?://", url):
+        return ""
+    parsed = urlparse(url)
+    host = (parsed.netloc or "").lower()
+    if host.startswith("www.") or host.startswith("m."):
+        host = host.split(".", 1)[1]
+    for domains, platform in DOMAIN_PLATFORMS:
+        if any(host == d or host.endswith("." + d) for d in domains):
+            return platform
+    return ""
+
+
 def effective_handle(row: VideoSource) -> str:
     """上报方给的优先；没给就从主页链接推导（只对 X / YouTube 有效）。"""
     stored = (row.author_handle or "").strip()
@@ -161,6 +188,10 @@ def _clean_item(raw: dict) -> tuple[str, dict[str, str]]:
         value = raw.get(name)
         value = "" if value is None else str(value).strip()
         fields[name] = value[: FIELD_LIMITS[name]]
+    if fields.get("platform", "") in ("", "unknown"):
+        inferred = infer_platform(fields.get("source_url", ""))
+        if inferred:
+            fields["platform"] = inferred
     return bvid, fields
 
 

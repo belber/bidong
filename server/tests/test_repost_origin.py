@@ -168,3 +168,42 @@ def test_derive_handle_rules():
     assert d("douyin", "https://v.douyin.com/Ou--3FzQeWs/") == ""
     assert d("", "") == ""
     assert d("x", "https://x.com/i/status/1") == ""
+
+
+def test_infer_platform_from_source_url():
+    f = repost_source.infer_platform
+    assert f("https://v.douyin.com/Ou--3FzQeWs/") == "douyin"
+    assert f("https://www.douyin.com/user/MS4w") == "douyin"
+    assert f("https://youtube.com/shorts/ge2l705Y1Vo") == "youtube"
+    assert f("https://youtu.be/abc") == "youtube"
+    assert f("https://x.com/o88oio/status/1") == "x"
+    assert f("https://b23.tv/AltBWeG") == "bilibili"
+    assert f("https://www.xiaohongshu.com/x") == "xiaohongshu"
+    assert f("") == ""
+    assert f("(用户上传视频)") == ""
+
+
+def test_platform_falls_back_to_source_url(db_engine):
+    """上报方把平台写成 unknown 时，能从源链接看出来就用看出来的。"""
+    db = _db(db_engine)
+    repost_source.upsert_items(
+        db,
+        [
+            {
+                "bvid": "BV1f2h26LESz",
+                "platform": "unknown",
+                "source_url": "https://youtube.com/shorts/ge2l705Y1Vo",
+            },
+            {
+                "bvid": "BV15Pbj6yEKg",
+                # 明确了平台就不要被源链接覆盖
+                "platform": "douyin",
+                "source_url": "https://youtube.com/shorts/abc",
+            },
+        ],
+    )
+    origin = repost_source.get_origin(db, bvid="BV1f2h26LESz", up_mid=UP_MID)
+    assert origin.platform == "youtube"
+    assert origin.platform_label == "YouTube"
+    assert repost_source.get_origin(db, bvid="BV15Pbj6yEKg", up_mid=UP_MID).platform == "douyin"
+    db.close()
