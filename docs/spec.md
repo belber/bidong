@@ -135,6 +135,22 @@ robot_cursor (                  -- Phase 1：worker 轮询游标，重启不重�
   last_time   int,          -- 已处理的最大时间戳（unix 秒）
   updated_at  timestamp
 )
+
+video_source (                  -- 「帅哥录屏」稿件出处，全局共用，不按用户分
+  id                PK,
+  bvid              text unique,   -- 唯一键，一条视频一条出处
+  title             text,
+  platform          text,          -- douyin / x / youtube / ...
+  author_name       text,          -- 原作者昵称
+  author_id         text,          -- 原作者稳定 ID（昵称会改）
+  author_url        text,          -- 原作者主页
+  source_url        text,          -- 源视频链接
+  source_video_id   text,
+  bili_published_at text,          -- YYYY-MM-DD（源站发布时间拿不到）
+  note              text,          -- 拿不到时的原因，如 parse失败 404
+  created_at        timestamp,
+  updated_at        timestamp
+)
 ```
 
 - **标签体系**：用户标签多对多；「分组」不单独建模，就是一个标签（如"帅哥"）。机器人触发时 `#标签` 直接落到 card_tag。
@@ -145,6 +161,9 @@ robot_cursor (                  -- Phase 1：worker 轮询游标，重启不重�
 - **来源**：`source` 只有 `local` / `robot` 两个值，对应前端「本机 / @壁咚咚」来源筛选；Phase 0 全部为 `local`。
 - **B站 ID 决策**：库表用 `bvid` 作为 `(user_id, bvid)` 唯一键，不存 `aid`。B站小程序跳转直接用 `bvid`；若未来某接口要求数字 ID，按 BV→AV 算法在本地换算，不额外请求 B站接口。
 - **媒体下载**：统计数（点赞/评论/收藏/投币）与弹幕条数来自 `view` 接口，不落库、解析时现取；视频/音频下载走中转流式、不落库本体，由三个后台开关控制。
+- **视频出处**：`video_source` 只服务「帅哥录屏」这一个账号的溯源需求（见 §11），
+  由小主机（Hermes）上报，按 `bvid` 幂等 upsert；表里有没有这条 bvid **不等于**这条视频是不是该账号的，
+  判断归属用 UP主 mid 白名单。详见 §11。
 
 ---
 
@@ -186,6 +205,7 @@ Phase 1：机器人触发
 | GET  | `/api/cards/:id/download?kind=...&qn=...` | 中转流式下载视频/音频 |
 | GET  | `/api/cards/:id/danmaku` | 弹幕 XML |
 | GET  | `/api/cards/:id/export?kind=txt\|srt` | 导出文本（txt 全量 / srt 字幕） |
+| POST | `/api/sources/ingest` | 小主机上报「帅哥录屏」稿件出处，`X-Ingest-Token` 鉴权，按 bvid 幂等 upsert（见 §11） |
 
 > Phase 0 不提供 `POST /api/cards`；解析即收藏。Phase 1 机器人由 worker 直接写库，也不走该接口。
 > Phase 1 提供 `POST /api/binding`（粘贴激活码绑定）、`GET /api/binding`（查绑定状态）与 `DELETE /api/binding`（解绑）。
@@ -392,3 +412,96 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 - **明细**：按访问时间倒序，每行展示访问时间（上海时区）、用户 openid、昵称（有则显示）、页面 `path`；`q` 支持按 openid / 昵称 / 页面搜索，支持分页。
 - **口径**：UV 为 `visit_event.user_id` 去重数——只有登录用户才会上报，因此 UV 等于"访问过的微信用户数"；「累计去重用户」不受天数区间限制，用于对齐 500 访客目标。
 - **已知限制**：`path` 目前恒为 `pages/home/home`（只在首页上报）；若以后要在其他页面补埋点，明细无需改动即可区分。
+
+---
+
+## 11. 视频出处（原up主）
+
+完整设计与取舍见 `docs/superpowers/specs/2026-09-25-repost-source-design.md`。
+
+### 11.1 定位
+
+给 B站账号「帅哥录屏」的粉丝看的溯源信息：解析结果页多出一块「帅哥录屏 · 原up主是谁」，
+写明这条视频从哪个平台、搬自谁。**只出现在帅哥录屏自己的稿件上**，其他 UP 主的视频解析结果页不变。
+
+### 11.2 数据来源
+
+小主机（Hermes）自动发布「帅哥录屏」的视频时，顺手把这一条的出处 POST 给后端；
+历史 124 条走一次性批量导入。**不解析 Markdown 台账**（脚注、重复编号、缺号、写法不统一，太脆）。
+
+| 字段 | 说明 |
+|:--|:--|
+| `bvid` | 唯一键 |
+| `platform` | `douyin` / `x` / `youtube` / … 只能从源链接域名推断 |
+| `author_name` / `author_id` / `author_url` | 原作者昵称 / 稳定 ID / 主页 |
+| `source_url` / `source_video_id` | 源视频链接与 ID |
+| `bili_published_at` | B站发布日；**源站发布时间拿不到** |
+| `note` | 拿不到时的原因，如 `parse失败 404` |
+
+**约定**：拿不到就留空 + `note` 写原因，**不猜**；一条视频只报一条「主要出处」= 画面来源，
+混源视频（画面来自 X、BGM 来自抖音）只报画面来源。
+
+### 11.3 上报接口
+
+`POST /api/sources/ingest`，请求头 `X-Ingest-Token`。请求体接受
+`{"items":[...]}`、单个对象或数组，单次最多 500 条。响应 `{"ok":true,"created":n,"updated":n,"rejected":[...]}`。
+
+- 按 `bvid` 幂等 upsert → **重发永远安全**。
+- `bvid` 不匹配 `^BV[0-9A-Za-z]{10}$` 的条目整条拒收，进 `rejected`，不写库。
+- token 不对 `401`；服务端未配置 token `503`；超过 500 条 `400`。
+
+### 11.4 归属判断
+
+**用 UP主 mid 白名单判断「这条视频是不是帅哥录屏的」，不是用「`video_source` 里有没有这个 bvid」。**
+
+因为台账漏记了 21 条线上稿件：按表判断会让这 21 条整块不显示，按 mid 判断则统一显示「出处还在整理」。
+
+配置项（管理后台可改）：
+
+| 配置 | 说明 |
+|:--|:--|
+| `repost_up_mid` | 帅哥录屏 B站 UID（现为 `3707052465589015`），支持逗号分隔多个；为空则任何视频都不显示该区块 |
+| `repost_account_name` | 区块显示的账号名，默认「帅哥录屏」 |
+| `repost_account_avatar_url` | 账号头像 URL（转存 COS，不硬编码在小程序里） |
+| `source_ingest_token` | 上报接口鉴权 token |
+
+### 11.5 解析结果字段
+
+`POST /api/parse` 响应新增 `origin`（与表示收藏来源的 `source` 字段无关）：
+
+```json
+{
+  "origin": {
+    "account_name": "帅哥录屏",
+    "account_avatar_url": "https://.../avatar.jpg",
+    "platform": "douyin",
+    "platform_label": "抖音",
+    "author_name": "小山坡",
+    "author_url": "https://www.douyin.com/user/MS4wLjABAAAA..."
+  }
+}
+```
+
+- `origin = null` → 前端**整块不渲染**。
+- `origin` 有值但字段为空 → 显示「整理中 / 待补充」。
+
+### 11.6 前端展示
+
+解析结果页在「基本信息」之后插入一张卡片，三种状态共用同一套样式：
+
+```text
+① 能查到                             ② 还在整理
+▍(头像) 帅哥录屏 · 原up主是谁 [粉丝专属]  ▍(头像) 帅哥录屏 · 原up主是谁 [粉丝专属]
+原平台　抖音                          原平台　—
+原up主　@小山坡          复制主页       原up主　—
+                                     这条的出处还在整理，稍后再来看看
+
+③ 只知道平台（14 条）：原平台　抖音 / 原up主　待补充
+```
+
+- 标题用粉丝原话「帅哥录屏 · 原up主是谁」，账号名出现在标题里，感知是「账号把出处告诉我了」，
+  而不是「小程序能解析出处」；`up主` 按页面现有写法用小写。
+- 字段沿用 `field` 的「字段名 / 值」结构；「复制主页」与「标题 / up主」行的「复制」同一位置、
+  同一 `class="action"`、同一处理方式。
+- 不提供「复制原视频链接」，不做跳转（抖音链接在小程序里打不开）。
+- 文案避免「搬运」二字（带二次上传意味），用「原up主 / 原平台」。

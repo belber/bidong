@@ -391,7 +391,9 @@ def set_repost_config(
 
 
 def source_ingest_token(db: Session) -> str:
-    return get_raw(db, "source_ingest_token") or settings.source_ingest_token
+    # 同白名单语义：显式存空串 = 关掉上报接口，只有「没有这一行」时才用 env
+    stored = get_raw(db, "source_ingest_token")
+    return settings.source_ingest_token if stored is None else stored
 
 
 def set_source_ingest_token(db: Session, token: str) -> None:

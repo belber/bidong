@@ -1,11 +1,14 @@
+import respx
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
 from app.models import VideoSource
 from app.services import config_store
+from helpers import BVID, mock_bili
 
 TOKEN = "test-ingest-token"
 ENDPOINT = "/api/sources/ingest"
+UP_MID = "3707052465589015"
 
 
 def _db(db_engine):
@@ -191,3 +194,31 @@ def test_ingest_truncates_overlong_fields(client, db_engine):
     assert len(row.title) <= 500
     assert len(row.platform) <= 32
     db.close()
+
+
+@respx.mock
+def test_ingested_source_shows_up_in_parse_result(client, db_engine, auth_headers):
+    """端到端：小主机上报 → 小程序解析结果页能看到出处。"""
+    _configure_token(db_engine)
+    mock_bili(bvid=BVID, up_mid=UP_MID)
+    resp = client.post(
+        ENDPOINT,
+        json={
+            "items": [
+                _item(
+                    bvid=BVID,
+                    platform="youtube",
+                    author_name="Hot Athletes",
+                    author_url="https://www.youtube.com/@HotChineseAthletes",
+                )
+            ]
+        },
+        headers=_headers(),
+    )
+    assert resp.status_code == 200
+
+    parsed = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+    assert parsed.status_code == 200
+    origin = parsed.json()["origin"]
+    assert origin["platform_label"] == "YouTube"
+    assert origin["author_name"] == "Hot Athletes"
