@@ -62,19 +62,26 @@ def download_outcomes(db: Session, days: int = 30) -> dict:
     )["items"]
     total = len(sessions)
     saved = copied = fail = 0
+    today_saved = today_copied = today_fail = 0
+    today_label = admin_stats._today_shanghai().isoformat()
     by_error: dict[str, int] = {}
 
     for session in sessions:
+        is_today = (session["started_at"] or "").startswith(today_label)
         if session["result"] == "success":
             saved += 1
+            today_saved += is_today
         elif session["copied_link"]:
             copied += 1
+            today_copied += is_today
         else:
             fail += 1
+            today_fail += is_today
             key = session["fail_error_type"] or "unknown"
             by_error[key] = by_error.get(key, 0) + 1
 
     success = saved + copied
+    today_total = today_saved + today_copied + today_fail
     return {
         "total": total,
         "saved": saved,
@@ -82,6 +89,10 @@ def download_outcomes(db: Session, days: int = 30) -> dict:
         "success": success,
         "fail": fail,
         "success_rate": round(success / total * 100, 1) if total else 0.0,
+        "today_total": today_total,
+        "today_saved": today_saved,
+        "today_copied": today_copied,
+        "today_fail": today_fail,
         "fail_by_error": [
             {"error_type": key, "count": value}
             for key, value in sorted(by_error.items(), key=lambda item: -item[1])
@@ -93,11 +104,23 @@ def domain_summary(db: Session) -> dict:
     rows = db.query(BiliCdnDomain).all()
     unconfigured = [row for row in rows if not row.is_configured]
     unconfigured.sort(key=lambda row: row.last_seen_at or datetime.min, reverse=True)
+    today_start = admin_stats._range_start_utc(1)
+    new_today = [
+        row
+        for row in unconfigured
+        if row.first_seen_at is not None and row.first_seen_at >= today_start
+    ]
+    new_today.sort(key=lambda row: row.first_seen_at or datetime.min, reverse=True)
     return {
         "total": len(rows),
         "configured": len(rows) - len(unconfigured),
         "unconfigured": len(unconfigured),
         "hits": sum(int(row.seen_count or 0) for row in rows),
+        # 今天新冒出来、还没配置到微信后台的域名——需要当天处理的事
+        "new_unconfigured_today": len(new_today),
+        "new_unconfigured_today_hosts": [
+            {"host": row.host, "first_seen_at": row.first_seen_at} for row in new_today
+        ],
         "recent_unconfigured": [
             {"host": row.host, "last_seen_at": row.last_seen_at}
             for row in unconfigured[:3]

@@ -1,9 +1,12 @@
 """概览页的五个口径：访问 / 机器人 / 解析 / 下载 / 域名。"""
 
+from datetime import timedelta
+
 from sqlalchemy.orm import sessionmaker
 
 from app.models import BiliCdnDomain, DownloadEvent, FollowEvent, ParseLog, User
 from app.services import overview_stats
+from app.time import utcnow_naive
 
 
 def _db(db_engine):
@@ -46,7 +49,7 @@ def test_parse_users_counts_distinct_users(db_engine):
 
 
 def _event(db, *, session_id, stage, status, bvid="BV1", kind="watermarked", user_id=1,
-           error_type="", host="h.example"):
+           error_type="", host="h.example", days_ago=0):
     db.add(
         DownloadEvent(
             user_id=user_id,
@@ -57,6 +60,7 @@ def _event(db, *, session_id, stage, status, bvid="BV1", kind="watermarked", use
             status=status,
             error_type=error_type,
             host=host,
+            created_at=utcnow_naive() - timedelta(days=days_ago),
         )
     )
 
@@ -108,6 +112,66 @@ def test_domain_summary(db_engine):
     db.close()
 
 
+def test_download_outcomes_splits_today(db_engine):
+    """今日下载单独看一份，不然当天有没有人在下载只能靠眼力从累计里抠。"""
+    db = _db(db_engine)
+    db.add(User(id=1, openid="u1"))
+    db.commit()
+
+    # 今天：一次保存成功
+    _event(db, session_id="a", stage="resolve", status="success")
+    _event(db, session_id="a", stage="save", status="success")
+    # 今天：一次彻底失败
+    _event(db, session_id="b", stage="resolve", status="success")
+    _event(db, session_id="b", stage="download", status="fail", error_type="wx_error")
+    # 3 天前：成功，但不该算进"今日"
+    _event(db, session_id="c", stage="resolve", status="success", days_ago=3)
+    _event(db, session_id="c", stage="save", status="success", days_ago=3)
+    db.commit()
+
+    result = overview_stats.download_outcomes(db)
+    assert result["total"] == 3
+    assert result["saved"] == 2
+    assert result["fail"] == 1
+    assert result["today_total"] == 2
+    assert result["today_saved"] == 1
+    assert result["today_copied"] == 0
+    assert result["today_fail"] == 1
+    db.close()
+
+
+def test_domain_summary_counts_new_unconfigured_today(db_engine):
+    db = _db(db_engine)
+    db.add(
+        BiliCdnDomain(
+            host="old.example",
+            is_configured=False,
+            seen_count=1,
+            first_seen_at=utcnow_naive() - timedelta(days=5),
+        )
+    )
+    db.add(
+        BiliCdnDomain(
+            host="new.example", is_configured=False, seen_count=1,
+            first_seen_at=utcnow_naive(),
+        )
+    )
+    db.add(
+        BiliCdnDomain(
+            host="ok.example", is_configured=True, seen_count=2,
+            first_seen_at=utcnow_naive(),
+        )
+    )
+    db.commit()
+
+    result = overview_stats.domain_summary(db)
+    # 已配置的新域名不算"需要处理的新增"
+    assert result["new_unconfigured_today"] == 1
+    assert [h["host"] for h in result["new_unconfigured_today_hosts"]] == ["new.example"]
+    assert result["unconfigured"] == 2
+    db.close()
+
+
 def test_bot_section_has_followers_and_bound(db_engine):
     db = _db(db_engine)
     db.add(FollowEvent(bili_uid="111", bili_name="A", mtime=1, sent_code=True))
@@ -146,4 +210,9 @@ def test_overview_api_exposes_five_sections(admin_client):
     assert data["visit"]["target"] == 500
     assert "local_users" in data["parse"]
     assert "copied" in data["download"]
+    assert "today_total" in data["download"]
     assert "unconfigured" in data["domains"]
+    assert "new_unconfigured_today" in data["domains"]
+    # 访问趋势给底部图表用
+    assert data["visit"]["trend"]
+    assert "uv" in data["visit"]["trend"][0]

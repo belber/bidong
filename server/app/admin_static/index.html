@@ -225,7 +225,10 @@ const renderers = {
       : `<div class="alert ok">◎ 机器人 Cookie 正常（最近检查 ${esc(cookie.cookie_last_checked || "—")}）</div>`);
     if (domains.unconfigured) {
       const hosts = (domains.recent_unconfigured || []).map(h => esc(h.host)).join("、");
+      const newToday = domains.new_unconfigured_today || 0;
+      const todayHosts = (domains.new_unconfigured_today_hosts || []).map(h => esc(h.host)).join("、");
       alerts.push(`<div class="alert">⚠ ${fmt(domains.unconfigured)} 个下载域名还没配置到微信后台，用户会下载失败`
+        + `${newToday ? `，其中 <b>${fmt(newToday)} 个是今天新出现的</b>${todayHosts ? `（${todayHosts}）` : ""}` : ""}`
         + `${hosts ? `（最近出现：${hosts}）` : ""} · <a href="javascript:void(0)" onclick="show('cdn')">去处理</a></div>`);
     }
 
@@ -273,7 +276,8 @@ const renderers = {
         <h3>视频下载</h3>
         <p class="note">一次下载算一次；用户改用"复制链接到浏览器保存"也算成功</p>
         <div class="metric-row">
-          <div class="metric"><b>${fmt(dl.total)}</b><span>下载次数</span></div>
+          <div class="metric"><b class="blue">${fmt(dl.today_total)}</b><span>今日下载（成功 ${fmt((dl.today_saved || 0) + (dl.today_copied || 0))} · 失败 ${fmt(dl.today_fail)}）</span></div>
+          <div class="metric"><b>${fmt(dl.total)}</b><span>近 30 天下载</span></div>
           <div class="metric"><b class="ok">${fmt(dl.success)}</b><span>成功（保存 ${fmt(dl.saved)} + 复制链接 ${fmt(dl.copied)}）</span></div>
           <div class="metric"><b class="bad">${fmt(dl.fail)}</b><span>失败</span></div>
           <div class="metric"><b>${fmt(dl.success_rate)}%</b><span>成功率</span></div>
@@ -285,6 +289,7 @@ const renderers = {
         <h3>B站 CDN 域名</h3>
         <p class="note">下载直链用到的域名；没配置到微信后台的域名，用户点下载会失败</p>
         <div class="metric-row">
+          <div class="metric"><b class="${domains.new_unconfigured_today ? 'bad' : 'ok'}">${fmt(domains.new_unconfigured_today)}</b><span>今日新增未配置</span></div>
           <div class="metric"><b>${fmt(domains.total)}</b><span>已登记域名</span></div>
           <div class="metric"><b class="ok">${fmt(domains.configured)}</b><span>已配置</span></div>
           <div class="metric"><b class="warn">${fmt(domains.unconfigured)}</b><span>未配置</span></div>
@@ -292,16 +297,24 @@ const renderers = {
         </div>
       </div>
 
-      <div class="panel"><h3>近 30 天趋势（粉丝新增 / 评论@触发）</h3><div id="chart-overview" class="chart"></div></div>`;
+      <div class="panel">
+        <h3>近 30 天访问用户趋势</h3>
+        <p class="note">每天有多少个不同的用户打开了小程序（每人每天最多上报一次）</p>
+        <div id="chart-overview" class="chart"></div>
+      </div>`;
     drawChart("chart-overview", chart => chart.setOption({
-      tooltip: { trigger: "axis" }, legend: { data: ["粉丝新增", "评论@触发"] },
-      grid: { left: 40, right: 20, top: 30, bottom: 30 },
-      xAxis: { type: "category", data: d.followers.trend.map(x => x.date.slice(5)) },
+      tooltip: { trigger: "axis" },
+      grid: { left: 44, right: 24, top: 20, bottom: 30 },
+      xAxis: { type: "category", data: (visit.trend || []).map(x => x.date.slice(5)) },
       yAxis: { type: "value", minInterval: 1 },
-      series: [
-        { name: "粉丝新增", type: "line", smooth: true, data: d.followers.trend.map(x => x.count) },
-        { name: "评论@触发", type: "line", smooth: true, data: d.at.trend.map(x => x.count) }
-      ]
+      series: [{
+        name: "访问用户",
+        type: "line",
+        smooth: true,
+        symbolSize: 6,
+        areaStyle: { opacity: 0.12 },
+        data: (visit.trend || []).map(x => x.uv)
+      }]
     }));
   },
 
