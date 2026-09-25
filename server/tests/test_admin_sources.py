@@ -1,10 +1,6 @@
-import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
-from app.admin_app import app as admin_app
-from app.db import get_db
 from app.models import VideoSource
 
 CSV_TEXT = """bvid,title,platform,author_name,author_id,author_url,source_url,source_video_id,bili_published_at,note
@@ -12,29 +8,6 @@ BV15Pbj6yEKg,【小视频】126-减脂只是为了多吃,douyin,小山坡,MS4wA,
 BV1Yubj6GELK,【小视频】123-重情重义的兄弟变恋人,douyin,,,,https://v.douyin.com/HQtGtlUmIQc/,,2026-09-05,parse失败 404
 not-a-bvid,坏行,douyin,某某,,,,,,
 """
-
-
-@pytest.fixture()
-def admin_client(db_engine, monkeypatch):
-    testing_session = sessionmaker(
-        bind=db_engine, autoflush=False, expire_on_commit=False
-    )
-    settings.admin_password = "admin-dev-password"
-    settings.dev_mode = False
-    monkeypatch.setattr("app.services.config_store.seed_defaults", lambda db: None)
-
-    def override_get_db():
-        db = testing_session()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    admin_app.dependency_overrides[get_db] = override_get_db
-    client = TestClient(admin_app)
-    yield client
-    client.close()
-    admin_app.dependency_overrides.clear()
 
 
 def _login(client):

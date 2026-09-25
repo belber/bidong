@@ -67,3 +67,30 @@ def auth_headers(client):
     assert resp.status_code == 200
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture()
+def admin_client(db_engine, monkeypatch):
+    """管理端（独立 app）的测试客户端，密码用默认开发密码。"""
+    from app.admin_app import app as admin_app
+    from app.db import get_db
+
+    testing_session = sessionmaker(
+        bind=db_engine, autoflush=False, expire_on_commit=False
+    )
+    settings.admin_password = "admin-dev-password"
+    settings.dev_mode = False  # 避免 lifespan 去真实 DB 建表/播种
+    monkeypatch.setattr("app.services.config_store.seed_defaults", lambda db: None)
+
+    def override_get_db():
+        db = testing_session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    admin_app.dependency_overrides[get_db] = override_get_db
+    client = TestClient(admin_app)
+    yield client
+    client.close()
+    admin_app.dependency_overrides.clear()

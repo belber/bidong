@@ -15,6 +15,7 @@ from .robot.cookie import check_cookie, build_client
 from .robot.worker import activation_message
 from .services import config_store
 from .services import admin_stats as stats
+from .services import overview_stats
 from .services import repost_source
 from .services.activation import issue_activation
 from .services.storage import get_storage
@@ -55,7 +56,8 @@ def overview(
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    return stats.overview(db, days)
+    # 概览按「访问 / 机器人 / 解析 / 下载 / 域名」五段组织，旧的平铺字段一并保留
+    return overview_stats.overview(db, days)
 
 
 @router.get("/stats/followers")

@@ -33,6 +33,12 @@
   .card .value { font-size:26px; font-weight:700; margin-top:2px; }
   .card .sub { color:var(--muted); font-size:12px; margin-top:2px; }
   .card .sub.ok { color:var(--ok); } .card .sub.bad { color:var(--danger); }
+  .metric-row { display:flex; gap:30px; flex-wrap:wrap; align-items:baseline; }
+  .metric-row .metric b { font-size:22px; font-weight:700; }
+  .metric-row .metric span { color:var(--muted); font-size:12px; margin-left:6px; }
+  .metric-row .blue { color:var(--main); } .metric-row .ok { color:var(--ok); }
+  .metric-row .bad { color:var(--danger); } .metric-row .warn { color:var(--warn); }
+  .panel .note { color:var(--muted); font-size:12px; margin:0 0 10px; }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
   .panel h3 { margin:0 0 12px; font-size:15px; }
   .chart { width:100%; height:280px; }
@@ -206,18 +212,86 @@ const renderers = {
     const d = await api("/stats/overview?days=30").catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return null; });
     if (!d) return;
     const cookie = d.cookie || {};
-    const alertHtml = cookie.cookie_valid === false
-      ? `<div class="alert">⚠ 机器人 Cookie 已失效（${esc(cookie.cookie_last_error || "")}）</div>`
-      : `<div class="alert ok">◎ Cookie 正常（最近检查 ${esc(cookie.cookie_last_checked || "—")}）</div>`;
+    const visit = d.visit || {};
+    const bot = d.bot || {};
+    const parse = d.parse || {};
+    const dl = d.download || {};
+    const domains = d.domains || {};
+
+    // 需要动一下手的事放最上面，其余只看数字
+    const alerts = [];
+    alerts.push(cookie.cookie_valid === false
+      ? `<div class="alert">⚠ 机器人 Cookie 已失效（${esc(cookie.cookie_last_error || "")}）—— 私信发码和评论 @ 监听都会停</div>`
+      : `<div class="alert ok">◎ 机器人 Cookie 正常（最近检查 ${esc(cookie.cookie_last_checked || "—")}）</div>`);
+    if (domains.unconfigured) {
+      const hosts = (domains.recent_unconfigured || []).map(h => esc(h.host)).join("、");
+      alerts.push(`<div class="alert">⚠ ${fmt(domains.unconfigured)} 个下载域名还没配置到微信后台，用户会下载失败`
+        + `${hosts ? `（最近出现：${hosts}）` : ""} · <a href="javascript:void(0)" onclick="show('cdn')">去处理</a></div>`);
+    }
+
+    const failReasons = (dl.fail_by_error || []).slice(0, 3)
+      .map(x => `${esc(errorLabel(x.error_type))} ${fmt(x.count)}`).join(" · ");
+    const parseOk = (parse.local_ok || 0) + (parse.robot_ok || 0);
+    const parseFail = (parse.local_fail || 0) + (parse.robot_fail || 0);
+
     el.innerHTML = `
-      ${alertHtml}
-      <div class="cards">
-        <div class="card"><div class="label">粉丝总数</div><div class="value">${fmt(d.followers.total)}</div><div class="sub ok">今日 +${fmt(d.followers.today)}</div></div>
-        <div class="card"><div class="label">评论@总数</div><div class="value">${fmt(d.at.total)}</div><div class="sub ok">今日 +${fmt(d.at.today)}</div></div>
-        <div class="card"><div class="label">已绑定</div><div class="value">${fmt(d.activation.bound)}</div><div class="sub">发码成功 ${fmt(d.activation.sent_ok)}</div></div>
-        <div class="card"><div class="label">贴链接解析</div><div class="value">${fmt(d.local_parse.ok)}</div><div class="sub">成功 / 失败 ${fmt(d.local_parse.fail)}</div></div>
-        <div class="card"><div class="label">@触发解析</div><div class="value">${fmt(d.robot_parse.ok)}</div><div class="sub">成功 / 失败 ${fmt(d.robot_parse.fail)}</div></div>
+      ${alerts.join("")}
+
+      <div class="panel">
+        <h3>访问情况</h3>
+        <p class="note">用户访问小程序（每人每天最多上报一次，等于"访问过的微信用户数"）</p>
+        <div class="metric-row">
+          <div class="metric"><b class="blue">${fmt(visit.today_uv)}</b><span>人今日访问</span></div>
+          <div class="metric"><b>${fmt(visit.total_uv)}</b><span>人累计访问</span></div>
+          <div class="metric"><b>${fmt(visit.progress)}%</b><span>500 访客目标（还差 ${fmt(Math.max((visit.target || 0) - (visit.total_uv || 0), 0))} 人）</span></div>
+        </div>
       </div>
+
+      <div class="panel">
+        <h3>机器人关注与绑定 <span class="tag muted">@壁咚咚私藏</span></h3>
+        <p class="note">粉丝关注机器人 → 机器人私信激活码 → 小程序粘贴绑定</p>
+        <div class="metric-row">
+          <div class="metric"><b class="blue">${fmt(bot.followers_today)}</b><span>今日新增关注</span></div>
+          <div class="metric"><b>${fmt(bot.followers_total)}</b><span>关注总数</span></div>
+          <div class="metric"><b class="ok">${fmt(bot.bound)}</b><span>已绑定</span></div>
+          <div class="metric"><b>${fmt(bot.conversion)}%</b><span>关注→绑定转化</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>视频解析</h3>
+        <p class="note">去重用户数：贴链接按小程序用户算，评论 @ 按 B站 UID 算（机器人链路没有小程序用户）</p>
+        <div class="metric-row">
+          <div class="metric"><b class="blue">${fmt(parse.local_users_today)}</b><span>今日贴链接触发</span></div>
+          <div class="metric"><b class="blue">${fmt(parse.robot_users_today)}</b><span>今日评论 @ 触发</span></div>
+          <div class="metric"><b>${fmt((parse.local_users || 0) + (parse.robot_users || 0))}</b><span>近 30 天解析用户</span></div>
+          <div class="metric"><b class="ok">${fmt(parseOk)}</b><span>成功（失败 ${fmt(parseFail)}）</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>视频下载</h3>
+        <p class="note">一次下载算一次；用户改用"复制链接到浏览器保存"也算成功</p>
+        <div class="metric-row">
+          <div class="metric"><b>${fmt(dl.total)}</b><span>下载次数</span></div>
+          <div class="metric"><b class="ok">${fmt(dl.success)}</b><span>成功（保存 ${fmt(dl.saved)} + 复制链接 ${fmt(dl.copied)}）</span></div>
+          <div class="metric"><b class="bad">${fmt(dl.fail)}</b><span>失败</span></div>
+          <div class="metric"><b>${fmt(dl.success_rate)}%</b><span>成功率</span></div>
+        </div>
+        <p class="note" style="margin:10px 0 0">失败原因：${failReasons || "无"}</p>
+      </div>
+
+      <div class="panel">
+        <h3>B站 CDN 域名</h3>
+        <p class="note">下载直链用到的域名；没配置到微信后台的域名，用户点下载会失败</p>
+        <div class="metric-row">
+          <div class="metric"><b>${fmt(domains.total)}</b><span>已登记域名</span></div>
+          <div class="metric"><b class="ok">${fmt(domains.configured)}</b><span>已配置</span></div>
+          <div class="metric"><b class="warn">${fmt(domains.unconfigured)}</b><span>未配置</span></div>
+          <div class="metric"><b>${fmt(domains.hits)}</b><span>累计命中次数</span></div>
+        </div>
+      </div>
+
       <div class="panel"><h3>近 30 天趋势（粉丝新增 / 评论@触发）</h3><div id="chart-overview" class="chart"></div></div>`;
     drawChart("chart-overview", chart => chart.setOption({
       tooltip: { trigger: "axis" }, legend: { data: ["粉丝新增", "评论@触发"] },
