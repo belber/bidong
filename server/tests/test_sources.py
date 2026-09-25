@@ -1,9 +1,11 @@
+from pathlib import Path
+
 import respx
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
 from app.models import VideoSource
-from app.services import config_store
+from app.services import config_store, repost_source
 from helpers import BVID, mock_bili
 
 TOKEN = "test-ingest-token"
@@ -222,3 +224,21 @@ def test_ingested_source_shows_up_in_parse_result(client, db_engine, auth_header
     origin = parsed.json()["origin"]
     assert origin["platform_label"] == "YouTube"
     assert origin["author_name"] == "Hot Athletes"
+
+
+def test_seed_csv_is_importable(db_engine):
+    """存量数据文件必须能被导入脚本解析（防止哪天改坏或存成乱码）。"""
+    seed = Path(__file__).resolve().parents[1] / "data" / "sources_seed.csv"
+    assert seed.exists(), "缺少存量数据文件 data/sources_seed.csv"
+
+    text = seed.read_text(encoding="utf-8-sig")
+    items = repost_source.parse_csv(text)
+    assert len(items) > 100
+    assert all(repost_source.BVID_RE.match(str(i["bvid"]).strip()) for i in items)
+
+    db = _db(db_engine)
+    result = repost_source.upsert_items(db, items)
+    assert result["rejected"] == []
+    assert result["created"] == len(items)
+    assert db.query(VideoSource).count() == len(items)
+    db.close()

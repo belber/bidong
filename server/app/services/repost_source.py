@@ -10,6 +10,7 @@ from io import StringIO
 from typing import Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
 
 from ..config import settings
 from ..errors import AppError
@@ -207,10 +208,96 @@ def summary(db: Session) -> dict:
     total = db.query(VideoSource).count()
     with_author = db.query(VideoSource).filter(VideoSource.author_name != "").count()
     last = db.query(VideoSource).order_by(VideoSource.id.desc()).first()
+    platform_rows = (
+        db.query(VideoSource.platform, func.count(VideoSource.id))
+        .group_by(VideoSource.platform)
+        .order_by(func.count(VideoSource.id).desc())
+        .all()
+    )
     return {
         "total": total,
         "with_author": with_author,
         "without_author": total - with_author,
         "last_updated_at": last.updated_at if last is not None else None,
         "up_mids": sorted(repost_up_mids(db)),
+        "by_platform": [
+            {"platform": value or "", "label": platform_label(value or ""), "count": count}
+            for value, count in platform_rows
+        ],
+    }
+
+
+def _source_item(row: VideoSource) -> dict:
+    return {
+        "bvid": row.bvid,
+        "title": row.title,
+        "platform": row.platform,
+        "platform_label": platform_label(row.platform),
+        "author_name": row.author_name,
+        "author_id": row.author_id,
+        "author_url": row.author_url,
+        "source_url": row.source_url,
+        "bili_published_at": row.bili_published_at,
+        "note": row.note,
+        "updated_at": row.updated_at,
+    }
+
+
+def list_sources(
+    db: Session,
+    *,
+    q: str = "",
+    platform: str = "",
+    status: str = "",
+    page: int = 1,
+    size: int = 20,
+) -> dict:
+    """管理端明细：分页 + 关键字 / 平台 / 完整度筛选。"""
+    size = max(1, min(int(size or 20), 100))
+    page = max(1, int(page or 1))
+
+    query = db.query(VideoSource)
+    text = (q or "").strip()
+    if text:
+        like = f"%{text}%"
+        query = query.filter(
+            or_(
+                VideoSource.bvid.ilike(like),
+                VideoSource.title.ilike(like),
+                VideoSource.author_name.ilike(like),
+                VideoSource.author_id.ilike(like),
+                VideoSource.author_url.ilike(like),
+                VideoSource.source_url.ilike(like),
+            )
+        )
+
+    platform = (platform or "").strip()
+    if platform:
+        query = query.filter(VideoSource.platform == platform)
+
+    status = (status or "").strip()
+    if status == "with_author":
+        query = query.filter(VideoSource.author_name != "")
+    elif status == "without_author":
+        query = query.filter(
+            VideoSource.author_name == "", VideoSource.platform != ""
+        )
+    elif status == "empty":
+        query = query.filter(VideoSource.author_name == "", VideoSource.platform == "")
+
+    total = query.count()
+    rows = (
+        query.order_by(
+            VideoSource.bili_published_at.desc(), VideoSource.id.desc()
+        )
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    return {
+        "items": [_source_item(row) for row in rows],
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size,
     }

@@ -159,3 +159,117 @@ def test_admin_avatar_upload_rejects_non_image(admin_client):
         headers={**_auth(token), "Content-Type": "text/plain"},
     )
     assert resp.status_code == 400
+
+
+LIST_CSV = """bvid,title,platform,author_name,author_id,author_url,source_url,bili_published_at,note
+BV15Pbj6yEKg,【小视频】126-减脂只是为了多吃,douyin,小山坡,MS4wA,https://www.douyin.com/user/MS4wA,https://v.douyin.com/Ou/,2026-09-05,
+BV1vcbj6mEfk,【小视频】125-遇到事情先拍抖音,douyin,JACKSON_13,MS4wB,https://www.douyin.com/user/MS4wB,https://v.douyin.com/30/,2026-09-04,
+BV1txaT6nEz3,【小视频】188-夜里的肌肉身材,youtube,Hot Athletes,UCT085,https://www.youtube.com/@HotChineseAthletes,https://youtube.com/shorts/D3S,2026-09-24,
+BV1Yubj6GELK,【小视频】123-重情重义的兄弟变恋人,douyin,,,,https://v.douyin.com/HQtGtlUmIQc/,2026-09-05,parse失败 404
+"""
+
+
+def _import(client, token, csv_text=LIST_CSV):
+    resp = client.post(
+        "/api/admin/sources/import", json={"csv": csv_text}, headers=_auth(token)
+    )
+    assert resp.status_code == 200
+    return resp.json()
+
+
+def test_admin_sources_list_is_paginated(admin_client):
+    token = _login(admin_client).json()["token"]
+    _import(admin_client, token)
+
+    resp = admin_client.get(
+        "/api/admin/sources/list", params={"page": 1, "size": 2}, headers=_auth(token)
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 4
+    assert data["page"] == 1
+    assert data["size"] == 2
+    assert data["pages"] == 2
+    assert len(data["items"]) == 2
+    # 按 B站发布日期倒序
+    assert data["items"][0]["bili_published_at"] == "2026-09-24"
+    assert data["items"][0]["platform_label"] == "YouTube"
+
+    page2 = admin_client.get(
+        "/api/admin/sources/list", params={"page": 2, "size": 2}, headers=_auth(token)
+    ).json()
+    assert len(page2["items"]) == 2
+    ids = {i["bvid"] for i in data["items"]} | {i["bvid"] for i in page2["items"]}
+    assert len(ids) == 4
+
+
+def test_admin_sources_list_search(admin_client):
+    token = _login(admin_client).json()["token"]
+    _import(admin_client, token)
+
+    by_author = admin_client.get(
+        "/api/admin/sources/list", params={"q": "JACKSON"}, headers=_auth(token)
+    ).json()
+    assert by_author["total"] == 1
+    assert by_author["items"][0]["bvid"] == "BV1vcbj6mEfk"
+
+    by_bvid = admin_client.get(
+        "/api/admin/sources/list", params={"q": "BV15Pbj"}, headers=_auth(token)
+    ).json()
+    assert by_bvid["total"] == 1
+
+    by_title = admin_client.get(
+        "/api/admin/sources/list", params={"q": "肌肉身材"}, headers=_auth(token)
+    ).json()
+    assert by_title["total"] == 1
+
+    none = admin_client.get(
+        "/api/admin/sources/list", params={"q": "不存在的东西"}, headers=_auth(token)
+    ).json()
+    assert none["total"] == 0
+
+
+def test_admin_sources_list_filters_by_platform_and_status(admin_client):
+    token = _login(admin_client).json()["token"]
+    _import(admin_client, token)
+
+    youtube = admin_client.get(
+        "/api/admin/sources/list", params={"platform": "youtube"}, headers=_auth(token)
+    ).json()
+    assert youtube["total"] == 1
+
+    missing = admin_client.get(
+        "/api/admin/sources/list",
+        params={"status": "without_author"},
+        headers=_auth(token),
+    ).json()
+    assert missing["total"] == 1
+    assert missing["items"][0]["bvid"] == "BV1Yubj6GELK"
+    assert missing["items"][0]["note"] == "parse失败 404"
+
+    with_author = admin_client.get(
+        "/api/admin/sources/list",
+        params={"status": "with_author"},
+        headers=_auth(token),
+    ).json()
+    assert with_author["total"] == 3
+
+
+def test_admin_sources_list_caps_page_size(admin_client):
+    token = _login(admin_client).json()["token"]
+    _import(admin_client, token)
+    data = admin_client.get(
+        "/api/admin/sources/list", params={"size": 9999}, headers=_auth(token)
+    ).json()
+    assert data["size"] == 100
+
+
+def test_admin_sources_stats_breaks_down_by_platform(admin_client):
+    token = _login(admin_client).json()["token"]
+    _import(admin_client, token)
+    stats = admin_client.get("/api/admin/sources/stats", headers=_auth(token)).json()
+    by_platform = {row["platform"]: row for row in stats["by_platform"]}
+    assert by_platform["douyin"]["count"] == 3
+    assert by_platform["douyin"]["label"] == "抖音"
+    assert by_platform["youtube"]["count"] == 1
+    assert stats["total"] == 4

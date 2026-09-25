@@ -84,6 +84,7 @@
       <a data-view="follow" href="javascript:void(0)">关注监控</a>
       <a data-view="parse" href="javascript:void(0)">解析监控</a>
       <a data-view="download" href="javascript:void(0)">下载监控</a>
+      <a data-view="sources" href="javascript:void(0)">视频出处</a>
       <div class="group">运维配置</div>
       <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
       <a data-view="features" href="javascript:void(0)">功能开关</a>
@@ -91,7 +92,6 @@
       <a data-view="operations" href="javascript:void(0)">运营管理</a>
       <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
       <a data-view="cdn" href="javascript:void(0)">B站域名管理</a>
-      <a data-view="sources" href="javascript:void(0)">视频出处</a>
       <div class="group"></div>
       <a href="javascript:void(0)" onclick="logout()">退出登录</a>
     </nav>
@@ -129,7 +129,8 @@ const charts = {};
 const S = {
   follow: { days: 30, q: "" },
   parse: { source: "local", days: 30, q: "" },
-  visit: { days: 30, q: "" }
+  visit: { days: 30, q: "" },
+  sources: { page: 1, size: 20, q: "", platform: "", status: "" }
 };
 
 function api(path, opts = {}) {
@@ -475,9 +476,25 @@ const renderers = {
 
   async sources(el) {
     el.innerHTML = "加载中…";
-    const [s, cfg] = await Promise.all([api("/sources/stats"), api("/config/repost")])
-      .catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return [null, null]; });
-    if (!s || !cfg) return;
+    const st = S.sources;
+    const [s, cfg, list] = await Promise.all([
+      api("/sources/stats"),
+      api("/config/repost"),
+      api("/sources/list" + qs({ q: st.q, platform: st.platform, status: st.status, page: st.page, size: st.size })),
+    ]).catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return [null, null, null]; });
+    if (!s || !cfg || !list) return;
+    const platformOptions = [{ platform: "", label: "全部平台" }]
+      .concat(s.by_platform || [])
+      .map(p => `<option value="${esc(p.platform)}" ${p.platform === st.platform ? "selected" : ""}>`
+        + `${esc(p.label || p.platform || "未知")}${p.count ? "（" + p.count + "）" : ""}</option>`)
+      .join("");
+    const statusOptions = [
+      ["", "全部"],
+      ["with_author", "有原作者"],
+      ["without_author", "缺原作者"],
+      ["empty", "平台和作者都缺"]
+    ].map(([value, text]) => `<option value="${value}" ${value === st.status ? "selected" : ""}>${text}</option>`).join("");
+    const rows = (list.items || []).map(sourceRow).join("");
     el.innerHTML = `
       <div class="panel">
         <h3>视频出处（原up主）</h3>
@@ -485,8 +502,33 @@ const renderers = {
           数据由家里小主机上报，按 bvid 幂等；这里只服务白名单账号，其他 UP 主的视频解析页不受影响。</p>
         <div class="cards" style="margin:12px 0">
           <div class="card"><div class="label">已收录稿件</div><div class="value">${fmt(s.total)}</div></div>
-          <div class="card"><div class="label">有原作者</div><div class="value">${fmt(s.with_author)}</div><div class="sub">缺作者 ${fmt(s.without_author)} 条（前端显示「待补充」）</div></div>
+          <div class="card"><div class="label">有原作者</div><div class="value">${fmt(s.with_author)}</div><div class="sub">覆盖率 ${s.total ? Math.round(s.with_author / s.total * 100) : 0}%</div></div>
+          <div class="card"><div class="label">缺原作者</div><div class="value">${fmt(s.without_author)}</div><div class="sub">前端显示「待补充 / 整理中」</div></div>
           <div class="card"><div class="label">最近一次上报</div><div class="value" style="font-size:15px">${esc(fmtTime(s.last_updated_at))}</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>明细</h3>
+        <div class="toolbar">
+          <input id="src-q" value="${esc(st.q)}" placeholder="搜 BVID / 标题 / 原作者 / 链接" style="min-width:240px"
+            onkeydown="if (event.key === 'Enter') searchSources()" />
+          <select id="src-platform">${platformOptions}</select>
+          <select id="src-status">${statusOptions}</select>
+          <button onclick="searchSources()">查询</button>
+          <button class="ghost" onclick="resetSources()">重置</button>
+        </div>
+        <table>
+          <thead><tr><th>B站发布日</th><th>BVID</th><th>标题</th><th>原平台</th><th>原up主</th><th>备注</th><th>最近更新</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7" class="muted">没有符合条件的记录</td></tr>'}</tbody>
+        </table>
+        <div class="toolbar" style="justify-content:flex-end">
+          <span class="muted">共 ${fmt(list.total)} 条 · 第 ${list.page} / ${list.pages || 1} 页</span>
+          <button class="ghost" onclick="sourcesPage(-1)" ${list.page <= 1 ? "disabled" : ""}>上一页</button>
+          <button class="ghost" onclick="sourcesPage(1)" ${list.page >= list.pages ? "disabled" : ""}>下一页</button>
+          <select onchange="sourcesSize(this.value)">
+            ${[20, 50, 100].map(n => `<option value="${n}" ${n === list.size ? "selected" : ""}>${n} 条/页</option>`).join("")}
+          </select>
         </div>
       </div>
 
@@ -651,6 +693,25 @@ function downloadRow(i) {
 
 function visitRow(i) {
   return `<tr><td>${esc(i.created_at)}</td><td><span class="host">${esc(i.openid || "—")}</span></td><td>${esc(i.nickname || "—")}</td><td>${esc(i.path || "—")}</td></tr>`;
+}
+
+function sourceRow(i) {
+  const platform = i.platform_label || i.platform;
+  const platformCell = platform
+    ? `<span class="tag muted">${esc(platform)}</span>`
+    : '<span class="tag bad">缺</span>';
+  const authorCell = i.author_name
+    ? esc(i.author_name) + (i.author_url ? ` <a class="muted" href="${esc(i.author_url)}" target="_blank" rel="noreferrer">主页</a>` : "")
+    : '<span class="tag bad">缺</span>';
+  return `<tr>
+    <td>${esc(i.bili_published_at || "—")}</td>
+    <td><span class="host">${esc(i.bvid)}</span></td>
+    <td>${esc(i.title || "—")}</td>
+    <td>${platformCell}</td>
+    <td>${authorCell}</td>
+    <td>${esc(i.note || "—")}</td>
+    <td>${esc(fmtTime(i.updated_at))}</td>
+  </tr>`;
 }
 
 function domainRow(i) {
@@ -908,13 +969,22 @@ async function saveRepost() {
 }
 async function importSources() {
   const csv = document.getElementById("source-csv").value;
-  const msg = document.getElementById("source-import-msg");
+  if (!csv.trim()) { showModal("提示", "请先粘贴 CSV 内容", true); return; }
   try {
     const r = await api("/sources/import", { method: "POST", body: JSON.stringify({ csv }) });
     const rejected = r.rejected || [];
-    msg.textContent = `新增 ${r.created} / 更新 ${r.updated} / 拒收 ${rejected.length}`
-      + (rejected.length ? `（${rejected.slice(0, 3).map(x => x.bvid || "空 bvid").join("、")}…）` : "");
-  } catch (e) { msg.textContent = e.message; }
+    const lines = [
+      `新增：${r.created} 条`,
+      `更新：${r.updated} 条`,
+      `拒收：${rejected.length} 条`,
+    ];
+    if (rejected.length) {
+      lines.push("", "拒收明细（最多 5 条）：");
+      rejected.slice(0, 5).forEach(x => lines.push(`· ${x.bvid || "(空 bvid)"}：${x.reason}`));
+    }
+    showModal("导入完成", lines.join("\n"), false);
+    show("sources");
+  } catch (e) { showModal("导入失败", e.message, true); }
 }
 async function uploadRepostAvatar() {
   const input = document.getElementById("repost-avatar-file");

@@ -954,6 +954,24 @@ def sources_stats(
     return data
 
 
+@router.get("/sources/list")
+def sources_list(
+    q: str = "",
+    platform: str = "",
+    status: str = "",
+    page: int = 1,
+    size: int = 20,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    data = repost_source.list_sources(
+        db, q=q, platform=platform, status=status, page=page, size=size
+    )
+    for item in data["items"]:
+        item["updated_at"] = _iso_utc(item["updated_at"]) if item["updated_at"] else ""
+    return data
+
+
 @router.post("/sources/import")
 def sources_import(
     payload: SourceImportPayload,
