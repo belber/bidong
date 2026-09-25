@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js');
 const { formatDuration, formatDateTime } = require('../../utils/format.js');
+const { mapOrigin } = require('../../utils/origin.js');
 const { downloadMediaParallel, downloadUrlErrorType, configuredCandidates } = require('../../utils/mediaDownload.js');
 const {
   initialExports,
@@ -126,6 +127,7 @@ Page({
     desc: '',
     stats: { like: 0, reply: 0, favorite: 0, coin: 0 },
     coverUrl: '',
+    origin: null,
     media: { watermarked: false, clean: false, audio: false },
     features: { comment: true, danmaku: true },
     shareEnabled: true,
@@ -203,6 +205,7 @@ Page({
       desc: r.desc,
       stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0 },
       coverUrl: r.cover_url,
+      origin: mapOrigin(r.origin),
       media: r.media || { watermarked: false, clean: false, audio: false },
       features: r.features || { comment: true, danmaku: true },
       danmakuCount: r.danmaku_count || 0,
@@ -235,6 +238,20 @@ Page({
 
   onCopyTag(e) {
     this.copy(e.currentTarget.dataset.field);
+  },
+
+  // 只复制原作者主页：抖音/X 的链接在小程序里打不开，复制到浏览器看
+  onCopyAuthorHome() {
+    const origin = this.data.origin;
+    const url = origin && origin.authorUrl;
+    if (!url) {
+      toast('没有可复制的主页');
+      return;
+    }
+    wx.setClipboardData({
+      data: url,
+      success() { toast('主页链接已复制'); }
+    });
   },
 
   onPreviewCover() {

@@ -38,6 +38,30 @@
     </view>
   </view>
 
+  <!-- 帅哥录屏专属：只有该账号的稿件，后端才会返回 origin -->
+  <view class="card source-card" wx:if="{{origin}}">
+    <view class="sec-title">
+      <text class="bar"></text>
+      <image wx:if="{{origin.accountAvatarUrl}}" class="src-avatar" src="{{origin.accountAvatarUrl}}" mode="aspectFill" />
+      <text>{{origin.accountName}} · 原up主是谁</text>
+      <text class="push"></text>
+      <text class="fan-chip">粉丝专属</text>
+    </view>
+
+    <view class="field">
+      <text class="label">原平台</text>
+      <view class="content {{origin.platformText === '—' ? 'muted' : ''}}">{{origin.platformText}}</view>
+    </view>
+
+    <view class="field">
+      <text class="label">原up主</text>
+      <view class="content {{origin.hasAuthor ? '' : 'muted'}}">{{origin.authorText}}</view>
+      <text class="action" wx:if="{{origin.authorUrl}}" bindtap="onCopyAuthorHome">复制主页</text>
+    </view>
+
+    <view class="src-hint" wx:if="{{origin.pending}}">这条的出处还在整理，稍后再来看看</view>
+  </view>
+
   <view class="card">
     <view class="sec-title"><text class="bar"></text><text>数据</text></view>
     <view class="stats-box">

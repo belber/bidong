@@ -79,6 +79,40 @@
   gap: 10rpx;
 }
 
+/* 帅哥录屏专属区块：淡粉描边与其余卡片区分，结构沿用 sec-title + field */
+.source-card {
+  border: 2rpx solid #fbd3e0;
+  background: linear-gradient(135deg, #fffafc, #fff5f8);
+}
+
+.src-avatar {
+  flex: none;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+}
+
+.push {
+  flex: 1;
+}
+
+.fan-chip {
+  flex: none;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #fff;
+  background: #fb7299;
+  border-radius: 999rpx;
+  padding: 4rpx 16rpx;
+  line-height: 1.4;
+}
+
+.src-hint {
+  font-size: 22rpx;
+  color: #b7aab0;
+  padding: 0 0 20rpx 156rpx;
+}
+
 .stats-box {
   display: flex;
   align-items: center;
