@@ -278,3 +278,24 @@ class VideoSource(Base):
     updated_at: Mapped[datetime] = mapped_column(
         default=utcnow_naive, onupdate=utcnow_naive
     )
+
+
+class CrawlerVisit(Base):
+    """微信搜索爬虫的访问记录，用来回答"爬虫到底来没来过"。
+
+    两个来源：服务端按请求头/UA 识别（source=header），以及小程序端按场景值
+    1129 上报（source=scene）——爬虫打开页面时微信会带上这个场景值。
+    """
+
+    __tablename__ = "crawler_visit"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(16), default="header")  # header | scene
+    path: Mapped[str] = mapped_column(String(255), default="")
+    query: Mapped[str] = mapped_column(String(255), default="")
+    user_agent: Mapped[str] = mapped_column(String(255), default="")
+    referer: Mapped[str] = mapped_column(String(255), default="")
+    scene: Mapped[int] = mapped_column(Integer, default=0)
+    # 签名校验结果：None = 没配 Token 无法校验
+    signature_verified: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive, index=True)

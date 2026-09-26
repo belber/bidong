@@ -13,6 +13,7 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .errors import AppError
 from . import models  # noqa: F401  # 注册模型到 metadata
+from .services import crawler as crawler_service
 from .routers import (
     auth,
     binding,
@@ -105,6 +106,19 @@ app.mount("/media/covers", StaticFiles(directory=str(local_dir)), name="covers")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    # 微信搜索爬虫的访问单独记一笔，用于诊断"页面为什么没被收录"
+    try:
+        if crawler_service.looks_like_crawler(request.headers):
+            db = SessionLocal()
+            try:
+                crawler_service.record_from_headers(
+                    db, request.headers, request.url.path, str(request.url.query or "")
+                )
+            finally:
+                db.close()
+    except Exception:  # noqa: BLE001  记录失败不能影响正常请求
+        logging.getLogger("bidong").exception("crawler visit record failed")
+
     path = request.url.path
     if not path.startswith("/api/"):
         return await call_next(request)

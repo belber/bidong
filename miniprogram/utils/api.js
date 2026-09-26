@@ -162,6 +162,14 @@ module.exports = {
   getPublicCard(bvid) {
     return publicRequest('GET', '/api/public/cards/' + bvid);
   },
+  // 微信搜索爬虫打开页面时会带场景值 1129：上报一笔，管理端就能看到"爬虫来过"
+  reportCrawlerVisit(path, query) {
+    return publicRequest('POST', '/api/public/crawler-visit', {
+      path: path || '',
+      query: query || '',
+      scene: 1129
+    });
+  },
   unbind() {
     return request('DELETE', '/api/binding');
   },

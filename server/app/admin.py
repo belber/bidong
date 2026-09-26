@@ -9,11 +9,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .admin_security import create_admin_token, decode_admin_token, verify_password
+from .config import settings
 from .db import get_db
 from .models import Binding, BiliCdnDomain, DownloadEvent, User
 from .robot.cookie import check_cookie, build_client
 from .robot.worker import activation_message
 from .services import config_store
+from .services import crawler as crawler_service
 from .services import admin_stats as stats
 from .services import overview_stats
 from .services import repost_source
@@ -953,6 +955,18 @@ def sources_stats(
     data = repost_source.summary(db)
     last = data.get("last_updated_at")
     data["last_updated_at"] = _iso_utc(last) if last else ""
+    return data
+
+
+@router.get("/stats/crawler")
+def crawler_stats(
+    days: int = Query(30),
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """微信搜索爬虫的访问情况：来没来过、从哪来、什么时候。"""
+    data = crawler_service.summary(db, days=days)
+    data["signature_check_enabled"] = bool(settings.wechat_msg_token)
     return data
 
 

@@ -80,5 +80,8 @@ class Settings(BaseSettings):
     repost_account_avatar_url: str = ""
     source_ingest_token: str = ""
 
+    # 微信搜索：爬虫签名校验用的 Token（小程序后台「消息推送」里的 Token）
+    wechat_msg_token: str = ""
+
 
 settings = Settings()

@@ -91,6 +91,7 @@
       <a data-view="parse" href="javascript:void(0)">解析监控</a>
       <a data-view="download" href="javascript:void(0)">下载监控</a>
       <a data-view="sources" href="javascript:void(0)">视频出处</a>
+      <a data-view="crawler" href="javascript:void(0)">搜索爬虫</a>
       <div class="group">运维配置</div>
       <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
       <a data-view="features" href="javascript:void(0)">功能开关</a>
@@ -115,6 +116,7 @@
     <section id="view-help" class="view hidden"></section>
     <section id="view-cdn" class="view hidden"></section>
     <section id="view-sources" class="view hidden"></section>
+    <section id="view-crawler" class="view hidden"></section>
   </main>
 </div>
 
@@ -672,6 +674,65 @@ const renderers = {
         <textarea id="source-csv" rows="8" style="width:100%;margin:10px 0;font-family:ui-monospace,monospace;font-size:12px"
           placeholder="bvid,platform,author_name,author_url,source_url,bili_published_at,note"></textarea>
         <button onclick="importSources()">导入</button> <span id="source-import-msg" class="muted"></span>
+      </div>`;
+  },
+
+  async crawler(el) {
+    el.innerHTML = "加载中…";
+    const days = 30;
+    const d = await api("/stats/crawler?days=" + days)
+      .catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return null; });
+    if (!d) return;
+
+    const rows = (d.items || []).map(i => `<tr>
+      <td>${esc(i.created_at)}</td>
+      <td>${i.source === "scene" ? "页面场景值" : "请求头"}</td>
+      <td>${i.scene ? fmt(i.scene) : "—"}</td>
+      <td>${esc(i.path || "—")}</td>
+      <td>${esc(i.query || "—")}</td>
+      <td><span class="host">${esc(i.user_agent || "—")}</span></td>
+    </tr>`).join("");
+    const pathRows = (d.by_path || []).map(p =>
+      `<tr><td>${esc(p.path)}</td><td>${fmt(p.count)}</td></tr>`).join("");
+
+    const diagnose = d.today
+      ? `爬虫今天来过 ${fmt(d.today)} 次，最近一次 ${esc(d.last_seen || "—")}。`
+      : (d.total
+          ? `今天没有爬虫访问，最近一次是 ${esc(d.last_seen || "—")}。`
+          : `还没有记录到任何爬虫访问。通常意味着微信还没发现这些页面：`
+            + `确认小程序已发布、后台搜索开关已打开，并用「搜一搜数据推送」主动提交过页面。`);
+    const signatureNote = d.signature_check_enabled
+      ? `签名校验：通过 ${fmt(d.verified)} · 未通过 ${fmt(d.unverified)}`
+      : `签名校验：未配置（后台「消息推送」的 Token）—— 目前按 UA 和场景值识别`;
+
+    el.innerHTML = `
+      <div class="alert ${d.today ? "ok" : ""}">${esc(diagnose)}</div>
+      <div class="panel">
+        <h3>微信搜索爬虫访问</h3>
+        <p class="note">爬虫打开小程序页面时会带场景值 1129（页面里上报）；
+          如果它直接请求后端接口，则从请求头/UA 识别。两条线索都记在这里。</p>
+        <div class="metric-row">
+          <div class="metric"><b class="blue">${fmt(d.today)}</b><span>今日访问次数</span></div>
+          <div class="metric"><b>${fmt(d.total)}</b><span>近 ${fmt(d.days)} 天累计</span></div>
+          <div class="metric"><b>${esc(d.last_seen || "—")}</b><span>最近一次</span></div>
+        </div>
+        <p class="note" style="margin:10px 0 0">${esc(signatureNote)}</p>
+      </div>
+
+      <div class="panel">
+        <h3>爬虫看过哪些页面</h3>
+        <table>
+          <thead><tr><th>页面</th><th>次数</th></tr></thead>
+          <tbody>${pathRows || '<tr><td colspan="2" class="muted">暂无记录</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h3>明细（最近 50 条）</h3>
+        <table>
+          <thead><tr><th>时间</th><th>来源</th><th>场景值</th><th>页面</th><th>参数</th><th>User-Agent</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6" class="muted">暂无记录</td></tr>'}</tbody>
+        </table>
       </div>`;
   },
 

@@ -144,6 +144,12 @@ class PublicCardOut(BaseModel):
     origin: OriginOut | None = None
 
 
+class CrawlerVisitRequest(BaseModel):
+    path: str = ""
+    query: str = ""
+    scene: int = 0
+
+
 class BindingRequest(BaseModel):
     code: str
 

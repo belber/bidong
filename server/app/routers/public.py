@@ -8,11 +8,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from .. import schemas
 from ..db import get_db
 from ..errors import AppError
 from ..models import VideoCard
 from ..schemas import PublicCardOut
-from ..services import repost_source
+from ..services import crawler, repost_source
 
 router = APIRouter(tags=["public"])
 
@@ -46,3 +47,19 @@ def public_card(bvid: str, db: Session = Depends(get_db)):
         source_url=card.source_url,
         origin=origin,
     )
+
+
+@router.post("/api/public/crawler-visit")
+def report_crawler_visit(payload: schemas.CrawlerVisitRequest, db: Session = Depends(get_db)):
+    """小程序端上报"微信搜索爬虫打开过页面"（场景值 1129）。
+
+    小程序运行时发起请求时不一定带爬虫头，所以场景值是最可靠的信号。
+    """
+    crawler.record(
+        db,
+        source="scene",
+        path=payload.path,
+        query=payload.query,
+        scene=payload.scene or crawler.SCENE_SEARCH_CRAWLER,
+    )
+    return {"ok": True}

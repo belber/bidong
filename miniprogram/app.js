@@ -1,7 +1,7 @@
 // 后端 API 地址按环境自动选择：
 // - 开发版（开发者工具模拟器 / 真机调试）：本地 127.0.0.1，需勾选「不校验合法域名」
 // - 体验版 / 正式版：必须用已备案的 HTTPS 域名，且要在公众平台配置 request 合法域名
-const DEV_API_BASE = 'http://192.168.28.173:8000';
+const DEV_API_BASE = 'http://192.168.10.248:8000';
 // TODO: 拿到备案域名后替换为正式地址，并在微信公众平台配置 request 合法域名
 const PROD_API_BASE = 'https://api.beastnotes.cn';
 
@@ -13,10 +13,37 @@ function resolveApiBase() {
   return env === 'trial' || env === 'release' ? PROD_API_BASE : DEV_API_BASE;
 }
 
+// 场景值 1129 = 微信搜索爬虫打开小程序
+const SCENE_SEARCH_CRAWLER = 1129;
+
+function queryString(query) {
+  if (!query || typeof query !== 'object') {
+    return '';
+  }
+  return Object.keys(query)
+    .map((k) => k + '=' + query[k])
+    .join('&');
+}
+
 App({
   globalData: {
     apiBase: resolveApiBase(),
     // B站官方小程序 appId（已配置 navigateToMiniProgramAppIdList）
     biliMiniProgramAppId: 'wx7564fd5313d24844'
+  },
+
+  // 爬虫访问时会带场景值 1129：上报一笔，管理端「搜索爬虫」页就能看到它来过
+  onShow(options) {
+    if (!options || options.scene !== SCENE_SEARCH_CRAWLER) {
+      return;
+    }
+    try {
+      require('./utils/api.js').reportCrawlerVisit(
+        options.path || '',
+        queryString(options.query)
+      );
+    } catch (e) {
+      // 上报失败不影响小程序使用
+    }
   }
 });
