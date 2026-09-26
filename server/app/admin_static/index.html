@@ -717,11 +717,13 @@ const renderers = {
         <div class="metric-row">
           <div class="metric"><b class="${search.enabled ? 'ok' : 'warn'}">${search.enabled ? "已开启" : "未开启"}</b><span>自动推送</span></div>
           <div class="metric"><b>${search.mode === "prod" ? "正式数据" : "审核数据"}</b><span>数据模式</span></div>
-          <div class="metric"><b class="blue">${fmt(search.pending)}</b><span>待推送视频</span></div>
+          <div class="metric"><b class="blue">${fmt(search.pending)}</b><span>上次推送后新增</span></div>
           <div class="metric"><b>${fmt(search.last_ok || 0)}</b><span>上次成功条数</span></div>
           <div class="metric"><b>${esc(search.last_push_at ? fmtTime(search.last_push_at) : "—")}</b><span>上次推送时间</span></div>
         </div>
         ${search.last_error ? `<div class="alert">上次推送失败：${esc(search.last_error)}</div>` : ""}
+        <p class="note" style="margin:10px 0 0">「上次推送后新增」= 上次推送时间之后新建的视频卡片，
+          下次自动推送（每天一次）或点「推送新增」时会把它们提交给微信。</p>
         <div class="toolbar" style="margin-top:10px">
           <button onclick="saveSearchConfig({enabled: ${!search.enabled}})">${search.enabled ? "关闭自动推送" : "开启自动推送"}</button>
           <button class="ghost" onclick="saveSearchConfig({mode: '${search.mode === "prod" ? "audit" : "prod"}'})">切换到${search.mode === "prod" ? "审核数据" : "正式数据"}</button>
