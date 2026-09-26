@@ -1161,6 +1161,30 @@ async function importSources() {
     show("sources");
   } catch (e) { showModal("导入失败", e.message, true); }
 }
+function searchSources() {
+  const st = S.sources;
+  st.q = (document.getElementById("src-q").value || "").trim();
+  st.platform = document.getElementById("src-platform").value;
+  st.status = document.getElementById("src-status").value;
+  st.page = 1;
+  show("sources");
+}
+function resetSources() {
+  S.sources = { page: 1, size: S.sources.size, q: "", platform: "", status: "" };
+  show("sources");
+}
+function sourcesPage(delta) {
+  const st = S.sources;
+  const next = st.page + delta;
+  if (next < 1) return;
+  st.page = next;
+  show("sources");
+}
+function sourcesSize(value) {
+  S.sources.size = parseInt(value, 10) || 20;
+  S.sources.page = 1;
+  show("sources");
+}
 async function uploadRepostAvatar() {
   const input = document.getElementById("repost-avatar-file");
   const msg = document.getElementById("repost-avatar-msg");
