@@ -158,6 +158,10 @@ module.exports = {
   getPublicConfig() {
     return publicRequest('GET', '/api/config/public');
   },
+  // 免登录的视频信息：结果页被分享/被爬虫打开时用（没有登录态也能看到内容）
+  getPublicCard(bvid) {
+    return publicRequest('GET', '/api/public/cards/' + bvid);
+  },
   unbind() {
     return request('DELETE', '/api/binding');
   },

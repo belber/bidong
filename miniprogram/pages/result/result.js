@@ -144,7 +144,8 @@ Page({
     fallbackVisible: false,
     fallbackUrl: '',
     activeKind: '',
-    activeQn: null
+    activeQn: null,
+    publicView: false
   },
 
   onLoad(options) {
@@ -187,17 +188,29 @@ Page({
       })
       .catch((err) => {
         wx.hideLoading();
-        if (!silent) {
-          toast(err.message || '加载失败');
+        // 没有登录态（未登录访客、微信搜索爬虫）或登录失效时，退回公开信息渲染：
+        // 页面必须"打开就有内容"，否则分享出去/被爬虫抓到的都是空页面
+        const authIssue = !err || !err.statusCode || err.statusCode === 401;
+        if (!authIssue) {
+          if (!silent) toast(err.message || '加载失败');
+          return;
         }
+        api.getPublicCard(bvid)
+          .then((card) => {
+            this.applyResult(card, { publicView: true });
+          })
+          .catch(() => {
+            if (!silent) toast(err.message || '加载失败');
+          });
       });
   },
 
-  applyResult(r) {
+  applyResult(r, opts) {
     if (!r) {
       toast('暂无解析数据');
       return;
     }
+    const publicView = !!(opts && opts.publicView);
     const subtitles = (r.subtitles || []).map((s) => ({
       t: s.t,
       text: s.text,
@@ -223,7 +236,8 @@ Page({
       danmakuCount: r.danmaku_count || 0,
       subtitles,
       subPreview: subtitles.slice(0, 5),
-      exports: initialExports()
+      exports: initialExports(),
+      publicView
     });
     // 导航标题跟着视频走：搜索结果里的标题相关性靠它
     wx.setNavigationBarTitle({

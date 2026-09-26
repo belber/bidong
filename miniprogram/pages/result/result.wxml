@@ -62,6 +62,8 @@
     <view class="src-hint" wx:if="{{origin.pending}}">这条的出处还在整理，稍后再来看看</view>
   </view>
 
+  <view class="visitor-tip" wx:if="{{publicView}}">以访客身份查看 · 登录后才能下载与导出</view>
+
   <view class="card">
     <view class="sec-title"><text class="bar"></text><text>数据</text></view>
     <view class="stats-box">
@@ -83,19 +85,19 @@
       </view>
     </view>
 
-    <view class="field" wx:if="{{media.watermarked}}">
+    <view class="field" wx:if="{{media.watermarked && !publicView}}">
       <text class="label">视频</text>
       <view class="content muted">{{mediaSize.watermarked || '单文件流，含音频'}}</view>
       <text class="action" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
     </view>
 
-    <view class="field" wx:if="{{media.clean}}">
+    <view class="field" wx:if="{{media.clean && !publicView}}">
       <text class="label">无水印视频</text>
       <view class="content muted">{{mediaSize.clean || '高清视频轨，不含音频'}}</view>
       <text class="action" bindtap="onDownloadVideo" data-kind="clean">下载</text>
     </view>
 
-    <view class="field export-field" wx:if="{{media.audio}}">
+    <view class="field export-field" wx:if="{{media.audio && !publicView}}">
       <text class="label">纯音频</text>
       <view class="content muted">{{mediaSize.audio || '音频轨'}}</view>
       <text
@@ -110,7 +112,7 @@
     </view>
 
     <!-- 下载进度 -->
-    <view class="field" wx:if="{{downloading}}">
+    <view class="field" wx:if="{{downloading && !publicView}}">
       <text class="label">下载中</text>
       <view class="content">
         <view class="progress-wrap">
@@ -121,7 +123,7 @@
     </view>
   </view>
 
-  <view class="card">
+  <view class="card" wx:if="{{!publicView}}">
     <view class="sec-title"><text class="bar"></text><text>文本</text></view>
 
     <view class="field export-field">

@@ -129,6 +129,21 @@ class ParseResult(CardOut):
     origin: OriginOut | None = None
 
 
+class PublicCardOut(BaseModel):
+    """免登录可见的视频信息：只有公开元数据，不含任何用户数据。"""
+
+    bvid: str
+    title: str
+    up_name: str
+    partition: str = ""
+    duration: int = 0
+    pubdate: int = 0
+    cover_url: str = ""
+    desc: str = ""
+    source_url: str = ""
+    origin: OriginOut | None = None
+
+
 class BindingRequest(BaseModel):
     code: str
 

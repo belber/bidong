@@ -113,6 +113,17 @@
   padding: 0 0 20rpx 156rpx;
 }
 
+/* 未登录访客（含微信搜索爬虫打开）时的提示 */
+.visitor-tip {
+  margin: 0 0 20rpx;
+  padding: 16rpx 24rpx;
+  border-radius: 16rpx;
+  background: #fceaf0;
+  color: #b28b97;
+  font-size: 24rpx;
+  text-align: center;
+}
+
 .stats-box {
   display: flex;
   align-items: center;

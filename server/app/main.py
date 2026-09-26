@@ -21,6 +21,7 @@ from .routers import (
     media,
     meta,
     parse,
+    public,
     sources,
     tags,
     tracking,
@@ -93,6 +94,7 @@ for router in (
     meta.router,
     tracking.router,
     sources.router,
+    public.router,
 ):
     app.include_router(router)
 
