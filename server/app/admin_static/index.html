@@ -91,7 +91,7 @@
       <a data-view="parse" href="javascript:void(0)">解析监控</a>
       <a data-view="download" href="javascript:void(0)">下载监控</a>
       <a data-view="sources" href="javascript:void(0)">视频出处</a>
-      <a data-view="crawler" href="javascript:void(0)">搜索爬虫</a>
+      <a data-view="crawler" href="javascript:void(0)">搜索与收录</a>
       <div class="group">运维配置</div>
       <a data-view="cookie" href="javascript:void(0)">账号/Cookie</a>
       <a data-view="features" href="javascript:void(0)">功能开关</a>
@@ -680,9 +680,11 @@ const renderers = {
   async crawler(el) {
     el.innerHTML = "加载中…";
     const days = 30;
-    const d = await api("/stats/crawler?days=" + days)
-      .catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return null; });
-    if (!d) return;
+    const [d, search] = await Promise.all([
+      api("/stats/crawler?days=" + days),
+      api("/search/status"),
+    ]).catch(e => { el.innerHTML = `<div class="alert">${esc(e.message)}</div>`; return [null, null]; });
+    if (!d || !search) return;
 
     const rows = (d.items || []).map(i => `<tr>
       <td>${esc(i.created_at)}</td>
@@ -707,6 +709,27 @@ const renderers = {
 
     el.innerHTML = `
       <div class="alert ${d.today ? "ok" : ""}">${esc(diagnose)}</div>
+
+      <div class="panel">
+        <h3>搜一搜数据推送</h3>
+        <p class="note">主动把页面推给微信搜索，比等爬虫自己发现快。先用「审核数据」跑通格式，
+          微信审核通过后再切「正式数据」——正式数据才会出现在搜索结果里。</p>
+        <div class="metric-row">
+          <div class="metric"><b class="${search.enabled ? 'ok' : 'warn'}">${search.enabled ? "已开启" : "未开启"}</b><span>自动推送</span></div>
+          <div class="metric"><b>${search.mode === "prod" ? "正式数据" : "审核数据"}</b><span>数据模式</span></div>
+          <div class="metric"><b class="blue">${fmt(search.pending)}</b><span>待推送视频</span></div>
+          <div class="metric"><b>${fmt(search.last_ok || 0)}</b><span>上次成功条数</span></div>
+          <div class="metric"><b>${esc(search.last_push_at ? fmtTime(search.last_push_at) : "—")}</b><span>上次推送时间</span></div>
+        </div>
+        ${search.last_error ? `<div class="alert">上次推送失败：${esc(search.last_error)}</div>` : ""}
+        <div class="toolbar" style="margin-top:10px">
+          <button onclick="saveSearchConfig({enabled: ${!search.enabled}})">${search.enabled ? "关闭自动推送" : "开启自动推送"}</button>
+          <button class="ghost" onclick="saveSearchConfig({mode: '${search.mode === "prod" ? "audit" : "prod"}'})">切换到${search.mode === "prod" ? "审核数据" : "正式数据"}</button>
+          <button onclick="pushSearch('new')">推送新增</button>
+          <button class="ghost" onclick="pushSearch('all')">全量重推</button>
+        </div>
+      </div>
+
       <div class="panel">
         <h3>微信搜索爬虫访问</h3>
         <p class="note">爬虫打开小程序页面时会带场景值 1129（页面里上报）；
@@ -1185,6 +1208,26 @@ function sourcesSize(value) {
   S.sources.page = 1;
   show("sources");
 }
+async function saveSearchConfig(patch) {
+  try {
+    await api("/search/config", { method: "PUT", body: JSON.stringify(patch) });
+    show("crawler");
+  } catch (e) {
+    showModal("保存失败", e.message, true);
+  }
+}
+
+async function pushSearch(scope) {
+  showModal("正在推送", scope === "all" ? "正在把全部页面推给微信搜索…" : "正在推送新增页面…", false);
+  try {
+    const r = await api("/search/push", { method: "POST", body: JSON.stringify({ scope }) });
+    showModal("推送完成", `成功 ${r.result.ok} 条 · 失败 ${r.result.fail} 条`, false);
+  } catch (e) {
+    showModal("推送失败", e.message, true);
+  }
+  show("crawler");
+}
+
 async function uploadRepostAvatar() {
   const input = document.getElementById("repost-avatar-file");
   const msg = document.getElementById("repost-avatar-msg");

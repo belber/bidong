@@ -28,6 +28,7 @@ from .routers import (
     tracking,
 )
 from .services import daily_report
+from .services import wechat_search
 
 
 async def _daily_report_loop() -> None:
@@ -36,6 +37,8 @@ async def _daily_report_loop() -> None:
             db = SessionLocal()
             try:
                 daily_report.maybe_send_daily_report(db)
+                # 搜一搜数据推送：每天一次增量（开关在管理端）
+                wechat_search.maybe_push_search(db)
             finally:
                 db.close()
         except Exception:

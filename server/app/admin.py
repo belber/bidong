@@ -19,6 +19,7 @@ from .services import crawler as crawler_service
 from .services import admin_stats as stats
 from .services import overview_stats
 from .services import repost_source
+from .services import wechat_search
 from .services.activation import issue_activation
 from .services.storage import get_storage
 from .time import utcnow_naive
@@ -968,6 +969,65 @@ def crawler_stats(
     data = crawler_service.summary(db, days=days)
     data["signature_check_enabled"] = bool(settings.wechat_msg_token)
     return data
+
+
+class SearchConfigPayload(BaseModel):
+    enabled: bool | None = None
+    mode: str | None = None
+
+
+class SearchPushPayload(BaseModel):
+    scope: str = "new"  # new = 只推新增 / all = 全量重推
+
+
+def _search_status(db: Session) -> dict:
+    return {
+        "enabled": wechat_search.enabled(db),
+        "mode": wechat_search.mode(db),
+        "pending": wechat_search.pending_count(db),
+        "signature_check_enabled": bool(settings.wechat_msg_token),
+        **wechat_search.state(db),
+    }
+
+
+@router.get("/search/status")
+def search_status(
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    return _search_status(db)
+
+
+@router.put("/search/config")
+def set_search_config(
+    payload: SearchConfigPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    if payload.enabled is not None:
+        wechat_search.set_enabled(db, payload.enabled)
+    if payload.mode is not None:
+        wechat_search.set_mode(db, payload.mode)
+    return _search_status(db)
+
+
+@router.post("/search/push")
+def search_push(
+    payload: SearchPushPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """手动推送：新增推送适合日常，全量重推适合首次接入或改过数据后。"""
+    mode = wechat_search.mode(db)
+    try:
+        result = (
+            wechat_search.push_all(db, mode=mode)
+            if payload.scope == "all"
+            else wechat_search.push_videos(db, mode=mode)
+        )
+    except wechat_search.SearchPushError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"result": result, "status": _search_status(db)}
 
 
 @router.get("/sources/list")
