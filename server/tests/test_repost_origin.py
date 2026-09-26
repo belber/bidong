@@ -58,11 +58,11 @@ def test_origin_none_for_other_up(db_engine):
     db.close()
 
 
-def test_origin_none_when_up_mid_missing(db_engine):
+def test_origin_falls_back_for_none_up_mid_too(db_engine):
+    """up_mid 是 None（字段没写）和空串一样，都走台账兜底。"""
     db = _db(db_engine)
     _record(db)
-    assert repost_source.get_origin(db, bvid=BVID, up_mid="") is None
-    assert repost_source.get_origin(db, bvid=BVID, up_mid=None) is None
+    assert repost_source.get_origin(db, bvid=BVID, up_mid=None) is not None
     db.close()
 
 
@@ -206,4 +206,16 @@ def test_platform_falls_back_to_source_url(db_engine):
     assert origin.platform == "youtube"
     assert origin.platform_label == "YouTube"
     assert repost_source.get_origin(db, bvid="BV15Pbj6yEKg", up_mid=UP_MID).platform == "douyin"
+    db.close()
+
+
+def test_origin_falls_back_to_ledger_when_up_mid_missing(db_engine):
+    """老卡片建卡时没存 up_mid；只要这条 bvid 在上报台账里，就说明是白名单账号的稿件。"""
+    db = _db(db_engine)
+    _record(db)
+    origin = repost_source.get_origin(db, bvid=BVID, up_mid="")
+    assert origin is not None
+    assert origin.platform_label == "抖音"
+    # 台账里没有的 bvid，缺 up_mid 时依然判定为"不是这个账号的"
+    assert repost_source.get_origin(db, bvid="BV1xx411c7mD", up_mid="") is None
     db.close()

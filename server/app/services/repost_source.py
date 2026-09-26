@@ -270,7 +270,7 @@ def is_repost_channel(db: Session, up_mid: str | int | None) -> bool:
 
 def get_origin(db: Session, *, bvid: str, up_mid: str | int | None) -> OriginOut | None:
     """返回解析结果页要用的出处；不是白名单账号的视频时返回 None（前端不渲染）。"""
-    if not is_repost_channel(db, up_mid):
+    if not is_repost_channel(db, up_mid) and not _in_ledger(db, bvid, up_mid):
         return None
 
     row = db.query(VideoSource).filter(VideoSource.bvid == bvid).first()
@@ -288,6 +288,22 @@ def get_origin(db: Session, *, bvid: str, up_mid: str | int | None) -> OriginOut
         author_name=row.author_name,
         author_handle=effective_handle(row),
         author_url=row.author_url,
+    )
+
+
+def _in_ledger(db: Session, bvid: str, up_mid: str | int | None) -> bool:
+    """老卡片建卡时还没存 UP主 mid，只有这套兜底能判断归属。
+
+    台账（video_source）里只有「帅哥录屏」自己的稿件，所以"这条 bvid 在台账里"
+    就等价于"这是白名单账号的视频"。仅在 up_mid 缺失时启用，不会覆盖正常判断。
+    """
+    if str(up_mid or "").strip():
+        return False
+    return (
+        db.query(VideoSource.id)
+        .filter(VideoSource.bvid == bvid)
+        .first()
+        is not None
     )
 
 
