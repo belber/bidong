@@ -185,11 +185,11 @@ def test_ui_config(admin_client):
     token = _login(admin_client).json()["token"]
     resp = admin_client.put(
         "/api/admin/config/ui",
-        json={"robot_guide": False, "share": False},
+        json={"robot_guide": False, "share": False, "at_reply": False},
         headers=_auth(token),
     )
     assert resp.status_code == 200
-    assert resp.json() == {"robot_guide": False, "share": False}
+    assert resp.json() == {"robot_guide": False, "share": False, "at_reply": False}
 
 
 def test_cookie_status_and_update(admin_client):

@@ -732,6 +732,7 @@ def set_parse_features(
 class UiPayload(BaseModel):
     robot_guide: bool | None = None
     share: bool | None = None
+    at_reply: bool | None = None
 
 
 @router.get("/config/ui")
@@ -742,6 +743,7 @@ def get_ui(
     return {
         "robot_guide": config_store.robot_guide_enabled(db),
         "share": config_store.share_enabled(db),
+        "at_reply": config_store.at_reply_enabled(db),
     }
 
 
@@ -755,9 +757,12 @@ def set_ui(
         config_store.set_robot_guide_enabled(db, payload.robot_guide)
     if payload.share is not None:
         config_store.set_share_enabled(db, payload.share)
+    if payload.at_reply is not None:
+        config_store.set_at_reply_enabled(db, payload.at_reply)
     return {
         "robot_guide": config_store.robot_guide_enabled(db),
         "share": config_store.share_enabled(db),
+        "at_reply": config_store.at_reply_enabled(db),
     }
 
 

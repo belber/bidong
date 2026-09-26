@@ -494,6 +494,7 @@ const renderers = {
         <h3>展示开关</h3>
         ${mk("robot_guide", "@壁咚咚私藏 引导", "首页是否展示「方式 2 · @壁咚咚私藏」引导（审核期可关闭）", u.robot_guide)}
         ${mk("share", "结果页分享按钮", "视频解析结果页是否展示「分享」按钮", u.share)}
+        ${mk("at_reply", "@ 自动回复", "有人 @ 机器人时回私信：未关注→引导关注，已关注未绑定→重发激活码，已绑定→收藏确认。出现风控就关掉", u.at_reply)}
         <button style="margin-top:12px" onclick="saveFeatures()">保存</button>
       </div>`;
   },
@@ -853,6 +854,12 @@ const renderers = {
 
 function resultTag(r) {
   if (r === "collected") return '<span class="tag ok">已收藏</span>';
+  if (r === "replied_collected") return '<span class="tag ok">已收藏·已回复</span>';
+  if (r === "replied_code") return '<span class="tag ok">已回复激活码</span>';
+  if (r === "replied_follow") return '<span class="tag ok">已回复关注引导</span>';
+  if (r === "unbound_quiet") return '<span class="tag muted">未绑定·24h内不重复</span>';
+  if (r === "collected_quiet") return '<span class="tag muted">已收藏·回复达上限</span>';
+  if (r === "reply_failed") return '<span class="tag bad">回复失败</span>';
   if (r === "parse_failed") return '<span class="tag bad">解析失败</span>';
   if (r === "unbound") return '<span class="tag muted">未绑定</span>';
   if (r === "error") return '<span class="tag bad">异常</span>';
@@ -1058,7 +1065,8 @@ async function saveFeatures() {
   };
   const uiBody = {
     robot_guide: document.getElementById("feat-robot_guide").checked,
-    share: document.getElementById("feat-share").checked
+    share: document.getElementById("feat-share").checked,
+    at_reply: document.getElementById("feat-at_reply").checked
   };
   try {
     await api("/config/features", { method: "PUT", body: JSON.stringify(mediaBody) });
@@ -1076,6 +1084,7 @@ async function saveFeatures() {
     document.getElementById("feat-danmaku").checked = !!p.danmaku;
     document.getElementById("feat-robot_guide").checked = !!u.robot_guide;
     document.getElementById("feat-share").checked = !!u.share;
+    document.getElementById("feat-at_reply").checked = !!u.at_reply;
     showModal("保存成功", "功能开关已保存并生效。", false);
   } catch (e) { showModal("保存失败", e.message, true); }
 }

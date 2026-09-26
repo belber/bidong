@@ -180,6 +180,15 @@ def set_share_enabled(db: Session, enabled: bool) -> None:
     set_raw(db, "enable_share", str(enabled))
 
 
+def at_reply_enabled(db: Session) -> bool:
+    """@ 未绑定/收藏成功后自动回私信的总开关（风控一响就关）。"""
+    return bool(get_bool(db, "enable_at_reply", default=True))
+
+
+def set_at_reply_enabled(db: Session, enabled: bool) -> None:
+    set_raw(db, "enable_at_reply", str(bool(enabled)))
+
+
 # ---------------------------------------------------------------------------
 # 业务读取：机器人 Cookie
 # ---------------------------------------------------------------------------

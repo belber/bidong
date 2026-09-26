@@ -8,6 +8,7 @@ from ..config import settings
 from ..db import Base, SessionLocal, engine
 from ..errors import AppError
 from ..models import Binding, RobotCursor, User
+from ..models import AtEvent
 from ..services import config_store, tracking
 from ..services.activation import issue_activation
 from ..services.bilibili_robot import BiliRobotClient
@@ -40,6 +41,28 @@ def already_bound_message() -> str:
         "你已经绑定过「壁咚咚藏链阁」啦，无需重复绑定。\n"
         "打开「壁咚咚藏链阁」小程序，即可查看收藏的视频。"
     )
+
+
+def follow_guide_message() -> str:
+    """没关注就 @ 我们的人：引导关注，不发码（关注才给码）。"""
+    return (
+        "想让我自动帮你收藏视频？先关注我 ✨\n"
+        "关注后我会自动私信你激活码，去「壁咚咚藏链阁」小程序「我的 → 绑定」粘贴即可。"
+    )
+
+
+def collected_message(title: str) -> str:
+    """已绑定用户 @ 收藏成功后的确认（带标题，他才知道收藏的是哪条）。"""
+    name = title or "这条视频"
+    return f"「{name}」已收藏到「壁咚咚藏链阁」✅ 打开小程序就能看到"
+
+
+# 已经回复过的结果，用于 24 小时频控（同一个人不重复骚扰）
+AT_REPLY_RESULTS = ("replied_code", "replied_follow")
+AT_REPLY_COOLDOWN_HOURS = 24
+# 收藏确认是"每次 @ 都有信息量"，所以按次数限流而不是完全静默
+COLLECTED_REPLY_RESULT = "replied_collected"
+COLLECTED_REPLY_LIMIT = 3
 
 
 def get_cursor(db: Session, kind: str) -> RobotCursor:
@@ -170,7 +193,7 @@ def process_at(
             .first()
         )
         if binding is None:
-            _record_at(db, feed_id, it, "unbound")
+            _reply_unbound(db, client, it, mid)
             continue
         user = db.get(User, binding.user_id)
         if user is None:
@@ -198,7 +221,16 @@ def process_at(
             title = ""
             if isinstance(res, tuple) and res:
                 title = getattr(res[0], "title", "") or ""
-            _record_at(db, feed_id, it, "collected", video_title=title)
+            # 一条 @ 只落一行：收藏结果和"有没有回私信"合并成同一行的结果
+            reply_result, reply_reason = _reply_collected(db, client, it, mid, title)
+            _record_at(
+                db,
+                feed_id,
+                it,
+                reply_result,
+                reply_reason,
+                video_title=title,
+            )
             tracking.log_parse(
                 db,
                 source="robot",
@@ -214,6 +246,92 @@ def process_at(
 
     last_id, last_time = _max_cursor(items)
     update_cursor(db, "at", last_id, last_time)
+
+
+def _reply_collected(
+    db: Session, client: BiliRobotClient, it: dict, mid: str, title: str
+) -> tuple[str, str]:
+    """已绑定用户收藏成功后的确认私信。
+
+    不回复会让用户不确定成功没成功，于是再 @ 几条试探——重复 @ 反而制造更多互动量。
+    但同样要限流：同一 UID 24 小时内最多回 COLLECTED_REPLY_LIMIT 条。
+
+    返回 (记录用的结果, 失败原因)——一条 @ 只对应 at_event 里一行，
+    所以回复结果并进这一行，而不是另写一行。
+    """
+    if not config_store.at_reply_enabled(db):
+        return "collected", ""
+
+    since = utcnow_naive() - timedelta(hours=AT_REPLY_COOLDOWN_HOURS)
+    sent_recently = (
+        db.query(AtEvent.id)
+        .filter(
+            AtEvent.bili_uid == mid,
+            AtEvent.created_at >= since,
+            AtEvent.result == COLLECTED_REPLY_RESULT,
+        )
+        .count()
+    )
+    if sent_recently >= COLLECTED_REPLY_LIMIT:
+        return "collected_quiet", "24h 内已回复 3 条"
+
+    try:
+        client.send_msg(mid, collected_message(title))
+    except AppError as exc:
+        reason = tracking.classify_send_error(exc)
+        log(f"回复已绑定用户 {mid} 收藏确认失败：{reason}")
+        return "reply_failed", reason
+    log(f"已回复已绑定用户 {mid}（收藏确认）")
+    if settings.robot_send_interval_seconds > 0:
+        time.sleep(settings.robot_send_interval_seconds)
+    return COLLECTED_REPLY_RESULT, ""
+
+
+def _reply_unbound(db: Session, client: BiliRobotClient, it: dict, mid: str) -> None:
+    """未绑定的人 @ 了我们：引导关注 / 重发激活码。
+
+    两种人分开对待：
+    - 有 binding 行 = 关注过（关注时就会建行）→ 重发同一个激活码（多半是私信漏看了）；
+    - 没有 binding 行 = 没关注过 → 引导关注，不发码（关注才是给码的回报）。
+
+    带总开关与 24 小时频控：有人连 @ 十条不能回十条私信，那是刷屏也是风控高危动作。
+    """
+    feed_id = str(it.get("id") or "")
+    if not config_store.at_reply_enabled(db):
+        _record_at(db, feed_id, it, "unbound")
+        return
+
+    since = utcnow_naive() - timedelta(hours=AT_REPLY_COOLDOWN_HOURS)
+    replied_recently = (
+        db.query(AtEvent.id)
+        .filter(
+            AtEvent.bili_uid == mid,
+            AtEvent.created_at >= since,
+            AtEvent.result.in_(AT_REPLY_RESULTS),
+        )
+        .first()
+    )
+    if replied_recently is not None:
+        _record_at(db, feed_id, it, "unbound_quiet")
+        return
+
+    followed = db.query(Binding).filter(Binding.bili_uid == mid).first()
+    if followed is None:
+        text, result = follow_guide_message(), "replied_follow"
+    else:
+        text, result = activation_message(followed.activation_code), "replied_code"
+
+    try:
+        client.send_msg(mid, text)
+    except AppError as exc:
+        reason = tracking.classify_send_error(exc)
+        log(f"回复 @ 未绑定用户 {mid} 失败：{reason}")
+        _record_at(db, feed_id, it, "reply_failed", reason)
+    else:
+        _record_at(db, feed_id, it, result)
+        log(f"已回复 @ 未绑定用户 {mid}（{result}）")
+        if settings.robot_send_interval_seconds > 0:
+            time.sleep(settings.robot_send_interval_seconds)
 
 
 def _at_exists(db: Session, feed_id: str) -> bool:
