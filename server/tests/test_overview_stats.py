@@ -1,244 +1,213 @@
-"""概览页的五个口径：访问 / 机器人 / 解析 / 下载 / 域名。"""
+"""概览页 / 运营日报共用的按天口径。"""
 
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import sessionmaker
 
-from app.models import BiliCdnDomain, DownloadEvent, FollowEvent, ParseLog, User
+from app.models import (
+    BiliCdnDomain,
+    Binding,
+    DownloadEvent,
+    FollowEvent,
+    ParseLog,
+    User,
+    VideoCard,
+    VisitEvent,
+)
 from app.services import overview_stats
-from app.time import utcnow_naive
+
+DAY = date(2026, 9, 18)
+AT = datetime(2026, 9, 18, 1, 0)  # 上海时间 09:00
+SH = timedelta(hours=8)
 
 
 def _db(db_engine):
-    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
-    return Session()
+    return sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)()
 
 
-def _parse_log(db, source, *, user_id=None, bili_uid=None, ok=True, count=1, days_ago=0):
-    for _ in range(count):
-        db.add(
-            ParseLog(
-                source=source,
-                user_id=user_id,
-                bili_uid=bili_uid,
-                ok=ok,
-                reason="" if ok else "network",
-                created_at=utcnow_naive() - timedelta(days=days_ago),
-            )
+def _seed(db):
+    user = User(openid="openid-1", created_at=AT)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    db.add(VisitEvent(user_id=user.id, path="home", created_at=AT))
+    db.add(VisitEvent(user_id=user.id, path="home", created_at=AT))
+    # 前一天的数据不该进这一天的快照
+    db.add(VisitEvent(user_id=user.id, path="home", created_at=AT - timedelta(days=1)))
+
+    db.add(FollowEvent(bili_uid="111", bili_name="A", mtime=1, sent_code=True, created_at=AT))
+    db.add(FollowEvent(bili_uid="111", bili_name="A", mtime=2, created_at=AT))
+    db.add(FollowEvent(bili_uid="222", bili_name="B", mtime=3, created_at=AT - timedelta(days=3)))
+    db.add(Binding(bili_uid="111", activation_code="C1", bound_at=AT, created_at=AT))
+
+    db.add(ParseLog(source="local", user_id=user.id, ok=True, created_at=AT))
+    db.add(
+        ParseLog(
+            source="local", user_id=user.id, ok=False, reason="network", created_at=AT
         )
+    )
+    db.add(ParseLog(source="robot", bili_uid="111", ok=True, created_at=AT))
+    db.add(ParseLog(source="local", user_id=user.id, ok=True, created_at=AT - timedelta(days=1)))
+
+    db.add(
+        VideoCard(
+            user_id=user.id, bvid="BV1xx411c7mD", title="t", cover_url="", up_name="u",
+            partition="", desc="", source_url="", source="local",
+            collected_at=AT, month="2026-09",
+        )
+    )
     db.commit()
+    return user
 
 
-def test_parse_users_counts_distinct_users(db_engine):
-    db = _db(db_engine)
-    # 同一个用户解析 3 次只算 1 个人
-    _parse_log(db, "local", user_id=1, count=3)
-    _parse_log(db, "local", user_id=2, count=1)
-    # 机器人链路没有小程序用户，按 B站 UID 去重
-    _parse_log(db, "robot", bili_uid="111", count=2)
-    _parse_log(db, "robot", bili_uid="222", count=1)
-    _parse_log(db, "robot", bili_uid="", count=1)  # 空 UID 不算人
-    _parse_log(db, "local", user_id=1, ok=False, count=1)
-
-    result = overview_stats.parse_users(db)
-    assert result["local_users"] == 2
-    assert result["robot_users"] == 2
-    assert result["local_ok"] == 4
-    assert result["local_fail"] == 1
-    assert result["robot_ok"] == 4
-    db.close()
-
-
-def test_parse_users_splits_today(db_engine):
-    """解析面板只看今天：今天多少条、成功失败怎么分、失败原因是什么。"""
-    db = _db(db_engine)
-    _parse_log(db, "local", user_id=1, count=2)               # 今天成功
-    _parse_log(db, "local", user_id=2, ok=False, count=1)     # 今天失败
-    _parse_log(db, "robot", bili_uid="111", count=1)          # 今天成功
-    _parse_log(db, "local", user_id=3, count=5, days_ago=3)   # 3 天前，不该算今天
-    db.commit()
-
-    result = overview_stats.parse_users(db)
-    assert result["today_total"] == 4
-    assert result["today_ok"] == 3
-    assert result["today_fail"] == 1
-    assert result["today_local_total"] == 3
-    assert result["today_robot_total"] == 1
-    assert result["local_users_today"] == 2
-    assert result["robot_users_today"] == 1
-    assert result["today_fail_by_reason"] == [{"reason": "network", "count": 1}]
-    db.close()
-
-
-def _event(db, *, session_id, stage, status, bvid="BV1", kind="watermarked", user_id=1,
-           error_type="", host="h.example", days_ago=0):
+def _event(db, *, user_id, kind, session_id, stage, status, error_type="", host="h.example",
+           at=None):
     db.add(
         DownloadEvent(
-            user_id=user_id,
-            bvid=bvid,
-            session_id=session_id,
-            kind=kind,
-            stage=stage,
-            status=status,
-            error_type=error_type,
-            host=host,
-            created_at=utcnow_naive() - timedelta(days=days_ago),
+            user_id=user_id, bvid="BV1xx411c7mD", kind=kind, session_id=session_id,
+            stage=stage, status=status, error_type=error_type, host=host,
+            created_at=at or AT,
         )
     )
 
 
-def test_download_outcomes_counts_copied_link_as_success(db_engine):
+def _seed_downloads(db, user_id):
+    # 视频：一次保存成功
+    _event(db, user_id=user_id, kind="watermarked", session_id="v1", stage="resolve", status="success")
+    _event(db, user_id=user_id, kind="watermarked", session_id="v1", stage="save", status="success")
+    # 视频：下载失败后改用复制链接 → 算成功
+    _event(db, user_id=user_id, kind="watermarked", session_id="v2", stage="resolve", status="success")
+    _event(db, user_id=user_id, kind="watermarked", session_id="v2", stage="download", status="fail",
+           error_type="domain_not_registered")
+    _event(db, user_id=user_id, kind="watermarked", session_id="v2", stage="fallback", status="copy_link")
+    # 视频：彻底失败
+    _event(db, user_id=user_id, kind="watermarked", session_id="v3", stage="resolve", status="success")
+    _event(db, user_id=user_id, kind="watermarked", session_id="v3", stage="download", status="fail",
+           error_type="expired")
+    # 音频：成功一次
+    _event(db, user_id=user_id, kind="audio", session_id="a1", stage="download", status="success")
+    # 字幕：失败一次
+    _event(db, user_id=user_id, kind="subtitle", session_id="s1", stage="download", status="fail",
+           error_type="wx_error")
+    # 前一天：不该算进来
+    _event(db, user_id=user_id, kind="watermarked", session_id="old", stage="save", status="success",
+           at=AT - timedelta(days=1))
+    db.commit()
+
+
+def test_visit_section(db_engine):
     db = _db(db_engine)
-    db.add(User(id=1, openid="u1"))
-    db.add(User(id=2, openid="u2"))
-    db.commit()
-
-    # A：正常保存成功
-    _event(db, session_id="a", stage="resolve", status="success")
-    _event(db, session_id="a", stage="download", status="success")
-    _event(db, session_id="a", stage="save", status="success")
-    # B：下载失败，用户改用复制链接兜底 —— 按成功算
-    _event(db, session_id="b", stage="resolve", status="success")
-    _event(db, session_id="b", stage="download", status="fail", error_type="domain_not_registered")
-    _event(db, session_id="b", stage="fallback", status="copy_link")
-    # C：彻底失败
-    _event(db, session_id="c", stage="resolve", status="success")
-    _event(db, session_id="c", stage="download", status="fail", error_type="expired")
-    db.commit()
-
-    result = overview_stats.download_outcomes(db)
-    assert result["total"] == 3
-    assert result["saved"] == 1
-    assert result["copied"] == 1
-    assert result["fail"] == 1
-    assert result["success"] == 2
-    assert result["success_rate"] == 66.7
-    # 成功原因不该出现在失败原因里
-    assert result["fail_by_error"] == [{"error_type": "expired", "count": 1}]
+    _seed(db)
+    snapshot = overview_stats.day_snapshot(db, DAY)
+    visit = snapshot["visit"]
+    assert visit["uv"] == 1
+    assert visit["pv"] == 2
+    assert visit["new_users"] == 1
+    assert visit["total_uv"] == 1
+    assert visit["target"] == 500
+    assert visit["remaining"] == 499
     db.close()
 
 
-def test_domain_summary(db_engine):
+def test_bot_section_counts_distinct_followers(db_engine):
     db = _db(db_engine)
-    db.add(BiliCdnDomain(host="a.example", is_configured=True, seen_count=10))
-    db.add(BiliCdnDomain(host="b.example", is_configured=False, seen_count=3))
-    db.add(BiliCdnDomain(host="c.example", is_configured=False, seen_count=2))
-    db.commit()
-
-    result = overview_stats.domain_summary(db)
-    assert result["total"] == 3
-    assert result["configured"] == 1
-    assert result["unconfigured"] == 2
-    assert result["hits"] == 15
-    assert {h["host"] for h in result["recent_unconfigured"]} == {"b.example", "c.example"}
+    _seed(db)
+    bot = overview_stats.day_snapshot(db, DAY)["bot"]
+    assert bot["new_follows"] == 1          # 同一个人两条关注事件只算一次
+    assert bot["followers_total"] == 2      # 累计含 3 天前那个
+    assert bot["bound"] == 1
+    assert bot["conversion"] == 50.0
+    assert bot["sent_ok"] == 1
     db.close()
 
 
-def test_download_outcomes_splits_today(db_engine):
-    """今日下载单独看一份，不然当天有没有人在下载只能靠眼力从累计里抠。"""
+def test_parse_section(db_engine):
     db = _db(db_engine)
-    db.add(User(id=1, openid="u1"))
-    db.commit()
-
-    # 今天：一次保存成功
-    _event(db, session_id="a", stage="resolve", status="success")
-    _event(db, session_id="a", stage="save", status="success")
-    # 今天：一次彻底失败
-    _event(db, session_id="b", stage="resolve", status="success")
-    _event(db, session_id="b", stage="download", status="fail", error_type="wx_error")
-    # 3 天前：成功，但不该算进"今日"
-    _event(db, session_id="c", stage="resolve", status="success", days_ago=3)
-    _event(db, session_id="c", stage="save", status="success", days_ago=3)
-    db.commit()
-
-    result = overview_stats.download_outcomes(db)
-    assert result["total"] == 3
-    assert result["saved"] == 2
-    assert result["fail"] == 1
-    assert result["today_total"] == 2
-    assert result["today_saved"] == 1
-    assert result["today_copied"] == 0
-    assert result["today_fail"] == 1
-    assert result["today_fail_by_error"] == [{"error_type": "wx_error", "count": 1}]
+    _seed(db)
+    parse = overview_stats.day_snapshot(db, DAY)["parse"]
+    assert parse["total"] == 3
+    assert parse["ok"] == 2
+    assert parse["fail"] == 1
+    assert parse["fail_by_reason"] == [{"reason": "network", "count": 1}]
+    assert parse["local_total"] == 2
+    assert parse["robot_total"] == 1
+    assert parse["local_users"] == 1
+    assert parse["robot_users"] == 1
+    assert parse["new_cards"] == 1
     db.close()
 
 
-def test_domain_summary_counts_new_unconfigured_today(db_engine):
+def test_download_section_separates_video_from_exports(db_engine):
     db = _db(db_engine)
-    db.add(
-        BiliCdnDomain(
-            host="old.example",
-            is_configured=False,
-            seen_count=1,
-            first_seen_at=utcnow_naive() - timedelta(days=5),
-            last_seen_at=utcnow_naive() - timedelta(days=5),
-        )
-    )
-    db.add(
-        BiliCdnDomain(
-            host="new.example", is_configured=False, seen_count=1,
-            first_seen_at=utcnow_naive(),
-        )
-    )
-    db.add(
-        BiliCdnDomain(
-            host="ok.example", is_configured=True, seen_count=2,
-            first_seen_at=utcnow_naive(),
-        )
-    )
-    db.commit()
+    user = _seed(db)
+    _seed_downloads(db, user.id)
+    snapshot = overview_stats.day_snapshot(db, DAY)
 
-    result = overview_stats.domain_summary(db)
-    # 已配置的新域名不算"需要处理的新增"
-    assert result["new_unconfigured_today"] == 1
-    assert [h["host"] for h in result["new_unconfigured_today_hosts"]] == ["new.example"]
-    assert result["unconfigured"] == 2
-    # 今天下载实际命中过 2 个域名（old.example 是 5 天前的）
-    assert result["seen_today"] == 2
+    download = snapshot["download"]
+    assert download["total"] == 3           # 只算视频，音频/字幕另有归属
+    assert download["saved"] == 1
+    assert download["copied"] == 1
+    assert download["success"] == 2
+    assert download["fail"] == 1
+    assert download["success_rate"] == 66.7
+    assert download["fail_by_error"] == [{"error_type": "expired", "count": 1}]
+
+    exports = snapshot["exports"]
+    assert exports["audio"] == {"total": 1, "users": 1, "success": 1, "fail": 0}
+    assert exports["subtitle"] == {"total": 1, "users": 1, "success": 0, "fail": 1}
+    # 没人用的项也要在，前端才能显示 0
+    assert exports["comment"] == {"total": 0, "users": 0, "success": 0, "fail": 0}
+    assert exports["danmaku"] == {"total": 0, "users": 0, "success": 0, "fail": 0}
     db.close()
 
 
-def test_bot_section_has_followers_and_bound(db_engine):
+def test_domains_section(db_engine):
     db = _db(db_engine)
-    db.add(FollowEvent(bili_uid="111", bili_name="A", mtime=1, sent_code=True))
-    db.add(FollowEvent(bili_uid="222", bili_name="B", mtime=2, sent_code=True))
+    db.add(BiliCdnDomain(host="ok.example", is_configured=True, seen_count=10,
+                         first_seen_at=AT, last_seen_at=AT))
+    db.add(BiliCdnDomain(host="new.example", is_configured=False, seen_count=3,
+                         first_seen_at=AT, last_seen_at=AT))
+    db.add(BiliCdnDomain(host="old.example", is_configured=False, seen_count=2,
+                         first_seen_at=AT - timedelta(days=5),
+                         last_seen_at=AT - timedelta(days=5)))
     db.commit()
 
-    from app.models import Binding
-    from app.time import utcnow_naive
-
-    db.add(Binding(bili_uid="111", activation_code="CODE1", bound_at=utcnow_naive()))
-    db.commit()
-
-    section = overview_stats.bot_section(db)
-    assert section["followers_total"] == 2
-    assert section["bound"] == 1
-    assert section["conversion"] == 50.0
+    domains = overview_stats.day_snapshot(db, DAY)["domains"]
+    assert domains["total"] == 3
+    assert domains["configured"] == 1
+    assert domains["unconfigured"] == 2
+    assert domains["hits"] == 15
+    assert domains["seen"] == 2            # 这一天命中过 2 个
+    assert [d["host"] for d in domains["new_unconfigured"]] == ["new.example"]
     db.close()
 
 
-def test_overview_api_exposes_five_sections(admin_client):
+def test_snapshot_is_scoped_to_the_given_day(db_engine):
+    """昨天的数据不该出现在今天的快照里（日报统计的是已收口的那一天）。"""
+    db = _db(db_engine)
+    user = _seed(db)
+    _seed_downloads(db, user.id)
+    yesterday = overview_stats.day_snapshot(db, DAY - timedelta(days=1))
+    assert yesterday["visit"]["pv"] == 1
+    assert yesterday["parse"]["total"] == 1
+    assert yesterday["download"]["total"] == 1
+    assert yesterday["exports"]["audio"]["total"] == 0
+    db.close()
+
+
+def test_overview_api_exposes_all_sections(admin_client):
     login = admin_client.post("/api/admin/login", json={"password": "admin-dev-password"})
-    token = login.json()["token"]
     resp = admin_client.get(
         "/api/admin/stats/overview?days=30",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {login.json()['token']}"},
     )
     assert resp.status_code == 200
     data = resp.json()
-    for key in ("visit", "bot", "parse", "download", "domains", "cookie"):
-        assert key in data, f"缺少 {key}"
-    # 旧字段保留，避免既有页面/测试被这次改动带崩
+    for key in ("visit", "bot", "parse", "download", "exports", "domains", "cookie"):
+        assert key in data, key
+    # 旧字段保留，避免既有页面被这次改动带崩
     for key in ("followers", "at", "activation", "local_parse", "robot_parse"):
         assert key in data
-    assert "today_uv" in data["visit"]
-    assert "total_uv" in data["visit"]
-    assert data["visit"]["target"] == 500
-    assert "local_users" in data["parse"]
-    assert "copied" in data["download"]
-    assert "today_total" in data["download"]
-    assert "unconfigured" in data["domains"]
-    assert "new_unconfigured_today" in data["domains"]
-    # 访问趋势给底部图表用
     assert data["visit"]["trend"]
-    assert "uv" in data["visit"]["trend"][0]
+    assert set(data["exports"]) == {"audio", "comment", "danmaku", "subtitle"}

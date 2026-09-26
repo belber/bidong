@@ -216,30 +216,39 @@ const renderers = {
     const bot = d.bot || {};
     const parse = d.parse || {};
     const dl = d.download || {};
+    const ex = d.exports || {};
     const domains = d.domains || {};
 
     // 需要动一下手的事放最上面，其余只看数字
     const alerts = [];
-    const hostsToday = (domains.new_unconfigured_today_hosts || []).map(h => esc(h.host)).join("、");
+    const hostsToday = (domains.new_unconfigured || []).map(h => esc(h.host)).join("、");
     alerts.push(cookie.cookie_valid === false
       ? `<div class="alert">⚠ 机器人 Cookie 已失效（${esc(cookie.cookie_last_error || "")}）—— 私信发码和评论 @ 监听都会停</div>`
       : `<div class="alert ok">◎ 机器人 Cookie 正常（最近检查 ${esc(cookie.cookie_last_checked || "—")}）</div>`);
     if (domains.unconfigured) {
       const hosts = (domains.recent_unconfigured || []).map(h => esc(h.host)).join("、");
-      const newToday = domains.new_unconfigured_today || 0;
+      const newToday = (domains.new_unconfigured || []).length;
       alerts.push(`<div class="alert">⚠ ${fmt(domains.unconfigured)} 个下载域名还没配置到微信后台，用户会下载失败`
         + `${newToday ? `，其中 <b>${fmt(newToday)} 个是今天新出现的</b>${hostsToday ? `（${hostsToday}）` : ""}` : ""}`
         + `${hosts ? `（最近出现：${hosts}）` : ""} · <a href="javascript:void(0)" onclick="show('cdn')">去处理</a></div>`);
     }
 
-    const parseFailReasons = (parse.today_fail_by_reason || []).slice(0, 3)
+    const parseFailReasons = (parse.fail_by_reason || []).slice(0, 3)
       .map(x => `${esc(x.reason || "其他")} ${fmt(x.count)}`).join(" · ");
-    const todayFailReasons = (dl.today_fail_by_error || []).slice(0, 3)
+    const todayFailReasons = (dl.fail_by_error || []).slice(0, 3)
       .map(x => `${esc(errorLabel(x.error_type))} ${fmt(x.count)}`).join(" · ");
-    const todaySuccess = (dl.today_saved || 0) + (dl.today_copied || 0);
-    const todayRate = dl.today_total
-      ? Math.round(todaySuccess / dl.today_total * 1000) / 10
-      : 0;
+    const exportLabels = { audio: "音频", comment: "评论", danmaku: "弹幕", subtitle: "字幕" };
+    const exportRows = Object.keys(exportLabels).map(kind => {
+      const item = ex[kind] || { total: 0, users: 0, success: 0, fail: 0 };
+      return `<tr>
+        <td>${exportLabels[kind]}</td>
+        <td>${item.total ? fmt(item.total) : '<span class="muted">0</span>'}</td>
+        <td>${item.users ? fmt(item.users) : '<span class="muted">0</span>'}</td>
+        <td>${item.success ? `<span class="ok">${fmt(item.success)}</span>` : '<span class="muted">0</span>'}</td>
+        <td>${item.fail ? `<span class="bad">${fmt(item.fail)}</span>` : '<span class="muted">0</span>'}</td>
+      </tr>`;
+    }).join("");
+    const usedExports = Object.keys(exportLabels).filter(k => (ex[k] || {}).total);
 
     el.innerHTML = `
       ${alerts.join("")}
@@ -248,9 +257,10 @@ const renderers = {
         <h3>访问情况</h3>
         <p class="note">用户访问小程序（每人每天最多上报一次，等于"访问过的微信用户数"）</p>
         <div class="metric-row">
-          <div class="metric"><b class="blue">${fmt(visit.today_uv)}</b><span>人今日访问</span></div>
+          <div class="metric"><b class="blue">${fmt(visit.uv)}</b><span>人今日访问（上报 ${fmt(visit.pv)} 次）</span></div>
           <div class="metric"><b>${fmt(visit.total_uv)}</b><span>人累计访问</span></div>
-          <div class="metric"><b>${fmt(visit.progress)}%</b><span>500 访客目标（还差 ${fmt(Math.max((visit.target || 0) - (visit.total_uv || 0), 0))} 人）</span></div>
+          <div class="metric"><b>${fmt(visit.progress)}%</b><span>${fmt(visit.target)} 访客目标（还差 ${fmt(visit.remaining)} 人）</span></div>
+          <div class="metric"><b>${fmt(visit.total_users)}</b><span>累计注册用户（今日 +${fmt(visit.new_users)}）</span></div>
         </div>
       </div>
 
@@ -258,20 +268,22 @@ const renderers = {
         <h3>机器人关注与绑定 <span class="tag muted">@壁咚咚私藏</span></h3>
         <p class="note">粉丝关注机器人 → 机器人私信激活码 → 小程序粘贴绑定</p>
         <div class="metric-row">
-          <div class="metric"><b class="blue">${fmt(bot.followers_today)}</b><span>今日新增关注</span></div>
+          <div class="metric"><b class="blue">${fmt(bot.new_follows)}</b><span>今日新增关注</span></div>
           <div class="metric"><b>${fmt(bot.followers_total)}</b><span>关注总数</span></div>
           <div class="metric"><b class="ok">${fmt(bot.bound)}</b><span>已绑定</span></div>
           <div class="metric"><b>${fmt(bot.conversion)}%</b><span>关注→绑定转化</span></div>
         </div>
+        <p class="note" style="margin:10px 0 0">今日发码成功 ${fmt(bot.sent_ok)} 条</p>
       </div>
 
       <div class="panel">
         <h3>视频解析 <span class="tag muted">只看今天</span></h3>
         <p class="note">今天的解析次数；括号里是去重人数（贴链接按小程序用户、评论 @ 按 B站 UID）</p>
         <div class="metric-row">
-          <div class="metric"><b class="blue">${fmt(parse.today_total)}</b><span>今日解析次数（成功 ${fmt(parse.today_ok)} · 失败 ${fmt(parse.today_fail)}）</span></div>
-          <div class="metric"><b>${fmt(parse.today_local_total)}</b><span>贴链接触发（${fmt(parse.local_users_today)} 人）</span></div>
-          <div class="metric"><b>${fmt(parse.today_robot_total)}</b><span>评论 @ 触发（${fmt(parse.robot_users_today)} 人）</span></div>
+          <div class="metric"><b class="blue">${fmt(parse.total)}</b><span>今日解析次数（成功 ${fmt(parse.ok)} · 失败 ${fmt(parse.fail)}）</span></div>
+          <div class="metric"><b>${fmt(parse.local_total)}</b><span>贴链接触发（${fmt(parse.local_users)} 人）</span></div>
+          <div class="metric"><b>${fmt(parse.robot_total)}</b><span>评论 @ 触发（${fmt(parse.robot_users)} 人）</span></div>
+          <div class="metric"><b>${fmt(parse.new_cards)}</b><span>新增收藏卡片</span></div>
         </div>
         <p class="note" style="margin:10px 0 0">失败原因：${parseFailReasons || "无"}</p>
       </div>
@@ -280,20 +292,30 @@ const renderers = {
         <h3>视频下载 <span class="tag muted">只看今天</span></h3>
         <p class="note">今天的下载；用户改用"复制链接到浏览器保存"也算成功</p>
         <div class="metric-row">
-          <div class="metric"><b class="blue">${fmt(dl.today_total)}</b><span>今日下载次数</span></div>
-          <div class="metric"><b class="ok">${fmt((dl.today_saved || 0) + (dl.today_copied || 0))}</b><span>成功（保存 ${fmt(dl.today_saved)} + 复制链接 ${fmt(dl.today_copied)}）</span></div>
-          <div class="metric"><b class="bad">${fmt(dl.today_fail)}</b><span>失败</span></div>
-          <div class="metric"><b>${fmt(todayRate)}%</b><span>成功率</span></div>
+          <div class="metric"><b class="blue">${fmt(dl.total)}</b><span>今日下载次数</span></div>
+          <div class="metric"><b class="ok">${fmt(dl.success)}</b><span>成功（保存 ${fmt(dl.saved)} + 复制链接 ${fmt(dl.copied)}）</span></div>
+          <div class="metric"><b class="bad">${fmt(dl.fail)}</b><span>失败</span></div>
+          <div class="metric"><b>${fmt(dl.success_rate)}%</b><span>成功率</span></div>
         </div>
         <p class="note" style="margin:10px 0 0">失败原因：${todayFailReasons || "无"}</p>
+      </div>
+
+      <div class="panel">
+        <h3>音频 / 评论 / 弹幕 / 字幕 <span class="tag muted">只看今天</span></h3>
+        <p class="note">这几项是"有没有人用"的观察口；一次导出算一次，人数按去重用户算</p>
+        <table>
+          <thead><tr><th>项目</th><th>今日次数</th><th>今日用户</th><th>成功</th><th>失败</th></tr></thead>
+          <tbody>${exportRows}</tbody>
+        </table>
+        <p class="note" style="margin:10px 0 0">${usedExports.length ? `今天有人用的是：${usedExports.map(k => exportLabels[k]).join("、")}` : "今天还没有人用这几项"}</p>
       </div>
 
       <div class="panel">
         <h3>B站 CDN 域名 <span class="tag muted">只看今天</span></h3>
         <p class="note">今天落地下载碰到过的域名；没配置到微信后台的域名，用户点下载会失败</p>
         <div class="metric-row">
-          <div class="metric"><b class="${domains.new_unconfigured_today ? 'bad' : 'ok'}">${fmt(domains.new_unconfigured_today)}</b><span>今日新增未配置${hostsToday ? `（${hostsToday}）` : ""}</span></div>
-          <div class="metric"><b>${fmt(domains.seen_today)}</b><span>今日命中域名</span></div>
+          <div class="metric"><b class="${(domains.new_unconfigured || []).length ? 'bad' : 'ok'}">${fmt((domains.new_unconfigured || []).length)}</b><span>今日新增未配置${hostsToday ? `（${hostsToday}）` : ""}</span></div>
+          <div class="metric"><b>${fmt(domains.seen)}</b><span>今日命中域名</span></div>
           <div class="metric"><b class="warn">${fmt(domains.unconfigured)}</b><span>当前未配置（待处理）</span></div>
         </div>
       </div>
@@ -768,7 +790,10 @@ function downloadRow(i) {
   const status = i.status === "success"
     ? '<span class="tag ok">成功</span>'
     : '<span class="tag bad">失败</span>';
-  const kindMap = { watermarked: "水印视频", clean: "无水印", audio: "音频" };
+  const kindMap = {
+    watermarked: "水印视频", clean: "无水印", audio: "音频",
+    comment: "评论", danmaku: "弹幕", subtitle: "字幕"
+  };
   const error = [i.error_type, i.error_message, i.wx_err_msg].filter(Boolean).join(" / ");
   let title = esc(i.video_title || "—");
   if (i.video_title && i.source_url) {

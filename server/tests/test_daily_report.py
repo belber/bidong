@@ -53,6 +53,7 @@ def _seed(db):
             user_id=user.id,
             bvid="BV1xx411c7mD",
             kind="watermarked",
+            session_id="v1",
             host="a.example.com",
             stage="resolve",
             status="success",
@@ -64,10 +65,45 @@ def _seed(db):
             user_id=user.id,
             bvid="BV1xx411c7mD",
             kind="watermarked",
+            session_id="v1",
             host="a.example.com",
-            stage="download",
+            stage="save",
             status="success",
             created_at=at,
+        )
+    )
+    # 视频：下载失败后改用复制链接 → 算成功
+    db.add(
+        DownloadEvent(
+            user_id=user.id, bvid="BV1xx411c7mD", kind="watermarked", session_id="v2",
+            stage="resolve", status="success", created_at=at,
+        )
+    )
+    db.add(
+        DownloadEvent(
+            user_id=user.id, bvid="BV1xx411c7mD", kind="watermarked", session_id="v2",
+            host="a.example.com", stage="download", status="fail",
+            error_type="domain_not_registered", created_at=at,
+        )
+    )
+    db.add(
+        DownloadEvent(
+            user_id=user.id, bvid="BV1xx411c7mD", kind="watermarked", session_id="v2",
+            stage="fallback", status="copy_link", created_at=at,
+        )
+    )
+    # 视频：彻底失败
+    db.add(
+        DownloadEvent(
+            user_id=user.id, bvid="BV1xx411c7mD", kind="watermarked", session_id="v3",
+            stage="resolve", status="success", created_at=at,
+        )
+    )
+    db.add(
+        DownloadEvent(
+            user_id=user.id, bvid="BV1xx411c7mD", kind="watermarked", session_id="v3",
+            host="c.example.com", stage="download", status="fail",
+            error_type="expired", created_at=at,
         )
     )
     db.add(
@@ -75,6 +111,7 @@ def _seed(db):
             user_id=user.id,
             bvid="BV1xx411c7mD",
             kind="comment",
+            session_id="c1",
             stage="download",
             status="success",
             created_at=at,
@@ -85,6 +122,7 @@ def _seed(db):
             user_id=user.id,
             bvid="BV1xx411c7mD",
             kind="danmaku",
+            session_id="d1",
             stage="download",
             status="fail",
             error_type="download_error",
@@ -96,19 +134,11 @@ def _seed(db):
             user_id=user.id,
             bvid="BV1xx411c7mD",
             kind="audio",
+            session_id="a1",
             host="b.example.com",
             stage="download",
             status="fail",
             error_type="domain_not_configured",
-            created_at=at,
-        )
-    )
-    db.add(
-        DownloadEvent(
-            user_id=user.id,
-            bvid="BV1xx411c7mD",
-            stage="fallback",
-            status="copy_link",
             created_at=at,
         )
     )
@@ -138,33 +168,39 @@ def test_build_report_counts_daily_metrics(db_engine):
     _seed(db)
     data = daily_report.build_report(db, date(2026, 9, 18))
 
-    assert data["users"]["new"] == 1
-    assert data["users"]["total"] == 1
-    assert data["users"]["uv"] == 1
-    assert data["users"]["pv"] == 3
+    # 口径与后台概览完全一致：同一份 day_snapshot
+    assert data["visit"]["new_users"] == 1
+    assert data["visit"]["total_users"] == 1
+    assert data["visit"]["uv"] == 1
+    assert data["visit"]["pv"] == 3
     assert data["parse"]["local_total"] == 2
-    assert data["parse"]["local_ok"] == 1
-    assert data["parse"]["local_fail"] == 1
-    assert data["parse"]["robot_ok"] == 1
+    assert data["parse"]["ok"] == 2
+    assert data["parse"]["fail"] == 1
+    assert data["parse"]["local_users"] == 1
+    assert data["parse"]["robot_users"] == 1
     assert data["parse"]["new_cards"] == 1
-    assert data["download"]["requests"] == 1
-    assert data["download"]["success"] == 1
+    # 视频下载按「一次下载」算：保存成功 / 复制链接兜底 / 彻底失败各 1 次
+    assert data["download"]["total"] == 3
+    assert data["download"]["saved"] == 1
+    assert data["download"]["copied"] == 1
+    assert data["download"]["success"] == 2
     assert data["download"]["fail"] == 1
-    assert data["download"]["success_rate"] == 50.0
-    assert data["download"]["fallback_copy"] == 1
-    assert data["download"]["fail_reasons"] == [("domain_not_configured", 1)]
-    assert data["download"]["by_kind"]["audio"]["users"] == 1
-    assert data["download"]["by_kind"]["audio"]["success_users"] == 0
-    assert data["download"]["by_kind"]["audio"]["fail_users"] == 1
-    assert data["download"]["by_kind"]["comment"]["users"] == 1
-    assert data["download"]["by_kind"]["comment"]["success_users"] == 1
-    assert data["download"]["by_kind"]["comment"]["fail_users"] == 0
-    assert data["download"]["by_kind"]["danmaku"]["fail_reasons"] == [("download_error", 1)]
-    assert data["robot"]["new_follows"] == 1
-    assert data["robot"]["activation_sent"] == 1
-    assert data["robot"]["bound"] == 1
-    assert data["domain"]["unconfigured_total"] == 1
-    assert data["domain"]["new_unconfigured"] == ["b.example.com"]
+    assert data["download"]["success_rate"] == 66.7
+    assert data["download"]["fail_by_error"] == [{"error_type": "expired", "count": 1}]
+    assert data["exports"]["audio"]["users"] == 1
+    assert data["exports"]["audio"]["success"] == 0
+    assert data["exports"]["audio"]["fail"] == 1
+    assert data["exports"]["comment"]["users"] == 1
+    assert data["exports"]["comment"]["success"] == 1
+    assert data["exports"]["danmaku"]["fail"] == 1
+    # 概览里也有字幕了（原来漏了）
+    assert "subtitle" in data["exports"]
+    assert data["exports"]["subtitle"]["total"] == 0
+    assert data["bot"]["new_follows"] == 1
+    assert data["bot"]["sent_ok"] == 1
+    assert data["bot"]["bound"] == 1
+    assert data["domains"]["unconfigured"] == 1
+    assert [d["host"] for d in data["domains"]["new_unconfigured"]] == ["b.example.com"]
     db.close()
 
 
@@ -173,13 +209,26 @@ def test_render_report_contains_sections(db_engine):
     _seed(db)
     text = daily_report.render_report(daily_report.build_report(db, date(2026, 9, 18)))
     assert "壁咚咚运营日报 2026-09-18" in text
-    assert "今日新增用户：1" in text
-    assert "下载成功率：50.0%" in text
-    assert "失败后复制链接：1" in text
-    assert "domain_not_configured：1" in text
-    assert "音频下载：1 人（失败 1 人）" in text
-    assert "评论下载：1 人（成功 1 人）" in text
-    assert "弹幕下载：1 人（失败 1 人）" in text
+    # 报告按概览的分区顺序组织
+    for section in (
+        "## 一、访问情况",
+        "## 二、机器人关注与绑定",
+        "## 三、视频解析",
+        "## 四、视频下载",
+        "## 五、音频 / 评论 / 弹幕 / 字幕",
+        "## 六、B站 CDN 域名",
+    ):
+        assert section in text, section
+    assert "当日访问用户：1 人（访问 3 次）" in text
+    assert "累计访问用户：1 / 500" in text
+    assert "当日下载：3 次" in text
+    assert "成功：2（保存 1 + 复制链接 1）" in text
+    assert "成功率：66.7%" in text
+    assert "失败原因：expired：1" in text
+    assert "音频：1 次 · 1 人（成功 0 / 失败 1）" in text
+    assert "评论：1 次 · 1 人（成功 1 / 失败 0）" in text
+    assert "弹幕：1 次 · 1 人（成功 0 / 失败 1）" in text
+    assert "- 字幕：0 次 · 0 人" in text
     db.close()
 
 
