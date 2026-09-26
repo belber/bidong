@@ -150,11 +150,18 @@ Page({
   onLoad(options) {
     this.loadUiConfig();
     const bvid = (options && options.bvid) || '';
+    const pending =
+      getApp().globalData.pendingResult || wx.getStorageSync('pending_result');
     if (bvid) {
-      this.loadByBvid(bvid);
+      // URL 自包含：先用刚解析出来的结果秒开，再按 bvid 拉一次最新（静默，不闪 loading）
+      const fresh = pending && pending.bvid === bvid;
+      if (fresh) {
+        this.applyResult(pending);
+      }
+      this.loadByBvid(bvid, { silent: fresh });
       return;
     }
-    this.applyResult(getApp().globalData.pendingResult || wx.getStorageSync('pending_result'));
+    this.applyResult(pending);
   },
 
   loadUiConfig() {
@@ -166,8 +173,11 @@ Page({
       .catch(() => {});
   },
 
-  loadByBvid(bvid) {
-    wx.showLoading({ title: '加载中' });
+  loadByBvid(bvid, opts) {
+    const silent = !!(opts && opts.silent);
+    if (!silent) {
+      wx.showLoading({ title: '加载中' });
+    }
     api.parse('https://www.bilibili.com/video/' + bvid)
       .then((card) => {
         wx.hideLoading();
@@ -177,7 +187,9 @@ Page({
       })
       .catch((err) => {
         wx.hideLoading();
-        toast(err.message || '加载失败');
+        if (!silent) {
+          toast(err.message || '加载失败');
+        }
       });
   },
 
@@ -212,6 +224,10 @@ Page({
       subtitles,
       subPreview: subtitles.slice(0, 5),
       exports: initialExports()
+    });
+    // 导航标题跟着视频走：搜索结果里的标题相关性靠它
+    wx.setNavigationBarTitle({
+      title: this.data.title ? this.data.title + ' · 壁咚咚藏链阁' : '解析结果 · 壁咚咚藏链阁'
     });
     this.loadMediaSize(r.id);
   },
@@ -558,10 +574,25 @@ Page({
     wx.navigateToMiniProgram({ appId, path: '/pages/video/video?bvid=' + this.data.bvid });
   },
 
+  // 分享出去的是"这一条视频的结果页"：卡片带标题和封面，路径带 bvid，
+  // 别人点开就能直接看到（微信搜索爬虫也是从这类分享链接发现页面的）
+  shareTitle() {
+    const title = this.data.title || 'B站视频收藏';
+    return this.data.origin ? title + ' · 原up主是谁' : title;
+  },
+
   onShareAppMessage() {
     return {
-      title: this.data.title || 'B站视频收藏',
+      title: this.shareTitle(),
       path: '/pages/result/result?bvid=' + this.data.bvid,
+      imageUrl: this.data.coverUrl
+    };
+  },
+
+  onShareTimeline() {
+    return {
+      title: this.shareTitle(),
+      query: 'bvid=' + this.data.bvid,
       imageUrl: this.data.coverUrl
     };
   }

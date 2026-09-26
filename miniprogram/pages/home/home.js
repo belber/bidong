@@ -80,7 +80,9 @@ Page(Object.assign({
       .then(([card]) => {
         getApp().globalData.pendingResult = card;
         wx.setStorageSync('pending_result', card);
-        wx.navigateTo({ url: '/pages/result/result' });
+        // 带上 bvid：这样结果页的 URL 是自包含的（可分享、可被微信搜索爬虫直接打开），
+        // 不再依赖 globalData / storage 传参
+        wx.navigateTo({ url: '/pages/result/result?bvid=' + card.bvid });
       })
       .catch((err) => {
         this.setData({ parsing: false });

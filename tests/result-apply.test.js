@@ -1,4 +1,5 @@
 const path = require('path');
+const { loadPage: loadPageHelper } = require('./helpers/page.js');
 
 // 后端返回的 origin 用的是 snake_case（和 cover_url / up_name 一致），
 // 这个测试直接用真实响应体喂给页面的 applyResult，防止字段名对不上还一路绿灯。
@@ -33,33 +34,16 @@ const REAL_RESPONSE = {
   }
 };
 
+const PAGE = path.join(__dirname, '../miniprogram/pages/result/result.js');
+
 function loadPage() {
-  const toasts = [];
-  global.wx = {
-    showToast: (o) => toasts.push(o.title),
-    showLoading: () => {},
-    hideLoading: () => {},
-    setStorageSync: () => {},
-    getStorageSync: () => '',
-    setClipboardData: () => {},
-    getSystemInfoSync: () => ({ platform: 'devtools' })
-  };
-  global.getApp = () => ({ globalData: {} });
-  let page = null;
-  global.Page = (obj) => { page = obj; };
-  jest.resetModules();
-  require(path.join(__dirname, '../miniprogram/pages/result/result.js'));
-  return { page, toasts };
+  const harness = loadPageHelper(PAGE);
+  return { page: harness.ctx, toasts: harness.toasts };
 }
 
+// 共用脚手架已经装好了 setData 与副作用桩，这里保留旧写法当别名
 function mount(page) {
-  const ctx = Object.assign({}, page, {
-    data: JSON.parse(JSON.stringify(page.data)),
-    setData(patch) { Object.assign(this.data, patch); }
-  });
-  ctx.loadMediaSize = () => {};
-  ctx.loadUiConfig = () => {};
-  return ctx;
+  return page;
 }
 
 describe('解析结果页 applyResult', () => {
