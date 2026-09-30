@@ -145,7 +145,8 @@ Page({
     fallbackUrl: '',
     activeKind: '',
     activeQn: null,
-    publicView: false
+    publicView: false,
+    audioUnavailable: false
   },
 
   onLoad(options) {
@@ -444,7 +445,14 @@ Page({
               error_type: 'http_error',
               error_message: 'download ' + res.statusCode
             });
-            toast('下载失败');
+            // 纯音频 404＝B站 没给这条视频独立音轨（长视频常见）。
+            // 这不是"失败"，是这条路走不通——告诉他声音在视频里，别让他对着按钮反复重试。
+            if (kind === 'audio' && res.statusCode === 404) {
+              this.setData({ audioUnavailable: true });
+              toast('这条视频没有单独的音轨，可下载视频');
+            } else {
+              toast('下载失败');
+            }
             return;
           }
           // 音频文件可能很大（如整场演唱会 Hi-Res），复制到 wx.env.USER_DATA_PATH

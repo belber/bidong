@@ -99,8 +99,10 @@
 
     <view class="field export-field" wx:if="{{media.audio && !publicView}}">
       <text class="label">纯音频</text>
-      <view class="content muted">{{mediaSize.audio || '音频轨'}}</view>
+      <view class="content muted" wx:if="{{!audioUnavailable}}">{{mediaSize.audio || '音频轨'}}</view>
+      <view class="content muted" wx:else>这条视频没有单独的音轨，下载上面的「视频」即可（视频里含声音）</view>
       <text
+        wx:if="{{!audioUnavailable}}"
         class="action {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
         bindtap="onExportTap"
         data-kind="audio"
