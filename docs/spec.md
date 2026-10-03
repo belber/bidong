@@ -247,7 +247,7 @@ Phase 1：机器人触发
 - **关注检测**：轮询 `x/relation/followers`（粉丝列表）取 `mid` / `uname` / `mtime`（关注时间）
 - **@ 检测**：轮询 `x/msgfeed/at`（@ 通知流，需 cookie），需拿到「发送者 mid / 评论正文 / 评论所在视频 aid/bvid」；字段以实测为准
 - **激活码回送**：私信接口 `web_im/send_msg`（`msg[content]` = 激活码）
-- **Cookie 前置**：机器人账号须持登录态 `SESSDATA`、`bili_jct`、`DedeUserID`、`buvid3/4`（二维码登录获取，见 bilibili-api.md §5.1）
+- **Cookie 前置**：机器人账号须持登录态 `SESSDATA`、`bili_jct`、`DedeUserID`、`buvid3/4`（二维码登录获取，见 bilibili-api.md §5.1）。管理端粘贴 Cookie 支持两种格式：浏览器请求头式 `k=v; k2=v2` 和 Netscape HTTP Cookie File（`#` 注释行忽略，按 tab 拆 `domain/flag/path/secure/expiration/name/value`）；两种格式只更新上述白名单字段，非法行跳过。
 - **幂等 & 控频（防刷码）**：同一 `bili_uid` 只对应一个激活码（`binding.bili_uid` 唯一）；重发是同一个码；发送控频（每账号间隔数秒）；激活码一次性、绑定后即失效
 
 **风险（已确认，设计时用防御性措施兜底）：**

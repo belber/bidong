@@ -462,7 +462,7 @@ const renderers = {
         </div>
         <div class="panel">
           <h3>更新 Cookie</h3>
-          <p class="muted">粘贴整段 Cookie（cookie 字段键值用分号分隔，如 SESSDATA=xxx; bili_jct=xxx; DedeUserID=xxx; buvid3=xxx; buvid4=xxx）。</p>
+          <p class="muted">粘贴整段 Cookie：支持请求头格式（SESSDATA=xxx; bili_jct=xxx; ...），也支持 Chrome/curl 插件导出的 Netscape HTTP Cookie File。</p>
           <textarea id="cookie-text" rows="4" style="width:100%"></textarea>
           <div class="flex" style="margin-top:10px"><button onclick="updateCookie()">保存并检测</button></div>
         </div>`;

@@ -669,12 +669,25 @@ def cookie_update(
         "robot_uid": payload.robot_uid,
     }
     if payload.cookie_text:
-        for pair in payload.cookie_text.split(";"):
-            if "=" not in pair:
+        for line in payload.cookie_text.splitlines():
+            line = line.strip()
+            # Chrome/curl 导出的 Netscape 格式按 tab 分列：
+            # domain/flag/path/secure/expiration/name/value
+            if "\t" in line:
+                parts = [p.strip() for p in line.split("\t")]
+                if len(parts) < 7:
+                    continue
+                k, v = parts[-2], parts[-1]
+            else:
+                for pair in line.split(";"):
+                    if "=" not in pair:
+                        continue
+                    k, v = pair.strip().split("=", 1)
+                    if k.strip() in cookie and v:
+                        cookie[k.strip()] = v
                 continue
-            k, v = pair.strip().split("=", 1)
-            if k.strip() in cookie and v:
-                cookie[k.strip()] = v
+            if k in cookie and v:
+                cookie[k] = v
     config_store.set_robot_cookie(db, cookie)
     return {"ok": True, "saved_fields": [f for f in config_store.cookie_fields() if cookie.get(f)]}
 

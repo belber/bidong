@@ -207,6 +207,28 @@ def test_cookie_status_and_update(admin_client):
     assert "SESSDATA" in upd.json()["saved_fields"]
 
 
+def test_cookie_update_supports_netscape_format(admin_client):
+    token = _login(admin_client).json()["token"]
+    cookie_text = """# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+.bilibili.com\tTRUE\t/\tTRUE\t1806592776\tSESSDATA\tnetscape-sess
+.bilibili.com\tTRUE\t/\tTRUE\t1806592776\tbili_jct\tnetscape-jct
+.bilibili.com\tTRUE\t/\tTRUE\t1806592776\tDedeUserID\t999
+.bilibili.com\tTRUE\t/\tFALSE\t1806846006\tbuvid3\tnetscape-b3
+.bilibili.com\tTRUE\t/\tFALSE\t1825601195\tbuvid4\tnetscape-b4
+"""
+    resp = admin_client.post(
+        "/api/admin/cookie/update",
+        json={"cookie_text": cookie_text},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["saved_fields"] == [
+        "SESSDATA", "bili_jct", "DedeUserID", "buvid3", "buvid4"
+    ]
+
+
 def test_activation_send_reads_uids(admin_client, db_engine):
     token = _login(admin_client).json()["token"]
     resp = admin_client.post(
