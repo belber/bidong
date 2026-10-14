@@ -16,6 +16,21 @@ function toast(title) {
   wx.showToast({ title: title, icon: 'none' });
 }
 
+// 出处头像和封面同样有两种形态：本地后端给相对路径（用 apiBase 拼），
+// COS（生产）给绝对地址，原样用。mapOrigin 保持纯函数，这里再补一次地址。
+function resolveOriginAvatar(origin) {
+  if (!origin || !origin.accountAvatarUrl) {
+    return origin;
+  }
+  origin.accountAvatarUrl = api.resolveMediaUrl(origin.accountAvatarUrl);
+  return origin;
+}
+
+// 一次下载的标识：同一次下载的每个阶段带同一个 id，后端据此把事件聚合回"一次下载"
+function newSessionId() {
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 function sanitizeName(name) {
   const cleaned = (name || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
   return (cleaned || 'bilibili').slice(0, 60);
@@ -115,6 +130,8 @@ function shareFilePromise(filePath, filename) {
 
 Page({
   data: {
+    resultAdUnitId: require('../../utils/ads.js').AD_UNIT_IDS.resultBanner,
+    resultAdError: false,
     cardId: 0,
     bvid: '',
     sourceUrl: '',
@@ -146,21 +163,25 @@ Page({
     activeKind: '',
     activeQn: null,
     publicView: false,
-    audioUnavailable: false
+    audioUnavailable: false,
+    imagePercent: 0
   },
 
   onLoad(options) {
     this.loadUiConfig();
-    const bvid = (options && options.bvid) || '';
+    const platform = (options && options.platform) === 'douyin' ? 'douyin' : 'bilibili';
+    // B站 走 ?bvid=，抖音走 ?platform=douyin&id=<aweme_id>；旧的 B站 分享链接继续有效
+    const videoId = (options && (options.bvid || options.id)) || '';
     const pending =
       getApp().globalData.pendingResult || wx.getStorageSync('pending_result');
-    if (bvid) {
-      // URL 自包含：先用刚解析出来的结果秒开，再按 bvid 拉一次最新（静默，不闪 loading）
-      const fresh = pending && pending.bvid === bvid;
+    if (videoId) {
+      // URL 自包含：先用刚解析出来的结果秒开，再按 id 拉一次最新（静默，不闪 loading）
+      const fresh =
+        pending && pending.bvid === videoId && (pending.platform || 'bilibili') === platform;
       if (fresh) {
         this.applyResult(pending);
       }
-      this.loadByBvid(bvid, { silent: fresh });
+      this.loadByPlatform(platform, videoId, { silent: fresh });
       return;
     }
     this.applyResult(pending);
@@ -175,12 +196,22 @@ Page({
       .catch(() => {});
   },
 
+  sourceOf(platform, videoId) {
+    return platform === 'douyin'
+      ? 'https://www.douyin.com/video/' + videoId
+      : 'https://www.bilibili.com/video/' + videoId;
+  },
+
   loadByBvid(bvid, opts) {
+    return this.loadByPlatform('bilibili', bvid, opts);
+  },
+
+  loadByPlatform(platform, videoId, opts) {
     const silent = !!(opts && opts.silent);
     if (!silent) {
       wx.showLoading({ title: '加载中' });
     }
-    api.parse('https://www.bilibili.com/video/' + bvid)
+    api.parse(this.sourceOf(platform, videoId))
       .then((card) => {
         wx.hideLoading();
         getApp().globalData.pendingResult = card;
@@ -196,7 +227,7 @@ Page({
           if (!silent) toast(err.message || '加载失败');
           return;
         }
-        api.getPublicCard(bvid)
+        api.getPublicCard(videoId, platform)
           .then((card) => {
             this.applyResult(card, { publicView: true });
           })
@@ -218,21 +249,29 @@ Page({
       timeText: formatDuration(s.t)
     }));
     const tags = Array.isArray(r.tags) ? r.tags : [];
+    const platform = r.platform === 'douyin' ? 'douyin' : 'bilibili';
+    const media = r.media || { watermarked: false, clean: false, audio: false, images: 0 };
     this.setData({
       cardId: r.id,
+      platform,
+      isDouyin: platform === 'douyin',
       bvid: r.bvid,
       sourceUrl: r.source_url,
       title: r.title,
       upName: r.up_name,
       partition: r.partition || '',
+      // 抖音没有分区，基本信息里这一行换成抖音号
+      douyinId: r.up_mid || '',
       pubText: formatDateTime(r.pubdate),
       tags,
       tagsText: tags.join(' '),
       desc: r.desc,
-      stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0 },
-      coverUrl: r.cover_url,
-      origin: mapOrigin(r.origin),
-      media: r.media || { watermarked: false, clean: false, audio: false },
+      stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0, share: 0 },
+      coverUrl: api.resolveMediaUrl(r.cover_url),
+      origin: resolveOriginAvatar(mapOrigin(r.origin)),
+      media,
+      imageCount: media.images || 0,
+      isNote: media.note === true,
       features: r.features || { comment: true, danmaku: true },
       danmakuCount: r.danmaku_count || 0,
       subtitles,
@@ -265,6 +304,11 @@ Page({
     }
     const text = Array.isArray(v) ? v.map((t) => '#' + t).join(' ') : String(v);
     wx.setClipboardData({ data: text, success() { toast('已复制'); } });
+  },
+
+  onResultAdError(e) {
+    console.warn('[ad] 结果页横幅加载失败', e && e.detail);
+    this.setData({ resultAdError: true });
   },
 
   onCopyTag(e) {
@@ -310,6 +354,135 @@ Page({
         saveToAlbum(wx.saveImageToPhotosAlbum, res.tempFilePath);
       },
       fail() { wx.hideLoading(); toast('下载失败'); }
+    });
+  },
+
+  // ---------------------------------------------------------------------
+  // 抖音：直链交给客户端自己去 CDN 拉，服务端不中转
+  // ---------------------------------------------------------------------
+  fetchDouyinCandidates(kind) {
+    return api.downloadUrl(this.data.cardId, kind).then((data) => {
+      const all = data.candidates || [];
+      return { all: all, configured: configuredCandidates(all) };
+    });
+  },
+
+  onDownloadDouyin(e) {
+    const kind = e.currentTarget.dataset.kind || 'video';
+    // 音频走导出状态机（onExportTap → 分享文件），相册存不了 MP3
+    if (kind !== 'video') {
+      return;
+    }
+    // activeKind 决定哪一行显示百分比和进度条；B站 的 onDownloadVideo 也这么做
+    this.setData({ activeKind: kind });
+    this._sessionId = newSessionId();
+    this.fetchDouyinCandidates(kind)
+      .then((res) => {
+        if (!res.configured.length) {
+          // 一个候选都没登记进微信白名单，直接给复制链接的办法
+          this.reportDownload('resolve', 'fail', {
+            kind,
+            error_type: 'domain_not_configured',
+            error_message: '暂无可用的已配置下载域名'
+          });
+          this.setData({ activeKind: '' });
+          this.openFallback(res.all);
+          return;
+        }
+        this.saveMedia(res.configured, kind);
+      })
+      .catch((err) => {
+        const msg = (err && err.message) || '取下载地址失败';
+        this.reportDownload('resolve', 'fail', {
+          kind,
+          error_type: downloadUrlErrorType(err),
+          error_message: msg
+        });
+        this.setData({ activeKind: '' });
+        toast(msg);
+      });
+  },
+
+  // 图文：一次拿全部图片，逐张下载保存，中途失败就报个数
+  onSaveImages() {
+    if (this.data.savingImages) {
+      return;
+    }
+    this._sessionId = newSessionId();
+    this.fetchDouyinCandidates('image')
+      .then((res) => {
+        const list = res.configured.length ? res.configured : res.all;
+        if (!list.length) {
+          toast('没有可保存的图片');
+          return;
+        }
+        this.setData({ savingImages: true, imageProgress: '0/' + list.length, imagePercent: 0 });
+        let done = 0;
+        let failed = 0;
+        const next = (i) => {
+          if (i >= list.length) {
+            this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+            this.reportDownload('save', failed ? 'fail' : 'success', {
+              kind: 'image',
+              error_type: failed ? 'permission' : '',
+              error_message: failed ? failed + ' 张保存失败' : ''
+            });
+            toast(failed ? '已保存 ' + done + ' 张，' + failed + ' 张失败' : '已保存 ' + done + ' 张图片');
+            return;
+          }
+          this.setData({
+            imageProgress: i + '/' + list.length,
+            imagePercent: Math.round((i / list.length) * 100)
+          });
+          wx.downloadFile({
+            url: list[i].url,
+            success: (r) => {
+              if (r.statusCode !== 200) {
+                failed += 1;
+                next(i + 1);
+                return;
+              }
+              wx.saveImageToPhotosAlbum({
+                filePath: r.tempFilePath,
+                success: () => {
+                  done += 1;
+                  next(i + 1);
+                },
+                fail: () => {
+                  failed += 1;
+                  next(i + 1);
+                }
+              });
+            },
+            fail: () => {
+              failed += 1;
+              next(i + 1);
+            }
+          });
+        };
+        next(0);
+      })
+      .catch((err) => {
+        this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+        toast((err && err.message) || '取图片地址失败');
+      });
+  },
+
+  // 抖音没有可以在微信里跳过去的小程序，只能复制作品链接 + 提示去 App
+  onOpenDouyin() {
+    const url =
+      this.data.sourceUrl ||
+      'https://www.douyin.com/video/' + this.data.bvid;
+    wx.setClipboardData({
+      data: url,
+      success() {
+        wx.showModal({
+          title: '去抖音查看',
+          content: '作品链接已复制。打开抖音 App，粘贴到搜索框即可看到这条作品。',
+          showCancel: false,
+          confirmText: '知道了'
+        });
+      }
     });
   },
 
@@ -370,6 +543,7 @@ Page({
         itemList: options.map((o) => o.label),
         success: (res) => {
           const chosen = options[res.tapIndex];
+          this._sessionId = newSessionId();
           this.setData({ activeQn: chosen.qn });
           api.downloadUrl(this.data.cardId, kind, chosen.qn).then((data) => {
             const autoCandidates = configuredCandidates(data.candidates);
@@ -417,6 +591,19 @@ Page({
     if (kind === 'subtitle') return api.exportFile(this.data.cardId, 'srt');
     if (kind === 'danmaku') return api.danmaku(this.data.cardId);
     if (kind === 'comment') return api.comments(this.data.cardId);
+    if (this.data.isDouyin) {
+      // 抖音音频是 CDN 直链，服务端不中转，所以不走 api.download 那条后端代理；
+      // 拿地址这一步失败要抛出，交给 startExport 统一落成 failed 状态。
+      return api.downloadUrl(this.data.cardId, 'audio').then((data) => {
+        const list = data.candidates || [];
+        const ready = configuredCandidates(list);
+        const pick = (ready.length ? ready : list)[0];
+        if (!pick) {
+          throw new Error('没有可用的音频地址');
+        }
+        return { url: pick.url, header: {} };
+      });
+    }
     return api.download(this.data.cardId, 'audio');
   },
 
@@ -429,6 +616,7 @@ Page({
 
   startExport(kind) {
     const filename = this.exportName(kind);
+    this._sessionId = newSessionId();
     this._downloadSpeed = this._downloadSpeed || {};
     this._downloadSpeed[kind] = null;
     this.setData({ exports: beginExport(this.data.exports, kind) });
@@ -546,6 +734,7 @@ Page({
     api.reportDownloadEvent({
       card_id: this.data.cardId,
       bvid: this.data.bvid,
+      session_id: this._sessionId || '',
       kind: evt.kind || this.data.activeKind,
       qn: this.data.activeQn,
       host: evt.host || '',
@@ -588,6 +777,10 @@ Page({
   },
 
   onOpenBili() {
+    if (this.data.isDouyin) {
+      this.onOpenDouyin();
+      return;
+    }
     const appId = getApp().globalData.biliMiniProgramAppId;
     if (!appId) {
       toast('B站小程序 appId 尚未配置');
@@ -604,9 +797,12 @@ Page({
   },
 
   onShareAppMessage() {
+    const path = this.data.isDouyin
+      ? '/pages/result/result?platform=douyin&id=' + this.data.bvid
+      : '/pages/result/result?bvid=' + this.data.bvid;
     return {
       title: this.shareTitle(),
-      path: '/pages/result/result?bvid=' + this.data.bvid,
+      path,
       imageUrl: this.data.coverUrl
     };
   },

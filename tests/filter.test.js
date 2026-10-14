@@ -1,4 +1,4 @@
-const { filterCards } = require('../miniprogram/utils/filter.js');
+const { filterCards, DOUYIN } = require('../miniprogram/utils/filter.js');
 
 const cards = [
   { id: 'a', source: 'local', partition: '知识', title: '三体解析', up_name: '木鱼水心', tags: ['科幻'] },
@@ -52,5 +52,34 @@ describe('filterCards', () => {
 
   test('无匹配返回空数组', () => {
     expect(filterCards(cards, { source: 'local', partition: '音乐', keyword: '' })).toEqual([]);
+  });
+});
+
+describe('平台筛选', () => {
+  const mixed = [
+    { id: 'b1', source: 'local', partition: '知识', title: 'B站一条', platform: 'bilibili', tags: [] },
+    { id: 'd1', source: 'local', partition: '', title: '抖音一条', platform: 'douyin', tags: [] },
+    { id: 'd2', source: 'robot', partition: '', title: '抖音两条', platform: 'douyin', tags: [] }
+  ];
+
+  test('选中「抖音」只看抖音卡片', () => {
+    const r = filterCards(mixed, { source: 'all', partition: DOUYIN, keyword: '' });
+    expect(r.map((c) => c.id)).toEqual(['d1', 'd2']);
+  });
+
+  test('选中 B站 分区时抖音卡片自然被排除', () => {
+    const r = filterCards(mixed, { source: 'all', partition: '知识', keyword: '' });
+    expect(r.map((c) => c.id)).toEqual(['b1']);
+  });
+
+  test('平台与来源筛选可叠加', () => {
+    const r = filterCards(mixed, { source: 'robot', partition: DOUYIN, keyword: '' });
+    expect(r.map((c) => c.id)).toEqual(['d2']);
+  });
+
+  test('没有 platform 字段的老卡片按 B站 处理', () => {
+    const legacy = [{ id: 'old', source: 'local', partition: '知识', title: '老卡片', tags: [] }];
+    expect(filterCards(legacy, { source: 'all', partition: DOUYIN, keyword: '' })).toHaveLength(0);
+    expect(filterCards(legacy, { source: 'all', partition: '知识', keyword: '' })).toHaveLength(1);
   });
 });

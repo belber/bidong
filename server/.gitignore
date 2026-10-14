@@ -8,3 +8,7 @@ __pycache__/
 var/
 logs/
 *.egg-info/
+
+# 抖音会话 cookie（探针用），绝不能提交
+data/dy_cookie.txt
+dy_cookie.txt

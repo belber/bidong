@@ -4,6 +4,28 @@ function baseUrl() {
   return getApp().globalData.apiBase;
 }
 
+// 封面等媒体地址：本地存储后端返回的是相对路径（/media/covers/x.jpg），
+// 用 apiBase 拼成当前环境能访问的地址；COS（生产）返回的是绝对地址，原样使用。
+// 这样开发版换 IP 不用改数据库，生产行为完全不变。
+function resolveMediaUrl(value) {
+  if (!value || typeof value !== 'string') {
+    return value;
+  }
+  if (/^(https?:)?\/\//i.test(value) || value.indexOf('data:') === 0) {
+    return value;
+  }
+  let base = '';
+  try {
+    base = baseUrl() || '';
+  } catch (err) {
+    base = ''; // 取不到环境地址时退回原值，别把图片地址拼坏
+  }
+  if (!base) {
+    return value;
+  }
+  return base.replace(/\/+$/, '') + '/' + value.replace(/^\/+/, '');
+}
+
 function login() {
   return new Promise((resolve, reject) => {
     wx.login({
@@ -125,6 +147,7 @@ function publicRequest(method, path, data) {
 }
 
 module.exports = {
+  resolveMediaUrl,
   parse(url) {
     return request('POST', '/api/parse', { url });
   },
@@ -185,7 +208,9 @@ module.exports = {
   },
   downloadUrl(id, kind, qn) {
     const suffix = qn ? '&qn=' + qn : '';
-    return request('GET', '/api/cards/' + id + '/download-url?kind=' + kind + suffix);
+    // 抖音图文要一次拿全部图片，index=0 表示「从这个位置开始给整组」
+    const idx = arguments.length > 3 && arguments[3] ? '&index=' + arguments[3] : '';
+    return request('GET', '/api/cards/' + id + '/download-url?kind=' + kind + suffix + idx);
   },
   reportDownloadEvent(payload) {
     return request('POST', '/api/download-events', payload);

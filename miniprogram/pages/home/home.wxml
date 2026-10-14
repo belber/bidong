@@ -12,6 +12,7 @@
       maxlength="200"
     />
     <text class="paste" bindtap="onPaste">粘贴</text>
+    <text class="plat-chip {{platform === 'douyin' ? 'dy' : ''}}" wx:if="{{platform}}">识别到 {{platformLabel}}</text>
   </view>
 
   <button class="btn-primary parse-btn {{parsing ? 'parsing' : ''}}" bindtap="onParse">
@@ -19,7 +20,10 @@
       <view class="spinner"></view>
       <text>解析中，请稍候…</text>
     </view>
-    <text wx:else>解析视频</text>
+    <block wx:else>
+      <text class="parse-main">解析视频</text>
+      <text class="parse-sub">B站 · 抖音</text>
+    </block>
     <view wx:if="{{parsing}}" class="shimmer"></view>
   </button>
 
@@ -27,7 +31,7 @@
     <view class="guide-title">如何获取链接</view>
 
     <view class="way">
-      <view class="way-label">方式 1 · B站视频点分享 → 复制链接</view>
+      <view class="way-label">方式 1 · 分享 → 复制链接（支持 B站、抖音）</view>
       <view class="share-demo">
         <view class="share-head">分享</view>
         <view class="share-row">
@@ -78,6 +82,10 @@
         </view>
       </view>
     </view>
+  </view>
+
+  <view class="ad-banner" wx:if="{{!homeAdError}}">
+    <ad unit-id="{{homeAdUnitId}}" binderror="onHomeAdError" />
   </view>
 
   <view class="home-footer-note">仅收藏整理视频信息，不存储视频，版权归原作者，请尊重原创</view>

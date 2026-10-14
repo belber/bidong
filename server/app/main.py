@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .db import Base, SessionLocal, engine
+from .schema_check import check_schema
 from .errors import AppError
 from . import models  # noqa: F401  # 注册模型到 metadata
 from .services import crawler as crawler_service
@@ -49,7 +50,8 @@ async def _daily_report_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.dev_mode:
-        Base.metadata.create_all(bind=engine)
+        # 只检查不建表：create_all 会建表但不盖迁移章，反而让库悄悄漂移
+        check_schema(engine)
     task = asyncio.create_task(_daily_report_loop())
     try:
         yield

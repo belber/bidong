@@ -427,3 +427,11 @@
 .action.disabled {
   opacity: 0.6;
 }
+
+.ad-banner {
+  width: calc(100vw - 48rpx);
+  height: calc((100vw - 48rpx) * 7 / 20);
+  margin: 24rpx 0 48rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+}

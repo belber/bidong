@@ -38,13 +38,6 @@ button::after {
   font-weight: 600;
 }
 
-.chip-tag {
-  color: #FB7299;
-  background: #FFF4F7;
-  border: 1rpx solid #FBDDE6;
-  font-weight: 600;
-}
-
 .btn-primary {
   background: #FB7299;
   color: #FFFFFF;
@@ -75,4 +68,11 @@ button::after {
   letter-spacing: 0.12em;
   color: #B28B97;
   text-transform: uppercase;
+}
+
+/* 隐藏页面滚动条（开发者工具 / Android 生效；iOS 为系统级瞬时指示条，不可禁用） */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }

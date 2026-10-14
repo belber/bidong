@@ -32,13 +32,16 @@ class VideoStats(BaseModel):
     like: int = 0
     reply: int = 0
     favorite: int = 0
-    coin: int = 0
+    coin: int = 0  # B站 第 4 格：投币
+    share: int = 0  # 抖音第 4 格：分享（douyin 的 share_count）
 
 
 class MediaAvailability(BaseModel):
     watermarked: bool = False
     clean: bool = False
     audio: bool = False
+    images: int = 0  # 抖音图文：能拿到的图片张数
+    note: bool = False  # 抖音：这是图文作品（不管图片拿不拿得到）
 
 
 class ParseFeatures(BaseModel):
@@ -67,6 +70,7 @@ class MediaDownloadUrlResponse(BaseModel):
 class DownloadEventReport(BaseModel):
     card_id: int | None = None
     bvid: str = ""
+    session_id: str = ""
     kind: str = ""
     qn: int | None = None
     host: str = ""
@@ -85,6 +89,7 @@ class VisitEventRequest(BaseModel):
 
 class CardOut(BaseModel):
     id: int
+    platform: str = "bilibili"
     bvid: str
     title: str
     up_name: str
@@ -133,6 +138,7 @@ class PublicCardOut(BaseModel):
     """免登录可见的视频信息：只有公开元数据，不含任何用户数据。"""
 
     bvid: str
+    platform: str = "bilibili"
     title: str
     up_name: str
     partition: str = ""

@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     robot_enabled: bool = False
     robot_uid: str = ""
     robot_sessdata: str = ""
+
+    # 抖音采集会话：整段 Cookie 头字符串。日常由管理端写入 DB，
+    # 这里只是本地开发/首次启动的兜底来源。
+    douyin_cookie: str = ""
+    # 解析节点标识，仅用于展示与排障：tencent（机房）/ home（住宅）
+    douyin_parse_node: str = "tencent"
     robot_bili_jct: str = ""
     robot_dedeuserid: str = ""
     robot_buvid3: str = ""

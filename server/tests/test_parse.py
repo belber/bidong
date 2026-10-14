@@ -27,9 +27,11 @@ def test_parse_auto_collect_and_idempotent(client, auth_headers):
     assert first["month"]
     assert [s["text"] for s in first["subtitles"]] == ["第一句", "第二句"]
     assert first["subtitles"][0]["t"] == 5
-    assert first["stats"] == {"like": 111, "reply": 22, "favorite": 333, "coin": 44}
+    assert first["stats"] == {"like": 111, "reply": 22, "favorite": 333, "coin": 44, "share": 0}
     assert first["danmaku_count"] == 55
-    assert first["media"] == {"watermarked": False, "clean": False, "audio": False}
+    assert first["media"] == {
+        "watermarked": False, "clean": False, "audio": False, "images": 0, "note": False
+    }
 
     again = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
     assert again.status_code == 200

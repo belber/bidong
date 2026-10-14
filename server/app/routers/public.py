@@ -14,35 +14,51 @@ from ..errors import AppError
 from ..models import VideoCard
 from ..schemas import PublicCardOut
 from ..services import crawler, repost_source
+from ..services.storage import media_url
 
 router = APIRouter(tags=["public"])
 
 
 @router.get("/api/public/cards/{bvid}", response_model=PublicCardOut)
-def public_card(bvid: str, db: Session = Depends(get_db)):
+def public_card(
+    bvid: str,
+    platform: str = "bilibili",
+    db: Session = Depends(get_db),
+):
     bvid = (bvid or "").strip()
-    if not repost_source.BVID_RE.match(bvid):
-        raise AppError(400, "不是有效的 BV 号")
+    platform = platform if platform in ("bilibili", "douyin") else "bilibili"
+    if platform == "bilibili":
+        if not repost_source.BVID_RE.match(bvid):
+            raise AppError(400, "不是有效的 BV 号")
+    elif not bvid.isdigit():
+        raise AppError(400, "不是有效的抖音作品 ID")
 
     # 同一条视频可能被多个用户收藏；取最早那张卡（元数据完全一样）
     card = (
         db.query(VideoCard)
-        .filter(VideoCard.bvid == bvid)
+        .filter(VideoCard.platform == platform, VideoCard.bvid == bvid)
         .order_by(VideoCard.id.asc())
         .first()
     )
     if card is None:
         raise AppError(404, "这条视频还没有人解析过")
 
-    origin = repost_source.get_origin(db, bvid=bvid, up_mid=card.up_mid)
+    # 出处是 B站 稿件专属的功能，抖音没有
+    origin = (
+        repost_source.get_origin(db, bvid=bvid, up_mid=card.up_mid)
+        if platform == "bilibili"
+        else None
+    )
     return PublicCardOut(
         bvid=card.bvid,
+        platform=card.platform,
         title=card.title,
         up_name=card.up_name,
         partition=card.partition,
         duration=card.duration,
         pubdate=card.pubdate,
-        cover_url=card.cover_url,
+        # 爬虫/分享这类外部消费方拿到相对路径没法用，这里补成绝对地址
+        cover_url=media_url(card.cover_url),
         desc=card.desc,
         source_url=card.source_url,
         origin=origin,

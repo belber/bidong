@@ -98,7 +98,7 @@
       <a data-view="schedule" href="javascript:void(0)">定时任务</a>
       <a data-view="operations" href="javascript:void(0)">运营管理</a>
       <a data-view="help" href="javascript:void(0)">帮助/反馈</a>
-      <a data-view="cdn" href="javascript:void(0)">B站域名管理</a>
+      <a data-view="cdn" href="javascript:void(0)">下载域名管理</a>
       <div class="group"></div>
       <a href="javascript:void(0)" onclick="logout()">退出登录</a>
     </nav>
@@ -136,9 +136,11 @@ let currentView = "overview";
 const charts = {};
 const S = {
   follow: { days: 30, q: "" },
-  parse: { source: "local", days: 30, q: "" },
+  parse: { source: "local", days: 30, q: "", platform: "" },
   visit: { days: 30, q: "" },
-  sources: { page: 1, size: 20, q: "", platform: "", status: "" }
+  download: { mode: "session", days: 30, q: "", page: 1, size: 20, platform: "" },
+  sources: { page: 1, size: 20, q: "", platform: "", status: "" },
+  cdn: { kind: "" }
 };
 
 function api(path, opts = {}) {
@@ -198,6 +200,28 @@ function show(view) {
   el.classList.remove("hidden");
   renderers[view] && renderers[view](el);
 }
+// 概览里的平台拆分表：合计一行 + B站/抖音各一行
+function platformTable(title, data, cols, kTotal, kOk, kFail, kTop) {
+  if (!data) return "";
+  const labels = { bilibili: "B站", douyin: "抖音" };
+  let t = 0, o = 0, f = 0;
+  const rows = ["bilibili", "douyin"].map((key) => {
+    const d = data[key] || {};
+    t += d[kTotal] || 0; o += d[kOk] || 0; f += d[kFail] || 0;
+    const rate = d.rate != null ? `（${d.rate}%）` : "";
+    return `<tr><td>${labels[key]}</td><td>${fmt(d[kTotal])}</td><td class="ok">${fmt(d[kOk])}</td>`
+      + `<td class="bad">${fmt(d[kFail])}${rate}</td><td class="muted">${esc(d[kTop] || "—")}</td></tr>`;
+  }).join("");
+  return `
+    <table style="margin-top:12px">
+      <thead><tr><th>${title} · 平台</th><th>${cols[0]}</th><th>${cols[1]}</th><th>${cols[2]}</th><th>主要失败原因</th></tr></thead>
+      <tbody>
+        <tr><td><b>合计</b></td><td><b>${fmt(t)}</b></td><td class="ok"><b>${fmt(o)}</b></td><td class="bad"><b>${fmt(f)}</b></td><td>—</td></tr>
+        ${rows}
+      </tbody>
+    </table>`;
+}
+
 function drawChart(id, render) {
   if (typeof echarts === "undefined") return;
   if (charts[id]) charts[id].dispose();
@@ -288,6 +312,7 @@ const renderers = {
           <div class="metric"><b>${fmt(parse.new_cards)}</b><span>新增收藏卡片</span></div>
         </div>
         <p class="note" style="margin:10px 0 0">失败原因：${parseFailReasons || "无"}</p>
+        ${platformTable("视频解析", parse.by_platform, ["解析次数", "成功", "失败"], "total", "ok", "fail", "top_reason")}
       </div>
 
       <div class="panel">
@@ -300,6 +325,7 @@ const renderers = {
           <div class="metric"><b>${fmt(dl.success_rate)}%</b><span>成功率</span></div>
         </div>
         <p class="note" style="margin:10px 0 0">失败原因：${todayFailReasons || "无"}</p>
+        ${platformTable("视频下载", dl.by_platform, ["下载次数", "成功", "失败"], "total", "success", "fail", "top_error")}
       </div>
 
       <div class="panel">
@@ -313,7 +339,7 @@ const renderers = {
       </div>
 
       <div class="panel">
-        <h3>B站 CDN 域名 <span class="tag muted">只看今天</span></h3>
+        <h3>CDN 域名 <span class="tag muted">B站 + 抖音</span></h3>
         <p class="note">今天落地下载碰到过的域名；没配置到微信后台的域名，用户点下载会失败</p>
         <div class="metric-row">
           <div class="metric"><b class="${(domains.new_unconfigured || []).length ? 'bad' : 'ok'}">${fmt((domains.new_unconfigured || []).length)}</b><span>今日新增未配置${hostsToday ? `（${hostsToday}）` : ""}</span></div>
@@ -389,16 +415,25 @@ const renderers = {
   },
 
   async parse(el) {
-    const { source, days, q } = S.parse;
+    const { source, days, q, platform } = S.parse;
     const rangeOpts = [7,30,90].map(d => `<option value="${d}" ${d===days?"selected":""}>近${d}天</option>`).join("");
-    const tabs = `
+    const platformTabs = `
       <div class="toolbar">
+        <button class="pill ${platform===''?'active':''}" onclick="S.parse.platform=''; S.parse.q=''; show('parse')">全部平台</button>
+        <button class="pill ${platform==='bilibili'?'active':''}" onclick="S.parse.platform='bilibili'; S.parse.source='local'; S.parse.q=''; show('parse')">B站</button>
+        <button class="pill ${platform==='douyin'?'active':''}" onclick="S.parse.platform='douyin'; S.parse.source='local'; S.parse.q=''; show('parse')">抖音</button>
+      </div>`;
+    // @评论触发是 B站 评论机器人专属，抖音下没有这一维
+    const sourceTabs = platform === 'douyin' ? '' : `
         <button class="pill ${source==='local'?'active':''}" onclick="S.parse.source='local'; S.parse.q=''; show('parse')">贴链接解析</button>
-        <button class="pill ${source==='robot'?'active':''}" onclick="S.parse.source='robot'; S.parse.q=''; show('parse')">@评论触发</button>
+        <button class="pill ${source==='robot'?'active':''}" onclick="S.parse.source='robot'; S.parse.q=''; show('parse')">@评论触发</button>`;
+    const tabs = `
+      ${platformTabs}
+      <div class="toolbar">${sourceTabs}
         <input placeholder="搜索" value="${esc(q)}" onchange="S.parse.q=this.value; show('parse')" style="min-width:180px"/>
         <select onchange="S.parse.days=parseInt(this.value); show('parse')">${rangeOpts}</select>
       </div>`;
-    const range = qs({ q, days, page: 1, size: 20 });
+    const range = qs({ q, days, platform, page: 1, size: 20 });
     const rangeSuffix = range ? "&" + range.slice(1) : "";
 
     if (source === 'robot') {
@@ -450,37 +485,83 @@ const renderers = {
   },
 
   async cookie(el) {
-    const load = async () => {
-      const s = await api("/cookie/status");
-      const badge = s.cookie_valid === false ? '<span class="tag bad">失效</span>' : '<span class="tag ok">正常</span>';
-      el.innerHTML = `
-        <div class="panel">
-          <h3>机器人账号 ${badge}</h3>
-          <p>UID：${esc(s.robot_uid || "—")} ｜ 已配置 Cookie：${s.has_cookie ? "是" : "否"}</p>
-          <p class="muted">最近检查：${esc(s.cookie_last_checked || "—")} ｜ ${esc(s.cookie_last_error || "")}</p>
-          <div class="flex"><button onclick="checkCookie()">立即检测</button><span id="cookie-msg" class="muted"></span></div>
+    const [bili, dy] = await Promise.all([
+      api("/cookie/status"),
+      api("/douyin/session").catch(() => null),
+    ]);
+    const biliBadge = bili.cookie_valid === false
+      ? '<span class="tag bad">失效</span>' : '<span class="tag ok">正常</span>';
+
+    let dyHtml = '<p class="muted">抖音会话信息读取失败。</p>';
+    if (dy) {
+      const dyBadge = !dy.configured
+        ? '<span class="tag bad">未配置</span>'
+        : '<span class="tag ok">已配置</span>';
+      const sw = dy.switches || {};
+      dyHtml = `
+        <p class="note">一个专用小号的登录态，服务端自己保温续期；视频/音频解析和图文抓取共用它。
+          判据是<b>响应体字节数</b>而不是状态码——身份失效时抖音回的是 <b>200 + 0 字节</b>。</p>
+        <div class="metric-row">
+          <div class="metric"><b>${esc(dy.parse_node === "home" ? "住宅节点" : "腾讯云")}</b><span>当前解析节点</span></div>
+          <div class="metric"><b class="blue">${fmt(dy.cookie_length)}</b><span>Cookie 长度</span></div>
+          <div class="metric"><b>${esc(dy.probe_aweme_id)}</b><span>探针作品 ID</span></div>
         </div>
-        <div class="panel">
-          <h3>更新 Cookie</h3>
-          <p class="muted">粘贴整段 Cookie：支持请求头格式（SESSDATA=xxx; bili_jct=xxx; ...），也支持 Chrome/curl 插件导出的 Netscape HTTP Cookie File。</p>
-          <textarea id="cookie-text" rows="4" style="width:100%"></textarea>
-          <div class="flex" style="margin-top:10px"><button onclick="updateCookie()">保存并检测</button></div>
+        <div id="dy-probe" class="muted" style="margin-top:10px">还没探活。</div>
+        <div class="toolbar" style="margin-top:10px">
+          <button onclick="probeDouyin()">立即探活</button>
+          <button class="ghost" onclick="switchDouyinNode()">切换到${dy.parse_node === "home" ? "腾讯云" : "住宅节点"}</button>
+          <span class="muted">开关：解析 ${sw.parse ? "开" : "关"} · 视频 ${sw.video ? "开" : "关"} · 音频 ${sw.audio ? "开" : "关"} · 图文 ${sw.images ? "开" : "关"}</span>
+        </div>
+        <p class="muted" style="margin:12px 0 6px">更新 Cookie：扫码登录后从浏览器导出整段 Cookie 粘进来；
+          日常由保温任务每 4~6 小时自动刷新，只有掉线时才需要手动贴。换节点后需要重新扫码登录一次。</p>
+        <textarea id="dy-cookie-text" rows="4" style="width:100%"></textarea>
+        <div class="toolbar" style="margin-top:10px">
+          <button onclick="updateDouyinCookie()">保存并探活</button>
+          <span id="dy-cookie-msg" class="muted"></span>
         </div>`;
-    };
-    await load();
+    }
+
+    el.innerHTML = `
+      <div class="panel">
+        <h3><span class="tag muted">B站</span> 机器人账号 ${biliBadge}</h3>
+        <p>UID：${esc(bili.robot_uid || "—")} ｜ 已配置 Cookie：${bili.has_cookie ? "是" : "否"}</p>
+        <p class="muted">最近检查：${esc(bili.cookie_last_checked || "—")} ｜ ${esc(bili.cookie_last_error || "")}</p>
+        <div class="flex"><button onclick="checkCookie()">立即检测</button><span id="cookie-msg" class="muted"></span></div>
+        <p class="muted" style="margin:12px 0 6px">更新 Cookie：支持请求头格式（SESSDATA=xxx; bili_jct=xxx; ...），也支持 Chrome/curl 插件导出的 Netscape HTTP Cookie File。</p>
+        <textarea id="cookie-text" rows="4" style="width:100%"></textarea>
+        <div class="flex" style="margin-top:10px"><button onclick="updateCookie()">保存并检测</button></div>
+      </div>
+      <div class="panel">
+        <h3><span class="tag muted">抖音</span> 采集会话 ${dy ? (dy.configured ? '<span class="tag ok">已配置</span>' : '<span class="tag bad">未配置</span>') : ""}</h3>
+        ${dyHtml}
+      </div>`;
+  },
+
+  async douyinSession(el) {
+    return this.cookie(el);
   },
 
   async features(el) {
-    const [f, p, u] = await Promise.all([
+    const [f, p, u, dy] = await Promise.all([
       api("/config/features"),
       api("/config/parse-features"),
       api("/config/ui"),
+      api("/douyin/session").catch(() => ({ switches: {} })),
     ]);
+    const dsw = dy.switches || {};
     const mk = (key, label, desc, val) => `
       <label class="switch"><input type="checkbox" id="feat-${key}" ${val ? "checked" : ""}/> <span><b>${label}</b><br/><span class="muted">${desc}</span></span></label><br/>`;
     el.innerHTML = `
       <div class="panel">
-        <h3>下载能力开关</h3>
+        <h3>抖音能力开关 <span class="tag muted">独立于 B站</span></h3>
+        <p class="note">抖音点播视频没有弹幕，所以这一组里不出现弹幕开关；评论下载也一并省略。</p>
+        ${mk("dy_parse", "抖音解析", "关掉后首页与结果页的抖音入口全部收起", dsw.parse)}
+        ${mk("dy_video", "抖音视频", "直链交给客户端自己去 CDN 拉，服务端不做中转", dsw.video)}
+        ${mk("dy_audio", "抖音音频", "与 B站「纯音频」同名同义", dsw.audio)}
+        ${mk("dy_images", "抖音图文", "关闭 = 图集只展示信息、图片不可保存", dsw.images)}
+      </div>
+      <div class="panel">
+        <h3>B站 下载能力开关</h3>
         ${mk("watermarked", "有水印视频", "允许用户下载带水印版本", f.watermarked)}
         ${mk("clean", "无水印视频", "允许用户下载无水印版本（风险高）", f.clean)}
         ${mk("audio", "纯音频", "允许用户下载音频 MP3", f.audio)}
@@ -763,30 +844,59 @@ const renderers = {
   },
 
   async download(el) {
-    const days = 30;
-    const s = await api("/stats/download?days=" + days);
-    const det = await api("/stats/download/detail" + qs({ days, page: 1, size: 20 }));
-    const failRows = (s.fail_by_error || []).map(r => `<tr><td>${esc(r.error_type)}</td><td>${fmt(r.count)}</td></tr>`).join("");
+    const { mode, days, q, page, size, platform } = S.download;
+    const s = await api("/stats/download" + qs({ days, platform }));
+    const det = mode === "event"
+      ? await api("/stats/download/detail" + qs({ q, days, platform, page, size }))
+      : await api("/stats/download/sessions" + qs({ q, days, platform, page, size }));
+    const failRows = (s.fail_by_error || []).map(r => `<tr><td>${esc(errorLabel(r.error_type))}</td><td>${fmt(r.count)}</td></tr>`).join("");
     const failHostRows = (s.fail_by_host || []).map(r => {
       const total = r.fail + r.success;
       const rate = total ? Math.round(r.fail / total * 100) : 0;
       return `<tr><td>${esc(r.host)}</td><td>${fmt(r.fail)}</td><td>${fmt(r.success)}</td><td>${rate}%</td></tr>`;
     }).join("");
+    const modeTab = (key, text) =>
+      `<button class="pill ${mode === key ? "active" : ""}" onclick="setDownloadMode('${key}')">${text}</button>`;
+    const rows = mode === "event"
+      ? det.items.map(downloadRow).join("")
+      : det.items.map(sessionRow).join("");
     el.innerHTML = `
       <div class="cards">
-        <div class="card"><div class="label">下载事件总数</div><div class="value">${fmt(s.total)}</div></div>
+        <div class="card"><div class="label">下载次数</div><div class="value">${fmt(s.total)}</div><div class="sub">一次下载算一次</div></div>
         <div class="card"><div class="label">成功</div><div class="value ok">${fmt(s.success)}</div></div>
         <div class="card"><div class="label">失败</div><div class="value bad">${fmt(s.fail)}</div></div>
         <div class="card"><div class="label">成功率</div><div class="value">${s.success_rate}%</div></div>
       </div>
-      <div class="panel"><h3>下载趋势</h3><div id="chart-download" class="chart"></div></div>
+      <div class="panel"><h3>下载趋势（按次）</h3><div id="chart-download" class="chart"></div></div>
       <div class="panel"><h3>失败原因分布</h3><table><thead><tr><th>错误类型</th><th>数量</th></tr></thead><tbody>${failRows || '<tr><td colspan=2 class="muted">暂无失败</td></tr>'}</tbody></table></div>
       <div class="panel"><h3>失败域名分布</h3><table><thead><tr><th>域名</th><th>失败</th><th>成功</th><th>失败率</th></tr></thead><tbody>${failHostRows || '<tr><td colspan=4 class="muted">暂无下载</td></tr>'}</tbody></table></div>
       <div class="panel">
-        <h3>明细</h3>
-        <table><thead><tr><th>时间</th><th>用户（openid）</th><th>视频</th><th>类型</th><th>域名</th><th>阶段</th><th>状态</th><th>错误</th></tr></thead>
-        <tbody>${det.items.map(downloadRow).join("")}</tbody></table>
-        <p class="muted">共 ${fmt(det.total)} 条</p>
+        <h3>明细 · ${mode === "event" ? "每个阶段一行" : "一次下载一行"}</h3>
+        <div class="toolbar">
+          <button class="pill ${(platform||'')===''?'active':''}" onclick="S.download.platform=''; S.download.page=1; show('download')">全部平台</button>
+          <button class="pill ${platform==='bilibili'?'active':''}" onclick="S.download.platform='bilibili'; S.download.page=1; show('download')">B站</button>
+          <button class="pill ${platform==='douyin'?'active':''}" onclick="S.download.platform='douyin'; S.download.page=1; show('download')">抖音</button>
+          ${modeTab("session", "按下载")}${modeTab("event", "按事件")}
+          <input id="dl-q" value="${esc(q)}" placeholder="搜 openid / BVID / 标题 / 域名 / 错误" style="min-width:240px"
+            onkeydown="if (event.key === 'Enter') searchDownload()" />
+          <select id="dl-days" onchange="downloadDays(this.value)">
+            ${[[0, "全部历史"], [7, "近7天"], [30, "近30天"], [90, "近90天"], [365, "近365天"]].map(([value, text]) =>
+              `<option value="${value}" ${days === value ? "selected" : ""}>${text}</option>`).join("")}
+          </select>
+          <button onclick="searchDownload()">查询</button>
+          <button class="ghost" onclick="resetDownload()">重置</button>
+        </div>
+        ${mode === "event"
+          ? `<table><thead><tr><th>时间</th><th>用户（openid）</th><th>视频</th><th>类型</th><th>域名</th><th>阶段</th><th>状态</th><th>错误</th></tr></thead><tbody>${rows}</tbody></table>`
+          : `<table><thead><tr><th>开始时间</th><th>用户（openid）</th><th>视频</th><th>类型</th><th>结果</th><th>断在哪一步</th><th>失败原因</th></tr></thead><tbody>${rows || '<tr><td colspan=7 class="muted">暂无下载</td></tr>'}</tbody></table>`}
+        <div class="toolbar" style="justify-content:flex-end">
+          <span class="muted">共 ${fmt(det.total)} 条 · 第 ${page} / ${Math.max(1, Math.ceil(det.total / size))} 页</span>
+          <button class="ghost" onclick="downloadPage(-1)" ${page <= 1 ? "disabled" : ""}>上一页</button>
+          <button class="ghost" onclick="downloadPage(1)" ${page >= Math.ceil(det.total / size) ? "disabled" : ""}>下一页</button>
+          <select onchange="downloadSize(this.value)">
+            ${[20, 50, 100].map(n => `<option value="${n}" ${size === n ? "selected" : ""}>${n} 条/页</option>`).join("")}
+          </select>
+        </div>
       </div>`;
     drawChart("chart-download", chart => chart.setOption({
       tooltip: { trigger: "axis" }, grid: { left: 40, right: 20, top: 20, bottom: 30 },
@@ -832,8 +942,12 @@ const renderers = {
   },
 
   async cdn(el) {
-    const data = await api("/download/domains");
+    const kind = S.cdn.kind || "";
+    const data = await api("/download/domains" + qs({ kind }));
     const rows = data.items.map(domainRow).join("");
+    const counts = data.kind_counts || {};
+    const kindTab = (key, text) =>
+      `<button class="pill ${kind === key ? "active" : ""}" onclick="S.cdn.kind='${key}'; show('cdn')">${text}</button>`;
     el.innerHTML = `
       <div class="panel">
         <h3>批量登记已配置域名</h3>
@@ -845,9 +959,16 @@ const renderers = {
       </div>
       <div class="panel">
         <h3>域名配置管理</h3>
-        <p class="muted">这里记录已配置到微信后台的域名。B站 CDN 域名会参与下载候选治理；自有 API / COS 域名也可以一起登记。</p>
+        <p class="muted">这里记录已配置到微信后台的域名。B站 和抖音的 CDN 域名都参与下载候选治理；抖音子域名会换（v3-web / v11-weba / v26-weba…），靠这张表观察真实集合。自有 API / COS 域名也可以一起登记。</p>
         <p class="muted">「可能闲置」表示 30 天未出现，「建议删除」表示 60 天未出现。系统只提醒，不会自动删除微信后台配置。</p>
-        <table><thead><tr><th>域名</th><th>状态</th><th>是否已配置</th><th>出现次数</th><th>成功/失败</th><th>最近出现</th><th>建议</th><th>操作</th></tr></thead><tbody>${rows || '<tr><td colspan=8 class="muted">暂无域名记录</td></tr>'}</tbody></table>
+        <div class="toolbar">
+          ${kindTab("", `全部 ${fmt((counts.video || 0) + (counts.audio || 0) + (counts.image || 0))}`)}
+          ${kindTab("video", `视频域名 ${fmt(counts.video || 0)}`)}
+          ${kindTab("audio", `音频域名 ${fmt(counts.audio || 0)}`)}
+          ${kindTab("image", `图片域名 ${fmt(counts.image || 0)}`)}
+          <span class="muted">按「需配置 → 视频优先 → 失败率」排序，微信后台名额有限时先配视频的</span>
+        </div>
+        <table><thead><tr><th>域名</th><th>类型</th><th>状态</th><th>是否已配置</th><th>出现次数</th><th>成功/失败</th><th>最近出现</th><th>建议</th><th>操作</th></tr></thead><tbody>${rows || '<tr><td colspan=9 class="muted">暂无域名记录</td></tr>'}</tbody></table>
       </div>`;
   }
 };
@@ -879,14 +1000,55 @@ function localRow(i) {
   return `<tr><td>${esc(i.created_at)}</td><td>${esc(i.origin || "—")}</td><td>${esc(i.input) || "—"}</td><td>${esc(i.video_title || "—")}</td><td>${esc(i.bvid || "—")}</td><td>${result}</td><td>${esc(reason)}</td></tr>`;
 }
 
-function downloadRow(i) {
-  const status = i.status === "success"
-    ? '<span class="tag ok">成功</span>'
-    : '<span class="tag bad">失败</span>';
+const STAGE_LABELS = {
+  resolve: "获取直链",
+  download: "下载文件",
+  prepare: "准备文件",
+  save: "保存到相册",
+  share: "分享",
+  fallback: "备用保存"
+};
+const ERROR_LABELS = {
+  domain_not_configured: "微信未配置该域名",
+  domain_not_registered: "后端暂无已配置域名",
+  permission: "相册权限被拒",
+  http_error: "HTTP 错误",
+  expired: "链接已过期",
+  wx_error: "微信接口错误",
+  unknown: "未知"
+};
+function stageLabel(s) { return STAGE_LABELS[s] || s || "—"; }
+function errorLabel(e) { return ERROR_LABELS[e] || e || "—"; }
+
+function sessionRow(i) {
   const kindMap = {
     watermarked: "水印视频", clean: "无水印", audio: "音频",
     comment: "评论", danmaku: "弹幕", subtitle: "字幕"
   };
+  let title = esc(i.video_title || "—");
+  if (i.video_title && i.source_url) {
+    title = `<a href="${esc(i.source_url)}" target="_blank" rel="noopener">${title}</a>`;
+  }
+  const video = title + (i.bvid ? `<br/><span class="muted">${esc(i.bvid)}</span>` : "");
+  const user = `<span class="host">${esc(i.openid || "—")}</span>`;
+  let result = i.result === "success"
+    ? '<span class="tag ok">成功</span>'
+    : '<span class="tag bad">失败</span>';
+  if (i.copied_link) result += '<br/><span class="muted">已复制链接</span>';
+  const stage = i.fail_stage ? esc(stageLabel(i.fail_stage)) : "—";
+  const reason = i.fail_error_type
+    ? esc(errorLabel(i.fail_error_type)) + (i.fail_message ? `<br/><span class="muted">${esc(i.fail_message)}</span>` : "")
+    : "—";
+  const time = esc(i.started_at) + (i.ended_at && i.ended_at !== i.started_at
+    ? `<br/><span class="muted">→ ${esc(i.ended_at)} · ${fmt(i.event_count)} 步</span>` : "");
+  return `<tr><td>${time}</td><td>${user}</td><td>${video}</td><td>${esc(kindMap[i.kind] || i.kind || "—")}</td><td>${result}</td><td>${stage}</td><td>${reason}</td></tr>`;
+}
+
+function downloadRow(i) {
+  const status = i.status === "success"
+    ? '<span class="tag ok">成功</span>'
+    : '<span class="tag bad">失败</span>';
+  const kindMap = { watermarked: "水印视频", clean: "无水印", audio: "音频" };
   const error = [i.error_type, i.error_message, i.wx_err_msg].filter(Boolean).join(" / ");
   let title = esc(i.video_title || "—");
   if (i.video_title && i.source_url) {
@@ -921,6 +1083,17 @@ function sourceRow(i) {
   </tr>`;
 }
 
+const DOMAIN_KIND_LABEL = { video: "视频", audio: "音频", image: "图片" };
+
+function domainKindCell(i) {
+  const kinds = i.kinds || [];
+  if (!kinds.length) return '<span class="muted">—</span>';
+  // 视频用醒目色：运营要优先配它
+  return kinds
+    .map((k) => `<span class="tag ${k === "video" ? "bad" : "muted"}">${DOMAIN_KIND_LABEL[k] || k}</span>`)
+    .join(" ");
+}
+
 function domainRow(i) {
   const configTag = i.is_configured
     ? '<span class="tag ok">已配置</span>'
@@ -931,7 +1104,7 @@ function domainRow(i) {
   const toggle = i.is_configured
     ? `<button class="small ghost" onclick="saveDomain('${esc(i.host)}', false)">标记未配置</button>`
     : `<button class="small" onclick="saveDomain('${esc(i.host)}', true)">标记已配置</button>`;
-  return `<tr><td>${host}</td><td>${configTag}</td><td>${i.is_configured ? "是" : "否"}</td><td>${fmt(i.seen_count)}</td><td>${fmt(i.download_success_count)} / ${fmt(i.download_failure_count)}</td><td>${esc(fmtTime(i.last_seen_at))}</td><td><span class="tag ${cls}">${esc(suggestion)}</span></td><td>${toggle}</td></tr>`;
+  return `<tr><td>${host}</td><td>${domainKindCell(i)}</td><td>${configTag}</td><td>${i.is_configured ? "是" : "否"}</td><td>${fmt(i.seen_count)}</td><td>${fmt(i.download_success_count)} / ${fmt(i.download_failure_count)}</td><td>${esc(fmtTime(i.last_seen_at))}</td><td><span class="tag ${cls}">${esc(suggestion)}</span></td><td>${toggle}</td></tr>`;
 }
 
 async function saveDomain(host, configured) {
@@ -1068,10 +1241,17 @@ async function saveFeatures() {
     share: document.getElementById("feat-share").checked,
     at_reply: document.getElementById("feat-at_reply").checked
   };
+  const dyBody = {
+    parse: document.getElementById("feat-dy_parse").checked,
+    video: document.getElementById("feat-dy_video").checked,
+    audio: document.getElementById("feat-dy_audio").checked,
+    images: document.getElementById("feat-dy_images").checked
+  };
   try {
     await api("/config/features", { method: "PUT", body: JSON.stringify(mediaBody) });
     await api("/config/parse-features", { method: "PUT", body: JSON.stringify(parseBody) });
     await api("/config/ui", { method: "PUT", body: JSON.stringify(uiBody) });
+    await api("/douyin/switches", { method: "PUT", body: JSON.stringify(dyBody) });
     const [f, p, u] = await Promise.all([
       api("/config/features"),
       api("/config/parse-features"),
@@ -1195,6 +1375,54 @@ async function importSources() {
     show("sources");
   } catch (e) { showModal("导入失败", e.message, true); }
 }
+async function saveSearchConfig(patch) {
+  try {
+    await api("/search/config", { method: "PUT", body: JSON.stringify(patch) });
+    show("crawler");
+  } catch (e) {
+    showModal("保存失败", e.message, true);
+  }
+}
+
+async function pushSearch(scope) {
+  showModal("正在推送", scope === "all" ? "正在把全部页面推给微信搜索…" : "正在推送新增页面…", false);
+  try {
+    const r = await api("/search/push", { method: "POST", body: JSON.stringify({ scope }) });
+    showModal("推送完成", `成功 ${r.result.ok} 条 · 失败 ${r.result.fail} 条`, false);
+  } catch (e) {
+    showModal("推送失败", e.message, true);
+  }
+  show("crawler");
+}
+
+function setDownloadMode(mode) {
+  S.download.mode = mode;
+  S.download.page = 1;
+  show("download");
+}
+function searchDownload() {
+  S.download.q = (document.getElementById("dl-q").value || "").trim();
+  S.download.page = 1;
+  show("download");
+}
+function downloadDays(value) {
+  S.download.days = parseInt(value, 10) || 0;
+  S.download.page = 1;
+  show("download");
+}
+function downloadPage(delta) {
+  S.download.page = Math.max(1, S.download.page + delta);
+  show("download");
+}
+function downloadSize(value) {
+  S.download.size = parseInt(value, 10) || 20;
+  S.download.page = 1;
+  show("download");
+}
+function resetDownload() {
+  S.download = { mode: S.download.mode, days: 30, q: "", page: 1, size: 20 };
+  show("download");
+}
 function searchSources() {
   const st = S.sources;
   st.q = (document.getElementById("src-q").value || "").trim();
@@ -1219,24 +1447,50 @@ function sourcesSize(value) {
   S.sources.page = 1;
   show("sources");
 }
-async function saveSearchConfig(patch) {
+async function probeDouyin() {
+  const box = document.getElementById("dy-probe");
+  if (box) box.textContent = "探活中…";
   try {
-    await api("/search/config", { method: "PUT", body: JSON.stringify(patch) });
-    show("crawler");
+    const r = await api("/douyin/probe");
+    if (!box) return;
+    box.textContent = r.ok
+      ? `✓ 正常 · 响应 ${(r.bytes / 1024).toFixed(1)} KB · ${r.status_code}`
+      : `✗ 异常：${r.error || "空包"}（响应 ${r.bytes} 字节）`;
+    box.style.color = r.ok ? "var(--ok)" : "var(--danger)";
+  } catch (e) {
+    if (box) { box.textContent = "探活失败：" + e.message; box.style.color = "var(--danger)"; }
+  }
+}
+
+async function updateDouyinCookie() {
+  const msg = document.getElementById("dy-cookie-msg");
+  const text = (document.getElementById("dy-cookie-text").value || "").trim();
+  if (!text) { if (msg) msg.textContent = "请先粘贴 Cookie"; return; }
+  try {
+    const r = await api("/douyin/cookie", { method: "POST", body: JSON.stringify({ cookie: text }) });
+    const p = r.probe;
+    const ok = p && p.ok;
+    showModal("保存结果", ok
+      ? `Cookie 已保存，探活正常（响应 ${p.bytes} 字节）。`
+      : `Cookie 已保存，但探活没通过：${(p && p.error) || "空包"}。请确认这段 Cookie 对应的账号还处于登录状态。`, !ok);
+    show("cookie");
   } catch (e) {
     showModal("保存失败", e.message, true);
   }
 }
 
-async function pushSearch(scope) {
-  showModal("正在推送", scope === "all" ? "正在把全部页面推给微信搜索…" : "正在推送新增页面…", false);
+async function switchDouyinNode() {
+  const s = await api("/douyin/session");
+  const next = s.parse_node === "home" ? "tencent" : "home";
   try {
-    const r = await api("/search/push", { method: "POST", body: JSON.stringify({ scope }) });
-    showModal("推送完成", `成功 ${r.result.ok} 条 · 失败 ${r.result.fail} 条`, false);
+    await api("/douyin/node", { method: "PUT", body: JSON.stringify({ node: next }) });
+    showModal("已切换", next === "home"
+      ? "解析节点切到住宅节点。注意：会话与出口 IP 有绑定，切完需要重新扫码登录一次。"
+      : "解析节点切回腾讯云。", false);
+    show("cookie");
   } catch (e) {
-    showModal("推送失败", e.message, true);
+    showModal("切换失败", e.message, true);
   }
-  show("crawler");
 }
 
 async function uploadRepostAvatar() {

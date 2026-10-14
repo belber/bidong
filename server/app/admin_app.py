@@ -10,15 +10,18 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  # 注册模型
 from .admin import router
+from .routers.admin_douyin import router as douyin_router
 from .config import settings
 from .db import Base, engine
+from .schema_check import check_schema
 from .services import config_store
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.dev_mode:
-        Base.metadata.create_all(bind=engine)
+        # 只检查不建表：create_all 会建表但不盖迁移章，反而让库悄悄漂移
+        check_schema(engine)
     # 让 admin_config 始终有与运行时一致的有效值（缺失才写，不覆盖用户已保存值）
     from .db import SessionLocal
 
@@ -87,6 +90,7 @@ async def no_cache(request, call_next):
 
 
 app.include_router(router)
+app.include_router(douyin_router)
 
 admin_static = Path(__file__).parent / "admin_static"
 admin_static.mkdir(parents=True, exist_ok=True)

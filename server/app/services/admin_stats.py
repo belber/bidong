@@ -7,6 +7,7 @@ from ..models import (
     ActivationLog,
     AtEvent,
     Binding,
+    DownloadEvent,
     FollowEvent,
     ParseLog,
     User,
@@ -380,17 +381,18 @@ def activation_detail(
     }
 
 
-def parse_summary(db: Session, source: str, days: int = 30) -> dict:
+def parse_summary(db: Session, source: str, days: int = 30, platform: str = "") -> dict:
     start = _range_start_utc(days)
-    base = db.query(ParseLog).filter(
-        ParseLog.source == source, ParseLog.created_at >= start
-    )
+    filters = [ParseLog.source == source, ParseLog.created_at >= start]
+    if platform:
+        filters.append(ParseLog.platform == platform)
+    base = db.query(ParseLog).filter(*filters)
     total = base.count()
     ok = base.filter(ParseLog.ok.is_(True)).count()
     fail = total - ok
     reasons = (
         db.query(ParseLog.reason, func.count(ParseLog.id))
-        .filter(ParseLog.source == source, ParseLog.created_at >= start, ParseLog.ok.is_(False))
+        .filter(*filters, ParseLog.ok.is_(False))
         .group_by(ParseLog.reason)
         .all()
     )
@@ -410,11 +412,14 @@ def parse_detail(
     days: int = 30,
     page: int = 1,
     size: int = 20,
+    platform: str = "",
 ) -> dict:
     filters = [
         ParseLog.source == source,
         ParseLog.created_at >= _range_start_utc(days),
     ]
+    if platform:
+        filters.append(ParseLog.platform == platform)
     if q:
         like = f"%{q}%"
         filters.append(
@@ -470,6 +475,173 @@ def _user_origin(user: User | None) -> str:
     if user is None:
         return ""
     return (user.nickname or "") or (user.openid or "")
+
+
+# ---------------------------------------------------------------------------
+# 下载会话：明细的默认口径——一次下载一行
+# ---------------------------------------------------------------------------
+SESSION_DONE_STAGES = ("save", "share")
+
+
+def _download_rows(db: Session, q: str, days: int) -> list:
+    filters = []
+    if days > 0:
+        filters.append(DownloadEvent.created_at >= _range_start_utc(days))
+    if q:
+        like = f"%{q}%"
+        filters.append(
+            (DownloadEvent.bvid.like(like))
+            | (DownloadEvent.video_title.like(like))
+            | (DownloadEvent.host.like(like))
+            | (DownloadEvent.error_message.like(like))
+            | (User.openid.like(like))
+        )
+    return (
+        db.query(DownloadEvent, User)
+        .outerjoin(User, User.id == DownloadEvent.user_id)
+        .filter(*filters)
+        .order_by(DownloadEvent.created_at.asc())
+        .all()
+    )
+
+
+def _build_download_sessions(rows: list) -> list[dict]:
+    """把下载事件归并成「一次下载」。
+
+    rows 为 (DownloadEvent, User | None)，需按 created_at 升序。
+    优先按客户端上报的 session_id 切分；历史数据没有该字段时，退化为
+    「同一 (user, bvid, kind) 内遇到 resolve 就开新会话」——resolve 是每次点下载的第一个动作。
+    """
+    sessions: list[dict] = []
+    current: dict | None = None
+    for event, user in rows:
+        key = (event.user_id, event.bvid, event.kind)
+        start_new = (
+            current is None
+            or current["key"] != key
+            or (event.session_id and event.session_id != current["session_id"])
+            or (
+                not event.session_id
+                and not current["session_id"]
+                and event.stage == "resolve"
+            )
+        )
+        if start_new:
+            current = {
+                "key": key,
+                "session_id": event.session_id or "",
+                "started_at": event.created_at,
+                "ended_at": event.created_at,
+                "events": [],
+                "user": user,
+            }
+            sessions.append(current)
+        current["events"].append(event)
+        current["ended_at"] = event.created_at
+        if current.get("user") is None and user is not None:
+            current["user"] = user
+    return sessions
+
+
+def _session_view(session: dict) -> dict:
+    events = session["events"]
+    first = events[0]
+    user = session.get("user")
+    done = next(
+        (e for e in events if e.status == "success" and e.stage in SESSION_DONE_STAGES),
+        None,
+    )
+    failed = next((e for e in events if e.status == "fail"), None)
+    if done is not None:
+        # 成功会话不展示失败点，避免"先失败后成功"的同一次下载被误读
+        failed = None
+    host = ""
+    if failed is not None and failed.host:
+        host = failed.host
+    else:
+        host = next((e.host for e in reversed(events) if e.host), "")
+    return {
+        "started_at": _fmt_dt_sh(session["started_at"]),
+        "ended_at": _fmt_dt_sh(session["ended_at"]),
+        "platform": getattr(first, "platform", "bilibili") or "bilibili",
+        "openid": ((user.openid if user else "") or ""),
+        "nickname": ((user.nickname if user else "") or ""),
+        "bvid": first.bvid,
+        "video_title": next((e.video_title for e in events if e.video_title), ""),
+        "source_url": next((e.source_url for e in events if e.source_url), ""),
+        "kind": first.kind,
+        "host": host,
+        "result": "fail" if failed is not None else "success",
+        "fail_stage": failed.stage if failed is not None else "",
+        "fail_error_type": failed.error_type if failed is not None else "",
+        "fail_message": (
+            (failed.error_message or failed.wx_err_msg or "") if failed is not None else ""
+        ),
+        "copied_link": any(e.stage == "fallback" for e in events),
+        "event_count": len(events),
+    }
+
+
+def download_sessions(
+    db: Session,
+    q: str = "",
+    days: int = 30,
+    page: int = 1,
+    size: int = 20,
+    platform: str = "",
+) -> dict:
+    views = [_session_view(s) for s in _build_download_sessions(_download_rows(db, q, days))]
+    if platform:
+        views = [v for v in views if v["platform"] == platform]
+    views.sort(key=lambda v: v["started_at"], reverse=True)
+    total = len(views)
+    offset = (page - 1) * size
+    return {"total": total, "items": views[offset : offset + size]}
+
+
+def download_session_summary(db: Session, days: int = 30, platform: str = "") -> dict:
+    raw = _build_download_sessions(_download_rows(db, "", days))
+    views = [_session_view(s) for s in raw]
+    if platform:
+        views = [v for v in views if v["platform"] == platform]
+    total = len(views)
+    success = sum(1 for v in views if v["result"] == "success")
+    fail = total - success
+
+    by_error: dict[str, int] = {}
+    by_host: dict[str, dict] = {}
+    for view in views:
+        if view["result"] == "fail":
+            key = view["fail_error_type"] or "unknown"
+            by_error[key] = by_error.get(key, 0) + 1
+        if view["host"]:
+            item = by_host.setdefault(view["host"], {"fail": 0, "success": 0})
+            item["fail" if view["result"] == "fail" else "success"] += 1
+
+    per_day: dict[str, int] = {}
+    for session in raw:
+        key = _shanghai_date(session["started_at"]).isoformat()
+        per_day[key] = per_day.get(key, 0) + 1
+
+    return {
+        "total": total,
+        "success": success,
+        "fail": fail,
+        "success_rate": round(success / total * 100, 1) if total else 0.0,
+        "fail_by_error": [
+            {"error_type": k, "count": v}
+            for k, v in sorted(by_error.items(), key=lambda x: -x[1])
+        ],
+        "fail_by_host": [
+            {"host": h, "fail": v["fail"], "success": v["success"]}
+            for h, v in sorted(by_host.items(), key=lambda x: -x[1]["fail"])
+        ],
+        "trend": (
+            [{"date": d, "count": per_day[d]} for d in sorted(per_day)]
+            if days <= 0
+            else [{"date": d, "count": per_day.get(d, 0)} for d in _date_labels(days)]
+        ),
+    }
 
 
 def visit_summary(db: Session, days: int = 30) -> dict:

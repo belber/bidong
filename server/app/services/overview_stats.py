@@ -82,10 +82,30 @@ def _download_stats(sessions: list[dict]) -> dict:
             if session.get("host"):
                 by_host[session["host"]] = by_host.get(session["host"], 0) + 1
 
+    def _by_platform() -> dict[str, dict]:
+        out: dict[str, dict] = {}
+        for key in ("bilibili", "douyin"):
+            rows = [s for s in videos if (s.get("platform") or "bilibili") == key]
+            ok = [s for s in rows if s["result"] == "success" or s.get("copied_link")]
+            fails: dict[str, int] = {}
+            for s in rows:
+                if s["result"] != "success" and not s.get("copied_link"):
+                    err = s.get("fail_error_type") or "unknown"
+                    fails[err] = fails.get(err, 0) + 1
+            out[key] = {
+                "total": len(rows),
+                "success": len(ok),
+                "fail": len(rows) - len(ok),
+                "rate": round(len(ok) / len(rows) * 100, 1) if rows else 0.0,
+                "top_error": max(fails, key=fails.get) if fails else "",
+            }
+        return out
+
     total = len(videos)
     success = saved + copied
     return {
         "total": total,
+        "by_platform": _by_platform(),
         "saved": saved,
         "copied": copied,
         "success": success,
@@ -180,6 +200,25 @@ def day_snapshot(db: Session, day: date) -> dict:
         if not item.ok:
             key = item.reason or "other"
             reasons[key] = reasons.get(key, 0) + 1
+
+    def _by_platform(rows: list) -> dict[str, dict]:
+        """合计之外再给 B站 / 抖音 各一行，方便看新链路跑得怎么样。"""
+        out: dict[str, dict] = {}
+        for key in ("bilibili", "douyin"):
+            subset = [p for p in rows if p.platform == key]
+            top = {}
+            for item in subset:
+                if not item.ok:
+                    reason = item.reason or "other"
+                    top[reason] = top.get(reason, 0) + 1
+            out[key] = {
+                "total": len(subset),
+                "ok": sum(1 for p in subset if p.ok),
+                "fail": sum(1 for p in subset if not p.ok),
+                "top_reason": max(top, key=top.get) if top else "",
+            }
+        return out
+
     parse = {
         "total": len(parses),
         "ok": sum(1 for p in parses if p.ok),
@@ -192,6 +231,7 @@ def day_snapshot(db: Session, day: date) -> dict:
         "robot_total": len(robot),
         "local_users": len({p.user_id for p in local if p.user_id}),
         "robot_users": len({p.bili_uid for p in robot if p.bili_uid}),
+        "by_platform": _by_platform(parses),
         "new_cards": db.query(VideoCard)
         .filter(VideoCard.collected_at >= start, VideoCard.collected_at < end)
         .count(),

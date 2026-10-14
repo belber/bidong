@@ -1,35 +1,25 @@
 .page {
   padding: 20rpx 28rpx 60rpx;
   background: #FFFFFF;
-  min-height: calc(100vh - 176rpx);
+  height: calc(100vh - 176rpx);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 列表用 scroll-view 承载：enhanced + show-scrollbar=false 双端隐藏滚动条 */
+.list-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.list-spacer {
+  height: calc(env(safe-area-inset-bottom) + 160rpx);
 }
 
 .page.editing {
   padding-bottom: 150rpx;
-}
-
-.seg {
-  display: flex;
-  margin-top: 20rpx;
-  background: #FFF4F7;
-  border-radius: 999rpx;
-  padding: 6rpx;
-}
-
-.seg-it {
-  flex: 1;
-  text-align: center;
-  font-size: 28rpx;
-  color: #B28B97;
-  padding: 14rpx 0;
-  border-radius: 999rpx;
-  font-weight: 600;
-}
-
-.seg-it.on {
-  background: #FB7299;
-  color: #FFFFFF;
-  font-weight: 700;
 }
 
 .search-box {
@@ -82,11 +72,79 @@
   padding-right: 20rpx;
 }
 
-.robot-records-tip {
-  margin: 32rpx 4rpx 12rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #2B1E23;
+/* 视图切换行：分区筛选下方独立一行，图标组居中。
+   列数不在这行里：改由双指捏合调整（见 pinchZoom.js），行内只有一个图标组 */
+.view-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  height: 52rpx;
+  margin-top: 16rpx;
+}
+
+.vseg {
+  display: flex;
+  gap: 4rpx;
+  padding: 4rpx;
+  background: #FFF4F7;
+  border-radius: 16rpx;
+}
+
+.vbtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60rpx;
+  height: 44rpx;
+  border-radius: 12rpx;
+  color: #B28B97;
+}
+
+/* 视觉尺寸保持很小，但把可点区域上下各撑 16rpx（约 76rpx ≈ 38pt），避免手指按不准 */
+.vbtn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -16rpx;
+  bottom: -16rpx;
+}
+
+.vbtn.on {
+  background: #FFFFFF;
+  color: #FB7299;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.08);
+}
+
+.vi-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 28rpx;
+  height: 22rpx;
+}
+
+.vi-list .bar {
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+}
+
+.vi-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4rpx;
+  width: 26rpx;
+  height: 26rpx;
+}
+
+.vi-grid .q {
+  width: 11rpx;
+  height: 11rpx;
+  border-radius: 2rpx;
+  background: currentColor;
 }
 
 .guide-card {
@@ -277,22 +335,6 @@
   height: 100%;
 }
 
-.src {
-  position: absolute;
-  left: 8rpx;
-  top: 8rpx;
-  font-size: 20rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-  background: #FB7299;
-  padding: 3rpx 12rpx;
-  border-radius: 999rpx;
-}
-
-.src.bot {
-  background: #3A3A45;
-}
-
 .dur {
   position: absolute;
   right: 8rpx;
@@ -330,15 +372,75 @@
   color: #B28B97;
 }
 
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx;
+/* 网格视图：列数由 cols-N 控制；卡片沿用列表的信息层级，只是改成纵向排布 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24rpx 18rpx;
 }
 
-.chips .chip {
+.grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid.cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.gcell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+.gthumb {
+  position: relative;
+  width: 100%;
+  padding-top: 62.5%; /* 16:10，与列表缩略图同一比例 */
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #ECEFF3;
+}
+
+.gthumb .dur {
+  right: 8rpx;
+  bottom: 8rpx;
+  font-size: 16rpx;
+  padding: 2rpx 8rpx;
+}
+
+/* 编辑态勾选圈落封面左上角（来源角标去掉后空出来的位置，右上角留给平台角标） */
+.gthumb .check {
+  position: absolute;
+  left: 8rpx;
+  top: 8rpx;
+}
+
+.gt {
+  font-size: 26rpx;
+  font-weight: 650;
+  color: #2B1E23;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gsub {
   font-size: 20rpx;
-  padding: 2rpx 12rpx;
+  color: #B28B97;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 网格卡片只留封面 + 标题 + UP主·分区：标签不进网格（列表里仍保留），
+   4 列时连 UP主·分区 也放不下，只剩标题 */
+.grid.cols-4 .gsub {
+  display: none;
 }
 
 .check {
@@ -427,4 +529,32 @@
 
 .empty-btn {
   width: 360rpx;
+}
+
+/* 平台角标：封面右上角（来源角标已去掉，左下/左上留给时长与编辑态勾选圈） */
+.plat {
+  position: absolute;
+  right: 8rpx;
+  top: 8rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: #FB7299;
+}
+
+.plat.dy {
+  background: #161823;
+}
+
+.ad-slot {
+  margin: 16rpx 0;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+/* 网格下的广告：贴在月份分组末尾的整行横幅（不参与网格排版，所以不会空出半格） */
+.ad-banner {
+  margin: 16rpx 0 0;
 }

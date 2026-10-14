@@ -1,11 +1,17 @@
 const api = require('../../utils/api.js');
+const { buildMineAds } = require('../../utils/ads.js');
+
+// 页面底部的两条横幅（上下叠放）：上面那条是原位置，下面那条是新加的
+const [mineTop, mineBottom] = buildMineAds();
 
 Page(Object.assign({
   data: {
     bound: false,
     biliUid: '',
     biliName: '',
-    showRobotGuide: true
+    showRobotGuide: true,
+    mineTop,
+    mineBottom
   },
 
   onShow() {
@@ -36,6 +42,22 @@ Page(Object.assign({
         });
       })
       .catch(() => {});
+  },
+
+  // 两条广告各自独立：只隐藏加载失败的那一条（slotKey 由 data-slot 带过来）
+  onAdError(e) {
+    const slotKey = (e && e.currentTarget && e.currentTarget.dataset
+      ? e.currentTarget.dataset.slot
+      : '') || '';
+    console.warn('[ad] 我的页横幅加载失败', slotKey, e && e.detail);
+
+    const patch = {};
+    ['mineTop', 'mineBottom'].forEach((key) => {
+      if (this.data[key] && this.data[key].slotKey === slotKey) {
+        patch[key] = Object.assign({}, this.data[key], { adError: true });
+      }
+    });
+    this.setData(patch);
   },
 
   onBind() {

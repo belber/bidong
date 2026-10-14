@@ -22,3 +22,6 @@ miniprogram/project.private.config.json
 .idea/
 .vscode/
 .superpowers/
+
+# 本地存储后端的运行时产物（covers 等）：从仓库根目录跑服务时会落在这里
+var/

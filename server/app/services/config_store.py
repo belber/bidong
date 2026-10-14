@@ -213,6 +213,70 @@ def set_robot_cookie(db: Session, cookie: dict[str, str]) -> None:
     set_json(db, "robot_cookie", payload)
 
 
+# ---------------------------------------------------------------------------
+# 抖音采集会话
+# ---------------------------------------------------------------------------
+DOUYIN_COOKIE_KEY = "douyin_cookie"
+DOUYIN_NODE_KEY = "douyin_parse_node"
+
+# 只保留这几项做「是否配过」的判断，不参与鉴权逻辑（鉴权认整段 Cookie）
+DOUYIN_COOKIE_MARKERS = ("sessionid=", "sid_tt=", "uid_tt=")
+
+
+def douyin_cookie(db: Session) -> str:
+    """整段 Cookie 头字符串：DB 优先，其次环境变量。"""
+    stored = get_raw(db, DOUYIN_COOKIE_KEY)
+    return (stored or settings.douyin_cookie or "").strip()
+
+
+def set_douyin_cookie(db: Session, raw: str) -> None:
+    set_raw(db, DOUYIN_COOKIE_KEY, normalize_cookie(raw))
+
+
+def normalize_cookie(raw: str) -> str:
+    """把各种粘贴格式压成一行 `k=v; k=v`。
+
+    支持请求头格式、多行格式，以及 Netscape 导出里混进来的裸域名 token
+    （`douyin.com` 这种没有 `=` 的片段会被丢掉）。
+    """
+    parts = []
+    for chunk in (raw or "").replace("\n", ";").split(";"):
+        item = chunk.strip()
+        if item and "=" in item:
+            parts.append(item)
+    return "; ".join(parts)
+
+
+def douyin_cookie_configured(db: Session) -> bool:
+    cookie = douyin_cookie(db)
+    return bool(cookie) and all(marker in cookie for marker in DOUYIN_COOKIE_MARKERS)
+
+
+def douyin_parse_node(db: Session) -> str:
+    return get_raw(db, DOUYIN_NODE_KEY) or settings.douyin_parse_node
+
+
+def set_douyin_parse_node(db: Session, node: str) -> None:
+    set_raw(db, DOUYIN_NODE_KEY, (node or "").strip() or "tencent")
+
+
+# 抖音能力开关：解析、视频、音频、图文（图文默认开）
+DOUYIN_SWITCH_KEYS = ("parse", "video", "audio", "images")
+
+
+def douyin_switches(db: Session) -> dict[str, bool]:
+    stored = get_json(db, "douyin_switches") or {}
+    return {key: bool(stored.get(key, True)) for key in DOUYIN_SWITCH_KEYS}
+
+
+def set_douyin_switches(db: Session, **kwargs: bool) -> None:
+    current = douyin_switches(db)
+    for key in DOUYIN_SWITCH_KEYS:
+        if key in kwargs:
+            current[key] = bool(kwargs[key])
+    set_json(db, "douyin_switches", current)
+
+
 def _env_field_name(cookie_field: str) -> str:
     table = {
         "SESSDATA": "robot_sessdata",

@@ -1,5 +1,6 @@
 .page {
-  padding: 32rpx 28rpx 60rpx;
+  /* 底部留出 Tab 栏（约 148rpx）+ 安全区的高度：最后一条广告不贴在 Tab 栏上 */
+  padding: 32rpx 28rpx calc(env(safe-area-inset-bottom) + 220rpx);
   background: #FFFFFF;
   min-height: calc(100vh - 176rpx);
 }
@@ -85,4 +86,13 @@
 .arr {
   font-size: 34rpx;
   color: #C9A6B1;
+}
+
+.ad-banner {
+  /* 我的页左右 padding 28rpx，按 20:7 预留固定高度 */
+  width: calc(100vw - 56rpx);
+  height: calc((100vw - 56rpx) * 7 / 20);
+  margin: 32rpx 0 0;
+  border-radius: 16rpx;
+  overflow: hidden;
 }

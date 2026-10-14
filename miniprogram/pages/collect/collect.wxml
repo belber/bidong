@@ -14,18 +14,48 @@
     <text class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword">×</text>
   </view>
 
-  <view class="seg">
-    <view class="seg-it {{sourceFilter === 'all' ? 'on' : ''}}" data-source="all" bindtap="onSourceTap">全部</view>
-    <view class="seg-it {{sourceFilter === 'local' ? 'on' : ''}}" data-source="local" bindtap="onSourceTap">本机</view>
-    <view class="seg-it {{sourceFilter === 'robot' ? 'on' : ''}}" data-source="robot" bindtap="onSourceTap">@壁咚咚</view>
-  </view>
-
   <scroll-view class="filter-scroll" wx:if="{{!showRobotGuide}}" scroll-x enhanced show-scrollbar="{{false}}">
     <view class="filter-inner">
       <text class="chip {{partitionFilter === item ? 'chip-on' : ''}}" wx:for="{{allPartitions}}" wx:key="*this" data-partition="{{item}}" bindtap="onPartitionTap">{{item}}</text>
     </view>
   </scroll-view>
 
+  <view class="view-row" wx:if="{{!showRobotGuide}}">
+    <view class="vseg">
+      <view
+        class="vbtn {{view === 'list' ? 'on' : ''}}"
+        data-view="list"
+        bindtap="onViewTap"
+        aria-role="button"
+        aria-label="列表视图"
+      >
+        <view class="vi-list"><view class="bar" /><view class="bar" /><view class="bar" /></view>
+      </view>
+      <view
+        class="vbtn {{view === 'grid' ? 'on' : ''}}"
+        data-view="grid"
+        bindtap="onViewTap"
+        aria-role="button"
+        aria-label="网格视图"
+      >
+        <view class="vi-grid"><view class="q" /><view class="q" /><view class="q" /><view class="q" /></view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view
+    class="list-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled="{{!editing}}"
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+    bindtouchstart="onFeedTouchStart"
+    bindtouchmove="onFeedTouchMove"
+    bindtouchend="onFeedTouchEnd"
+    bindtouchcancel="onFeedTouchEnd"
+  >
   <block wx:if="{{showRobotGuide}}">
     <view class="guide-card">
       <view class="guide-title">你还未绑定或未 @过，可以按下面的方式操作</view>
@@ -53,38 +83,64 @@
         </view>
       </view>
     </view>
+    <view class="ad-slot" wx:if="{{emptyAd && !emptyAd.adError}}">
+      <ad unit-id="{{emptyAd.unitId}}" binderror="onAdError" data-slot="{{emptyAd.slotKey}}" />
+    </view>
   </block>
 
   <block wx:else>
-    <view class="robot-records-tip" wx:if="{{sourceFilter === 'robot'}}">你 @过的内容如下</view>
     <block wx:if="{{groups.length}}">
       <view class="month" wx:for="{{groups}}" wx:key="month" wx:for-item="group">
         <view class="month-head">
           <text class="month-y">● {{group.month}}</text>
           <text class="month-c">{{group.count}} 个视频</text>
         </view>
+        <view class="grid cols-{{cols}}" wx:if="{{view === 'grid'}}">
+          <block wx:for="{{group.items}}" wx:key="id" wx:for-item="item">
+          <view
+            class="gcell"
+            bindtap="onCardTap"
+            bindlongpress="onCardLongPress"
+            data-id="{{item.id}}"
+          >
+            <view class="gthumb">
+              <image class="thumb-img" src="{{item.cover_url}}" mode="aspectFill" />
+              <text class="plat {{item.platform === 'douyin' ? 'dy' : ''}}">{{item.platform === 'douyin' ? '抖音' : 'B站'}}</text>
+              <text class="dur">{{item.dur}}</text>
+              <view wx:if="{{editing}}" class="check {{item.selected ? 'on' : ''}}"></view>
+            </view>
+            <view class="gt">{{item.title}}</view>
+            <view class="gsub">{{item.up_name}} · {{item.partition}}</view>
+          </view>
+          </block>
+        </view>
+        <block wx:else>
+        <block wx:for="{{group.items}}" wx:key="id" wx:for-item="item">
+        <view wx:if="{{item.isAd}}" class="ad-slot">
+          <ad wx:if="{{!item.adError}}" unit-id="{{item.unitId}}" binderror="onAdError" data-slot="{{item.slotKey}}" />
+        </view>
         <view
+          wx:else
           class="card"
-          wx:for="{{group.items}}"
-          wx:key="id"
-          wx:for-item="card"
           bindtap="onCardTap"
           bindlongpress="onCardLongPress"
-          data-id="{{card.id}}"
+          data-id="{{item.id}}"
         >
-          <view wx:if="{{editing}}" class="check {{card.selected ? 'on' : ''}}"></view>
+          <view wx:if="{{editing}}" class="check {{item.selected ? 'on' : ''}}"></view>
           <view class="thumb">
-            <image class="thumb-img" src="{{card.cover_url}}" mode="aspectFill" />
-            <text class="src {{card.source === 'robot' ? 'bot' : ''}}">{{card.source === 'robot' ? '@壁咚咚' : '本机'}}</text>
-            <text class="dur">{{card.dur}}</text>
+            <image class="thumb-img" src="{{item.cover_url}}" mode="aspectFill" />
+            <text class="plat {{item.platform === 'douyin' ? 'dy' : ''}}">{{item.platform === 'douyin' ? '抖音' : 'B站'}}</text>
+            <text class="dur">{{item.dur}}</text>
           </view>
           <view class="meta">
-            <view class="t">{{card.title}}</view>
-            <view class="sub">{{card.up_name}} · {{card.partition}}</view>
-            <view class="chips">
-              <text class="chip chip-tag" wx:for="{{card.tags}}" wx:key="*this">＃{{item}}</text>
-            </view>
+            <view class="t">{{item.title}}</view>
+            <view class="sub">{{item.up_name}} · {{item.platform === 'douyin' ? '抖音' : item.partition}}</view>
           </view>
+        </view>
+        </block>
+        </block>
+        <view class="ad-slot ad-banner" wx:if="{{view === 'grid' && group.ad && !group.ad.adError}}">
+          <ad unit-id="{{group.ad.unitId}}" binderror="onAdError" data-slot="{{group.ad.slotKey}}" />
         </view>
       </view>
     </block>
@@ -93,8 +149,14 @@
       <view class="empty-icon">🗂</view>
       <view class="empty-text">{{keyword ? '没有找到相关收藏' : '还没有符合条件的收藏'}}</view>
       <button class="btn-primary empty-btn" bindtap="onGotoParse">＋ 去解析</button>
+      <view class="ad-slot" wx:if="{{emptyAd && !emptyAd.adError}}">
+        <ad unit-id="{{emptyAd.unitId}}" binderror="onAdError" data-slot="{{emptyAd.slotKey}}" />
+      </view>
     </view>
   </block>
+
+  <view class="list-spacer" />
+  </scroll-view>
 
   <view class="edit-bar" wx:if="{{editing}}">
     <text class="edit-count">已选 {{selectedCount}} 项</text>

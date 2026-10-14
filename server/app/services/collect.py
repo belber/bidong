@@ -11,6 +11,7 @@ from .tags import get_or_create_tag
 def card_to_out(card: VideoCard) -> CardOut:
     return CardOut(
         id=card.id,
+        platform=card.platform,
         bvid=card.bvid,
         title=card.title,
         up_name=card.up_name,
@@ -39,13 +40,17 @@ def collect_video(
 
 
 def collect_video_by_bvid(
-    db: Session, user: User, bvid: str, source: str = "robot"
+    db: Session, user: User, bvid: str, source: str = "robot", platform: str = "bilibili"
 ) -> tuple[VideoCard, list[dict], dict, int]:
     client = BiliClient()
     try:
         existing = (
             db.query(VideoCard)
-            .filter(VideoCard.user_id == user.id, VideoCard.bvid == bvid)
+            .filter(
+                VideoCard.user_id == user.id,
+                VideoCard.platform == platform,
+                VideoCard.bvid == bvid,
+            )
             .first()
         )
         if existing is not None:

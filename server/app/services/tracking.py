@@ -16,6 +16,9 @@ def classify_error(exc: Exception) -> str:
     lowered = msg.lower()
 
     if name == "AppError":
+        # 调用方给了明确分类就用它（抖音各条通道的失败原因各不相同）
+        if getattr(exc, "error_type", None):
+            return exc.error_type
         status = getattr(exc, "status_code", 0)
         if status == 400:
             return "invalid_url"
@@ -147,6 +150,7 @@ def log_activation(
 def log_parse(
     db: Session,
     *,
+    platform: str = "bilibili",
     source: str,
     user_id: int | None,
     bili_uid: str | None,
@@ -159,6 +163,7 @@ def log_parse(
 ) -> None:
     db.add(
         ParseLog(
+            platform=platform,
             source=source,
             user_id=user_id,
             bili_uid=bili_uid,

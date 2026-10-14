@@ -14,9 +14,11 @@ from ..schemas import (
     SubtitleLine,
     VideoStats,
 )
-from ..services import config_store, repost_source, tracking
+from ..services import collect_douyin as collect_douyin_service
+from ..services import config_store, link_platform, repost_source, tracking
 from ..services.bilibili import BiliClient
 from ..services.collect import card_to_out, collect_video_by_bvid
+from ..services.douyin_provider import DouyinProvider
 from ..services.parse_cache import parse_cache
 
 router = APIRouter(tags=["parse"])
@@ -28,6 +30,71 @@ def parse(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if link_platform.detect_platform(payload.url) == "douyin":
+        return _parse_douyin(payload, user, db)
+    return _parse_bilibili(payload, user, db)
+
+
+def _parse_douyin(payload: ParseRequest, user: User, db: Session) -> ParseResult:
+    """抖音：解析 → 建卡 → 返回。所有媒体直链交给客户端自己去 CDN 拉，服务端不中转。"""
+    start = time.monotonic()
+    provider = DouyinProvider(cookie=config_store.douyin_cookie(db))
+    aweme_id = None
+    try:
+        meta = provider.resolve(payload.url)
+        aweme_id = meta.aweme_id
+        card = collect_douyin_service.collect_douyin(db, user, meta, source="local")
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        tracking.log_parse(
+            db,
+            platform="douyin",
+            source="local",
+            user_id=user.id,
+            bili_uid=None,
+            input=payload.url,
+            bvid=aweme_id,
+            ok=False,
+            reason=tracking.classify_error(exc),
+            duration_ms=tracking.elapsed_ms(start),
+        )
+        raise
+    finally:
+        provider.close()
+
+    tracking.log_parse(
+        db,
+        platform="douyin",
+        source="local",
+        user_id=user.id,
+        bili_uid=None,
+        input=payload.url,
+        bvid=card.bvid,
+        ok=True,
+        reason="",
+        duration_ms=tracking.elapsed_ms(start),
+        video_title=card.title,
+    )
+    out = card_to_out(card)
+    return ParseResult(
+        **out.model_dump(),
+        subtitles=[],
+        stats=VideoStats(**meta.stats),
+        danmaku_count=0,
+        origin=None,
+        media=MediaAvailability(
+            watermarked=False,
+            clean=bool(meta.video_urls),
+            audio=bool(meta.audio_urls),
+            images=len(meta.image_urls),
+            note=meta.kind == "note",
+        ),
+        # 抖音没有字幕 / 弹幕 / 评论下载，前端凭这个整块不渲染「文本」卡
+        features=ParseFeatures(comment=False, danmaku=False),
+    )
+
+
+def _parse_bilibili(payload: ParseRequest, user: User, db: Session) -> ParseResult:
     start = time.monotonic()
     bvid = None
     try:
@@ -37,7 +104,7 @@ def parse(
         finally:
             client.close()
 
-        key = (user.id, bvid)
+        key = (user.id, "bilibili", bvid)
         cached = parse_cache.get(key)
         if cached is not None:
             # 媒体/解析开关是动态配置，始终实时读取，不随缓存走
@@ -46,7 +113,11 @@ def parse(
             # 出处同理：解析结果缓存 60 秒，出处不能跟着缓存变旧
             cached_card = (
                 db.query(VideoCard)
-                .filter(VideoCard.user_id == user.id, VideoCard.bvid == bvid)
+                .filter(
+                    VideoCard.user_id == user.id,
+                    VideoCard.platform == "bilibili",
+                    VideoCard.bvid == bvid,
+                )
                 .first()
             )
             origin = repost_source.get_origin(

@@ -10,6 +10,10 @@ export ENABLE_WATERMARKED_VIDEO="true"
 export ENABLE_CLEAN_VIDEO="true"
 export ENABLE_AUDIO="true"
 
+# 先跑迁移再起服务：否则代码里用到的新字段会报 no such column
+echo "跑数据库迁移…"
+.venv/bin/python -m alembic upgrade head
+
 .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --reload &
 
 .venv/bin/python -m uvicorn app.admin_app:app --host 0.0.0.0 --port "${ADMIN_PORT:-8081}" --reload &

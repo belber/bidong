@@ -17,6 +17,7 @@ from ..config import settings
 from ..models import VideoCard
 from ..time import utcnow_naive, to_unix
 from . import admin_stats, config_store, repost_source
+from .storage import media_url
 
 TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token"
 PUSH_URL = "https://api.weixin.qq.com/wxa/search/wxaapi_submitpages"
@@ -140,7 +141,8 @@ def build_video_page(db: Session, card: VideoCard, type_value: str) -> dict:
                 "page_type": PAGE_TYPE,
                 "title": _short(card.title),
                 "abstract": [_short(card.desc, 60)] if card.desc else [],
-                "cover_img_url": card.cover_url,
+                # 微信搜索爬虫直接消费这个地址，相对路径它取不到，这里补成绝对地址
+                "cover_img_url": media_url(card.cover_url),
                 "mainbody": mainbody,
                 "time_publish": int(card.pubdate or 0) or to_unix(utcnow_naive()),
                 "time_modify": to_unix(utcnow_naive()),

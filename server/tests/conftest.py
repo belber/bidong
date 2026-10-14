@@ -12,6 +12,15 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
+def _no_download_debug_fail(monkeypatch):
+    """本地 .env 可能开着 DOWNLOAD_DEBUG_FAIL（返回必然失败的调试候选）。
+
+    测试不能依赖开发者本地的 .env，默认关掉；需要它的用例自己再打开。
+    """
+    monkeypatch.setattr(settings, "download_debug_fail", False)
+
+
+@pytest.fixture(autouse=True)
 def _clear_parse_cache():
     from app.services.parse_cache import parse_cache
 

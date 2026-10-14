@@ -37,10 +37,14 @@ class User(Base):
 
 class VideoCard(Base):
     __tablename__ = "video_card"
-    __table_args__ = (UniqueConstraint("user_id", "bvid", name="uq_video_card_user_bvid"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "platform", "bvid", name="uq_video_card_user_platform_bvid"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
+    # bilibili | douyin：bvid 列存的是「该平台内的作品 ID」（B站 BV 号 / 抖音 aweme_id）
+    platform: Mapped[str] = mapped_column(String(16), default="bilibili", index=True)
     bvid: Mapped[str] = mapped_column(String(32), index=True)
     up_mid: Mapped[str] = mapped_column(String(32), default="")
     title: Mapped[str] = mapped_column(Text)
@@ -165,6 +169,7 @@ class ParseLog(Base):
     __tablename__ = "parse_log"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(16), default="bilibili", index=True)
     source: Mapped[str] = mapped_column(String(16), index=True)  # local | robot
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("user.id"), nullable=True, index=True
@@ -195,13 +200,16 @@ class AdminConfig(Base):
 
 
 class BiliCdnDomain(Base):
-    """B站 CDN 域名登记，用于微信 downloadFile 合法域名治理。"""
+    """CDN 域名登记，用于微信 downloadFile 合法域名治理（B站 与抖音共用）。"""
 
     __tablename__ = "bili_cdn_domain"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     host: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     is_configured: Mapped[bool] = mapped_column(Boolean, default=False)
+    # 这个域名服务过哪些下载类型，逗号分隔：video / audio / image。
+    # 图、音、视频在抖音上是三个完全不同的域名族，运营要优先配视频的。
+    kinds: Mapped[str] = mapped_column(String(64), default="")
     first_seen_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
     last_seen_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
     seen_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -226,9 +234,11 @@ class DownloadEvent(Base):
     card_id: Mapped[int | None] = mapped_column(
         ForeignKey("video_card.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    platform: Mapped[str] = mapped_column(String(16), default="bilibili", index=True)
     bvid: Mapped[str] = mapped_column(String(32), default="", index=True)
     video_title: Mapped[str] = mapped_column(Text, default="")
     source_url: Mapped[str] = mapped_column(Text, default="")
+    session_id: Mapped[str] = mapped_column(String(40), default="", index=True)
     kind: Mapped[str] = mapped_column(String(16), default="", index=True)
     qn: Mapped[int | None] = mapped_column(Integer, nullable=True)
     host: Mapped[str] = mapped_column(String(255), default="", index=True)

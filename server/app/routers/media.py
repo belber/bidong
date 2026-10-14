@@ -11,9 +11,10 @@ from ..models import User, VideoCard
 from ..schemas import DownloadEventReport, MediaOption
 from ..config import settings
 from ..services.bilibili import BiliClient, UA
+from ..services.douyin_provider import DouyinProvider
 from ..services import media_download
 from ..services import notify
-from ..services import config_store
+from ..services import config_store, douyin
 
 router = APIRouter(tags=["media"])
 
@@ -39,6 +40,68 @@ def _require_enabled(kind: str, db: Session) -> None:
         raise AppError(403, "该下载未开放")
     if kind == "audio" and not switches["audio"]:
         raise AppError(403, "该下载未开放")
+
+
+DOUYIN_KIND_SWITCH = {"video": "video", "audio": "audio", "image": "images"}
+
+
+def _douyin_download_url(card: VideoCard, kind: str, index: int, db: Session) -> dict:
+    """抖音直链：每次现取，不落库。
+
+    抖音的 CDN 直链几小时就过期，存下来只会拿到死链；而且它不校验 Referer / UA，
+    客户端可以直接下，所以服务端只做「取链接」这一步，不碰文件字节。
+    """
+    switch = DOUYIN_KIND_SWITCH.get(kind)
+    if switch is None:
+        raise AppError(400, "未知下载类型")
+    if not config_store.douyin_switches(db)[switch]:
+        raise AppError(403, "该下载未开放")
+
+    provider = DouyinProvider(cookie=config_store.douyin_cookie(db))
+    try:
+        meta = douyin.meta_from_detail(provider.fetch_detail(card.bvid))
+    finally:
+        provider.close()
+
+    if kind == "video":
+        urls = meta.video_urls
+        dedup = True
+    elif kind == "audio":
+        urls = meta.audio_urls
+        dedup = True
+    else:
+        if meta.kind == "note" and not meta.image_urls:
+            # 接口把图文的图片过滤掉了，这不是「图不存在」
+            raise AppError(422, "这是抖音图文作品，图片暂不支持保存", error_type="douyin_note_unsupported")
+        if index < 0 or index >= len(meta.image_urls):
+            raise AppError(404, "这张图不存在")
+        urls = meta.image_urls if index == 0 and len(meta.image_urls) > 1 else [meta.image_urls[index]]
+        # 图文：一次返回全部图片，前端逐张保存，不能按域名去重
+        dedup = False
+
+    if not urls:
+        raise AppError(404, "这个作品没有该类型的内容")
+
+    if settings.download_debug_fail:
+        return {
+            "kind": kind,
+            "qn": None,
+            "expires_at": None,
+            "candidates": [{
+                "url": "https://debug.invalid/download-debug-fail",
+                "host": "debug.invalid",
+                "configured": False,
+            }],
+        }
+
+    candidates = media_download.candidates_from_urls(db, urls, dedup_by_host=dedup, kind=kind)
+    if not candidates:
+        raise AppError(502, "无可用下载地址")
+
+    for host in sorted({c["host"] for c in candidates if not c["configured"]}):
+        notify.send_unconfigured_domain_alert(db, host, card.bvid)
+
+    return {"kind": kind, "qn": None, "expires_at": None, "candidates": candidates}
 
 
 def _streams(client: BiliClient, card: VideoCard, kind: str) -> list[dict]:
@@ -120,12 +183,16 @@ def download_url(
     card_id: int,
     kind: str = "watermarked",
     qn: int | None = None,
+    index: int = 0,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """返回 B站 CDN 直链，由客户端直接下载，不经过服务器中转。"""
-    _require_enabled(kind, db)
+    """返回 CDN 直链，由客户端直接下载，不经过服务器中转。"""
     card = _get_owned_card(db, user, card_id)
+    if card.platform == "douyin":
+        return _douyin_download_url(card, kind, index, db)
+
+    _require_enabled(kind, db)
     client = BiliClient()
     try:
         if kind == "watermarked":
@@ -170,7 +237,7 @@ def download_url(
                 "configured": True,
             }]
         else:
-            candidates = media_download.build_candidates(db, streams)
+            candidates = media_download.build_candidates(db, streams, kind=kind)
             if not candidates:
                 raise AppError(502, "无可用下载地址")
             unconfigured_hosts = sorted({c["host"] for c in candidates if not c["configured"]})

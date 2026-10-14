@@ -445,6 +445,198 @@ def test_visit_monitor_lists_openid_and_counts(admin_client, db_engine):
     assert by_nickname["total"] == 2
 
 
+def _add_download_events(db, user_id, bvid, rows):
+    """rows: [(距现在多少秒前, stage, status, session_id, error_type, error_message)]"""
+    from datetime import timedelta
+
+    now = utcnow_naive()
+    for seconds_ago, stage, status, session_id, error_type, message in rows:
+        db.add(
+            DownloadEvent(
+                user_id=user_id,
+                bvid=bvid,
+                video_title="测试视频",
+                source_url=f"https://www.bilibili.com/video/{bvid}",
+                kind="watermarked",
+                host="upos-sz-estgoss.bilivideo.com",
+                stage=stage,
+                status=status,
+                session_id=session_id,
+                error_type=error_type,
+                error_message=message,
+                created_at=now - timedelta(seconds=seconds_ago),
+            )
+        )
+    db.commit()
+
+
+def test_download_sessions_split_legacy_events_on_resolve(admin_client, db_engine):
+    """没有 session_id 的历史事件：同一 bvid 内遇到 resolve 就开新会话。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    user = User(openid="openid-dl-session")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    _add_download_events(
+        db,
+        user.id,
+        "BV1xx411c7mD",
+        [
+            (150, "resolve", "success", "", "", ""),
+            (149, "download", "success", "", "", ""),
+            (60, "save", "fail", "", "permission", "saveVideoToPhotosAlbum:fail:auth denied"),
+            (20, "resolve", "success", "", "", ""),
+            (19, "download", "success", "", "", ""),
+            (18, "save", "fail", "", "permission", "saveVideoToPhotosAlbum:fail auth deny"),
+            (10, "fallback", "copy_link", "", "", ""),
+            (5, "fallback", "copy_link", "", "", ""),
+        ],
+    )
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get(
+        "/api/admin/stats/download/sessions", headers=_auth(token)
+    ).json()
+    assert data["total"] == 2
+    newest, oldest = data["items"][0], data["items"][1]
+    assert newest["openid"] == "openid-dl-session"
+    assert newest["bvid"] == "BV1xx411c7mD"
+    assert newest["result"] == "fail"
+    assert newest["fail_stage"] == "save"
+    assert newest["fail_error_type"] == "permission"
+    assert "auth deny" in newest["fail_message"]
+    assert newest["copied_link"] is True
+    assert newest["event_count"] == 5
+
+    assert oldest["result"] == "fail"
+    assert oldest["fail_stage"] == "save"
+    assert oldest["copied_link"] is False
+    assert oldest["event_count"] == 3
+
+    summary = admin_client.get(
+        "/api/admin/stats/download?days=30", headers=_auth(token)
+    ).json()
+    assert summary["total"] == 2
+    assert summary["success"] == 0
+    assert summary["fail"] == 2
+    assert {"error_type": "permission", "count": 2} in summary["fail_by_error"]
+    assert {"error_type": "unknown", "count": 2} not in summary["fail_by_error"]
+
+
+def test_download_sessions_prefer_session_id_and_ignore_copy_link(admin_client, db_engine):
+    """有 session_id 时按 id 切分；copy_link 不算失败。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    user = User(openid="openid-dl-sid")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    _add_download_events(
+        db,
+        user.id,
+        "BV1yy411c7mD",
+        [
+            (200, "resolve", "success", "s1", "", ""),
+            (198, "download", "success", "s1", "", ""),
+            (190, "save", "success", "s1", "", ""),
+            (100, "resolve", "success", "s2", "", ""),
+            (99, "download", "success", "s2", "", ""),
+            (98, "save", "fail", "s2", "permission", "auth deny"),
+            (95, "fallback", "copy_link", "s2", "", ""),
+            (50, "resolve", "fail", "s3", "domain_not_registered", "暂无已配置的下载域名"),
+        ],
+    )
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get(
+        "/api/admin/stats/download/sessions", headers=_auth(token)
+    ).json()
+    assert data["total"] == 3
+    by_result = {(i["result"], i["fail_stage"]) for i in data["items"]}
+    assert by_result == {("success", ""), ("fail", "save"), ("fail", "resolve")}
+
+    summary = admin_client.get(
+        "/api/admin/stats/download?days=30", headers=_auth(token)
+    ).json()
+    assert summary["total"] == 3
+    assert summary["success"] == 1
+    assert summary["fail"] == 2
+    assert summary["success_rate"] == 33.3
+
+
+def test_download_monitor_pagination_supports_all_history(admin_client, db_engine):
+    """days=0 查全部历史；两种明细都按 page/size 分页。"""
+    from datetime import timedelta
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    now = utcnow_naive()
+    db.add(
+        DownloadEvent(
+            bvid="BV1old000000",
+            kind="watermarked",
+            stage="save",
+            status="success",
+            created_at=now - timedelta(days=400),
+        )
+    )
+    db.add(
+        DownloadEvent(
+            bvid="BV1new000000",
+            kind="watermarked",
+            stage="save",
+            status="success",
+            created_at=now - timedelta(hours=1),
+        )
+    )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    detail_30 = admin_client.get(
+        "/api/admin/stats/download/detail",
+        params={"days": 30, "page": 1, "size": 1},
+        headers=_auth(token),
+    ).json()
+    assert detail_30["total"] == 1
+    assert detail_30["items"][0]["bvid"] == "BV1new000000"
+
+    detail_all_page2 = admin_client.get(
+        "/api/admin/stats/download/detail",
+        params={"days": 0, "page": 2, "size": 1},
+        headers=_auth(token),
+    ).json()
+    assert detail_all_page2["total"] == 2
+    assert detail_all_page2["items"][0]["bvid"] == "BV1old000000"
+
+    sessions_30 = admin_client.get(
+        "/api/admin/stats/download/sessions",
+        params={"days": 30, "page": 1, "size": 1},
+        headers=_auth(token),
+    ).json()
+    assert sessions_30["total"] == 1
+    assert sessions_30["items"][0]["bvid"] == "BV1new000000"
+
+    sessions_all_page2 = admin_client.get(
+        "/api/admin/stats/download/sessions",
+        params={"days": 0, "page": 2, "size": 1},
+        headers=_auth(token),
+    ).json()
+    assert sessions_all_page2["total"] == 2
+    assert sessions_all_page2["items"][0]["bvid"] == "BV1old000000"
+
+    summary_all = admin_client.get(
+        "/api/admin/stats/download",
+        params={"days": 0},
+        headers=_auth(token),
+    ).json()
+    assert summary_all["total"] == 2
+    assert sum(x["count"] for x in summary_all["trend"]) == 2
+
+
 def test_download_domains_list_and_update(admin_client, db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()

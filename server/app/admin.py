@@ -8,7 +8,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .admin_security import create_admin_token, decode_admin_token, verify_password
+from .admin_security import (
+    create_admin_token,
+    decode_admin_token,
+    get_admin_user,
+    verify_password,
+)
 from .config import settings
 from .db import get_db
 from .models import Binding, BiliCdnDomain, DownloadEvent, User
@@ -21,19 +26,10 @@ from .services import overview_stats
 from .services import repost_source
 from .services import wechat_search
 from .services.activation import issue_activation
-from .services.storage import get_storage
+from .services.storage import get_storage, media_url
 from .time import utcnow_naive
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-bearer = HTTPBearer(auto_error=False)
-
-
-def get_admin_user(
-    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
-) -> str:
-    if creds is None or not decode_admin_token(creds.credentials):
-        raise HTTPException(status_code=401, detail="需登录管理后台")
-    return "admin"
 
 
 # ---------------------------------------------------------------------------
@@ -150,10 +146,11 @@ def activation_detail(
 def parse_stats(
     source: str = Query("local", pattern="^(local|robot)$"),
     days: int = Query(30),
+    platform: str = Query("", pattern="^(bilibili|douyin)?$"),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    return stats.parse_summary(db, source, days)
+    return stats.parse_summary(db, source, days, platform)
 
 
 @router.get("/stats/parse/detail")
@@ -164,10 +161,11 @@ def parse_detail(
     days: int = Query(30),
     page: int = Query(1),
     size: int = Query(20),
+    platform: str = Query("", pattern="^(bilibili|douyin)?$"),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    return stats.parse_detail(db, source, q, result, days, page, size)
+    return stats.parse_detail(db, source, q, result, days, page, size, platform)
 
 
 # ---------------------------------------------------------------------------
@@ -175,80 +173,47 @@ def parse_detail(
 # ---------------------------------------------------------------------------
 @router.get("/stats/download")
 def download_stats(
-    days: int = Query(30),
+    days: int = Query(30, ge=0),
+    platform: str = Query("", pattern="^(bilibili|douyin)?$"),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    cutoff = utcnow_naive().replace(hour=0, minute=0, second=0, microsecond=0)
-    from datetime import timedelta
+    # 会话口径：统计单位是「一次下载」，不是单条阶段事件
+    return stats.download_session_summary(db, days, platform)
 
-    start = cutoff - timedelta(days=days - 1)
-    events = db.query(DownloadEvent).filter(DownloadEvent.created_at >= start).all()
 
-    total = len(events)
-    success = sum(1 for e in events if e.status == "success")
-    fail = total - success
-
-    by_stage: dict[str, int] = {}
-    by_error_type: dict[str, int] = {}
-    by_host: dict[str, dict] = {}
-    for e in events:
-        by_stage[e.stage] = by_stage.get(e.stage, 0) + 1
-        if e.status == "fail":
-            key = e.error_type or "unknown"
-            by_error_type[key] = by_error_type.get(key, 0) + 1
-            if e.host:
-                item = by_host.setdefault(e.host, {"fail": 0, "success": 0})
-                item["fail"] += 1
-        elif e.host:
-            item = by_host.setdefault(e.host, {"fail": 0, "success": 0})
-            item["success"] += 1
-
-    trend = []
-    for offset in range(days):
-        day = (start + timedelta(days=offset)).date()
-        count = sum(
-            1
-            for e in events
-            if e.created_at is not None and e.created_at.date() == day
-        )
-        trend.append({"date": day.isoformat(), "count": count})
-
-    return {
-        "total": total,
-        "success": success,
-        "fail": fail,
-        "success_rate": round(success / total * 100, 1) if total else 0,
-        "by_stage": [
-            {"stage": k, "count": v} for k, v in sorted(by_stage.items(), key=lambda x: -x[1])
-        ],
-        "fail_by_error": [
-            {"error_type": k, "count": v}
-            for k, v in sorted(by_error_type.items(), key=lambda x: -x[1])
-        ],
-        "fail_by_host": [
-            {"host": k, "fail": v["fail"], "success": v["success"]}
-            for k, v in sorted(by_host.items(), key=lambda x: -x[1]["fail"])
-        ],
-        "trend": trend,
-    }
+@router.get("/stats/download/sessions")
+def download_session_list(
+    q: str = "",
+    days: int = Query(30, ge=0),
+    platform: str = Query("", pattern="^(bilibili|douyin)?$"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """按「一次下载」聚合的明细；原始阶段事件见 /stats/download/detail。"""
+    return stats.download_sessions(db, q, days, page, size, platform)
 
 
 @router.get("/stats/download/detail")
 def download_detail(
     q: str = "",
     status: str = Query("", pattern="^(success|fail)?$"),
-    days: int = Query(30),
-    page: int = Query(1),
-    size: int = Query(20),
+    days: int = Query(30, ge=0),
+    platform: str = Query("", pattern="^(bilibili|douyin)?$"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
     from datetime import timedelta
 
     query = db.query(DownloadEvent).outerjoin(User, User.id == DownloadEvent.user_id)
-    start = utcnow_naive() - timedelta(days=days)
-    query = query.filter(DownloadEvent.created_at >= start)
+    if days > 0:
+        query = query.filter(DownloadEvent.created_at >= utcnow_naive() - timedelta(days=days))
+    if platform:
+        query = query.filter(DownloadEvent.platform == platform)
     if status:
         query = query.filter(DownloadEvent.status == status)
     if q:
@@ -349,6 +314,7 @@ def _domain_item(row: BiliCdnDomain) -> dict:
     return {
         "id": row.id,
         "host": row.host,
+        "kinds": [k for k in (row.kinds or "").split(",") if k],
         "is_configured": row.is_configured,
         "first_seen_at": _iso_utc(row.first_seen_at),
         "last_seen_at": _iso_utc(row.last_seen_at),
@@ -362,20 +328,32 @@ def _domain_item(row: BiliCdnDomain) -> dict:
     }
 
 
-def _domain_priority(item: dict) -> tuple[int, float]:
+# 视频优先：用户主要下的是视频，白名单名额有限，先把视频的排前面
+_KIND_RANK = {"video": 0, "audio": 1, "image": 2}
+
+
+def _domain_kind_rank(item: dict) -> int:
+    kinds = item.get("kinds") or []
+    return min((_KIND_RANK.get(k, 3) for k in kinds), default=3)
+
+
+def _domain_priority(item: dict) -> tuple[int, int, float, str]:
     suggestion = item.get("suggestion") or ""
     if not item.get("is_configured"):
-        return (0, item.get("failure_rate") or 0.0)
-    if suggestion == "建议删除":
-        return (1, item.get("failure_rate") or 0.0)
-    if suggestion == "可能闲置":
-        return (2, item.get("failure_rate") or 0.0)
-    return (3, item.get("failure_rate") or 0.0)
+        stage = 0
+    elif suggestion == "建议删除":
+        stage = 1
+    elif suggestion == "可能闲置":
+        stage = 2
+    else:
+        stage = 3
+    return (stage, _domain_kind_rank(item), item.get("failure_rate") or 0.0, item.get("host") or "")
 
 
 @router.get("/download/domains")
 def download_domains(
     q: str = "",
+    kind: str = Query("", pattern="^(video|audio|image)?$"),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -383,9 +361,22 @@ def download_domains(
     if q:
         query = query.filter(BiliCdnDomain.host.ilike(f"%{q}%"))
     rows = query.all()
-    items = [_domain_item(r) for r in rows]
-    items.sort(key=lambda item: (-_domain_priority(item)[0], -item["failure_rate"], item["host"]))
-    return {"total": len(items), "items": items}
+    all_items = [_domain_item(r) for r in rows]
+
+    counts: dict[str, int] = {}
+    for item in all_items:
+        for k in (item.get("kinds") or []):
+            counts[k] = counts.get(k, 0) + 1
+
+    items = [i for i in all_items if kind in (i.get("kinds") or [])] if kind else all_items
+    # stage / kind_rank 越小越靠前（需要配置的、视频的排在前面）
+    items.sort(key=lambda item: (
+        _domain_priority(item)[0],
+        _domain_priority(item)[1],
+        -item["failure_rate"],
+        item["host"],
+    ))
+    return {"total": len(items), "items": items, "kind_counts": counts}
 
 
 class DomainUpdatePayload(BaseModel):
@@ -937,6 +928,8 @@ class SourceImportPayload(BaseModel):
 
 def _repost_config_out(db: Session) -> dict:
     payload = config_store.repost_config(db)
+    # 管理端是浏览器直接 <img src>，相对路径会打到管理端端口上，这里补成绝对地址
+    payload["account_avatar_url"] = media_url(payload.get("account_avatar_url"))
     payload["source_ingest_token"] = config_store.source_ingest_token(db)
     return payload
 
@@ -1106,4 +1099,4 @@ async def upload_repost_avatar(
     key = f"repost-avatar-{int(time.time())}"
     url = get_storage().save_cover(key, body, content_type)
     config_store.set_repost_config(db, account_avatar_url=url)
-    return {"account_avatar_url": url}
+    return {"account_avatar_url": media_url(url)}

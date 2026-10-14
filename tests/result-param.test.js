@@ -21,6 +21,19 @@ const CARD = {
 };
 
 describe('结果页 URL 自包含', () => {
+  test('抖音走 platform=douyin&id= 打开，并带上平台去刷新', () => {
+    const { ctx } = loadPage(PAGE);
+    const refreshed = [];
+    ctx.loadByPlatform = (platform, id, opts) =>
+      refreshed.push({ platform, id, opts });
+
+    ctx.onLoad({ platform: 'douyin', id: '7685688911658323392' });
+
+    expect(refreshed).toHaveLength(1);
+    expect(refreshed[0].platform).toBe('douyin');
+    expect(refreshed[0].id).toBe('7685688911658323392');
+  });
+
   test('首页跳结果页要带上 bvid', () => {
     expect(homeJs).toContain("'/pages/result/result?bvid=' + card.bvid");
   });
@@ -29,13 +42,15 @@ describe('结果页 URL 自包含', () => {
     const { ctx, app } = loadPage(PAGE);
     app.globalData.pendingResult = CARD;
     const refreshed = [];
-    ctx.loadByBvid = (bvid, opts) => refreshed.push({ bvid, opts });
+    ctx.loadByPlatform = (platform, id, opts) =>
+      refreshed.push({ platform, id, opts });
 
     ctx.onLoad({ bvid: 'BV1Nse466EsX' });
 
     expect(ctx.data.title).toBe('【小视频】167-国贸街拍');
     expect(refreshed).toHaveLength(1);
-    expect(refreshed[0].bvid).toBe('BV1Nse466EsX');
+    expect(refreshed[0].platform).toBe('bilibili');
+    expect(refreshed[0].id).toBe('BV1Nse466EsX');
     expect(refreshed[0].opts).toMatchObject({ silent: true });
   });
 
@@ -43,7 +58,8 @@ describe('结果页 URL 自包含', () => {
     const { ctx, app } = loadPage(PAGE);
     app.globalData.pendingResult = Object.assign({}, CARD, { bvid: 'BVother' });
     const refreshed = [];
-    ctx.loadByBvid = (bvid, opts) => refreshed.push({ bvid, opts });
+    ctx.loadByPlatform = (platform, id, opts) =>
+      refreshed.push({ platform, id, opts });
 
     ctx.onLoad({ bvid: 'BV1Nse466EsX' });
 
@@ -54,7 +70,7 @@ describe('结果页 URL 自包含', () => {
   test('没带 bvid 时仍然沿用手上的解析结果（老路径不能坏）', () => {
     const { ctx, app } = loadPage(PAGE);
     app.globalData.pendingResult = CARD;
-    ctx.loadByBvid = () => { throw new Error('不该发请求'); };
+    ctx.loadByPlatform = () => { throw new Error('不该发请求'); };
 
     ctx.onLoad({});
 

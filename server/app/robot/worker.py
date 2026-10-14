@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import Base, SessionLocal, engine
+from ..schema_check import check_schema
 from ..errors import AppError
 from ..models import Binding, RobotCursor, User
 from ..models import AtEvent
@@ -384,7 +385,8 @@ def main(argv: list[str] | None = None) -> None:
         log("机器人未启用（ROBOT_ENABLED=false）")
         return
     if settings.dev_mode:
-        Base.metadata.create_all(bind=engine)
+        # 只检查不建表：create_all 会建表但不盖迁移章，反而让库悄悄漂移
+        check_schema(engine)
     db = SessionLocal()
     try:
         log("worker 已启动，开始轮询")

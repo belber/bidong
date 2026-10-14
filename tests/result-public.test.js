@@ -9,12 +9,16 @@ const wxml = fs.readFileSync(
   path.join(__dirname, '../miniprogram/pages/result/result.wxml'), 'utf8'
 );
 
+const realApi = jest.requireActual('../miniprogram/utils/api.js');
+
 const mockApi = {
   parse: jest.fn(),
   getPublicCard: jest.fn(),
   getPublicConfig: jest.fn(() => Promise.resolve({})),
   mediaSize: jest.fn(() => Promise.resolve({})),
-  reportDownloadEvent: jest.fn(() => Promise.resolve({}))
+  reportDownloadEvent: jest.fn(() => Promise.resolve({})),
+  // 页面会把 cover_url / 头像过一遍地址解析：公开信息里的绝对地址原样返回
+  resolveMediaUrl: realApi.resolveMediaUrl
 };
 jest.mock('../miniprogram/utils/api.js', () => mockApi);
 
@@ -50,7 +54,7 @@ describe('未登录时退回公开信息', () => {
     ctx.onLoad({ bvid: 'BV1Nse466EsX' });
     await tick();
 
-    expect(mockApi.getPublicCard).toHaveBeenCalledWith('BV1Nse466EsX');
+    expect(mockApi.getPublicCard).toHaveBeenCalledWith('BV1Nse466EsX', 'bilibili');
     expect(ctx.data.title).toBe('【小视频】167-国贸街拍');
     expect(ctx.data.upName).toBe('帅哥录屏');
     expect(ctx.data.publicView).toBe(true);
@@ -102,8 +106,83 @@ describe('公开视图的界面约束', () => {
   test('页面有访客提示，且下载/导出入口按 publicView 隐藏', () => {
     expect(wxml).toContain('visitor-tip');
     expect(wxml).toContain('以访客身份查看');
-    expect(wxml).toContain('{{media.watermarked && !publicView}}');
-    expect(wxml).toContain('{{media.audio && !publicView}}');
-    expect(wxml).toContain('wx:if="{{!publicView}}"');
+    expect(wxml).toContain('{{!isDouyin && media.watermarked && !publicView}}');
+    expect(wxml).toContain('{{!isDouyin && media.audio && !publicView}}');
+    expect(wxml).toContain('wx:if="{{!publicView && !isDouyin}}"');
+  });
+});
+
+describe('抖音图文提示', () => {
+  const wxml = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.wxml'), 'utf8'
+  );
+
+  test('拿不到图片时说明是图文作品，而不是「图不存在」', () => {
+    expect(wxml).toContain('{{isDouyin && isNote && !imageCount}}');
+    expect(wxml).toContain('这是抖音图文作品，图片暂不支持保存');
+    expect(wxml).not.toContain('这张图不存在');
+  });
+});
+
+describe('抖音下载的进度反馈', () => {
+  const wxml = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.wxml'), 'utf8'
+  );
+  const js = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.js'), 'utf8'
+  );
+
+  test('视频、音频、图文三种都有进度条', () => {
+    // 视频走相册保存（自己的 downloading/activeKind）
+    expect(wxml).toContain('{{downloading && activeKind === \'video\'}}');
+    expect(wxml).toContain('width: {{downloadProgress}}%');
+    // 音频走导出状态机（和 B站 同一套）
+    expect(wxml).toContain("{{exports.audio.state === 'downloading'}}");
+    // 图文按张数推进
+    expect(wxml).toContain('{{savingImages}}');
+    expect(wxml).toContain('width: {{imagePercent}}%');
+  });
+
+  test('抖音下载要设 activeKind，否则百分比和进度条都不会显示', () => {
+    const body = js.slice(js.indexOf('onDownloadDouyin(e)'), js.indexOf('onSaveImages()'));
+    expect(body).toContain('this.setData({ activeKind: kind })');
+  });
+});
+
+describe('抖音音频走导出状态机（和 B站 一致）', () => {
+  const wxml = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.wxml'), 'utf8'
+  );
+  const js = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.js'), 'utf8'
+  );
+
+  // 相册只收视频：MP3 走 saveVideoToPhotosAlbum 会报 invalid file type
+  test('抖音音频不再用相册保存，改走 onExportTap', () => {
+    const start = wxml.indexOf('isDouyin && media.audio');
+    const row = wxml.slice(start, wxml.indexOf('</view>', wxml.indexOf('export-progress', start)));
+    expect(row).toContain('bindtap="onExportTap"');
+    expect(row).not.toContain('onDownloadDouyin');
+    expect(row).not.toContain('saveVideoToPhotosAlbum');
+    expect(row).toContain("exports.audio.state === 'ready' ? '保存'");
+  });
+
+  test('抖音视频仍然走相册保存', () => {
+    const start = wxml.indexOf('isDouyin && media.clean');
+    const row = wxml.slice(start, wxml.indexOf('isDouyin && media.audio'));
+    expect(row).toContain('bindtap="onDownloadDouyin"');
+    expect(row).toContain("data-kind=\"video\"");
+  });
+
+  test('exportRequest 对抖音取 CDN 直链，而不是后端代理', () => {
+    const body = js.slice(js.indexOf('exportRequest(kind)'), js.indexOf('exportName(kind)'));
+    expect(body).toContain('this.data.isDouyin');
+    expect(body).toContain("api.downloadUrl(this.data.cardId, 'audio')");
+    expect(body).toContain('configuredCandidates');
+  });
+
+  test('onDownloadDouyin 拒绝音频，避免走回相册那条路', () => {
+    const body = js.slice(js.indexOf('onDownloadDouyin(e)'), js.indexOf('onSaveImages()'));
+    expect(body).toContain("if (kind !== 'video')");
   });
 });

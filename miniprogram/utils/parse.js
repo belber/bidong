@@ -8,6 +8,55 @@ const VIDEO_URL_RE = /(?:https?:\/\/)?(?:www\.|m\.)?bilibili\.com\/video\/(BV[0-
 const B23_RE = /https?:\/\/b23\.tv\/[0-9A-Za-z]+/i;
 const BV_RE = /\bBV[0-9A-Za-z]{10}\b/;
 
+// 抖音：
+//   https://v.douyin.com/xxxx/           短链，交给后端跟随 302
+//   https://www.douyin.com/video/<id>    视频作品页
+//   https://www.douyin.com/note/<id>     图文作品页
+//   https://www.iesdouyin.com/share/slides/<id>/  图文分享页（短链的终点）
+const DY_SHORT_RE = /https?:\/\/v\.douyin\.com\/[0-9A-Za-z_-]+\/?/i;
+const DY_SHARE_RE = /https?:\/\/[^\s]*douyin\.com\/(?:share\/)?(?:video|note|slides)\/\d+\/?/i;
+const DY_PAGE_RE = /https?:\/\/[^\s]*douyin\.com\/(video|note)\/(\d{6,})/i;
+
+function extractDouyinLink(text) {
+  if (!text || !text.trim()) {
+    return null;
+  }
+
+  const short = text.match(DY_SHORT_RE);
+  if (short) {
+    return { kind: 'short', url: short[0] };
+  }
+
+  const page = text.match(DY_PAGE_RE);
+  if (page) {
+    return {
+      kind: page[1].toLowerCase(),
+      awemeId: page[2],
+      url: 'https://www.douyin.com/' + page[1].toLowerCase() + '/' + page[2]
+    };
+  }
+
+  const share = text.match(DY_SHARE_RE);
+  if (share) {
+    return { kind: 'short', url: share[0] };
+  }
+
+  return null;
+}
+
+// 首页只有一个「贴链接」入口，统一在这里认平台。
+function extractLink(text) {
+  const douyin = extractDouyinLink(text);
+  if (douyin) {
+    return { platform: 'douyin', link: douyin };
+  }
+  const bili = extractBiliLink(text);
+  if (bili) {
+    return { platform: 'bilibili', link: bili };
+  }
+  return null;
+}
+
 function extractBiliLink(text) {
   if (!text || !text.trim()) {
     return null;
@@ -41,4 +90,4 @@ function extractBiliLink(text) {
   return null;
 }
 
-module.exports = { extractBiliLink };
+module.exports = { extractBiliLink, extractDouyinLink, extractLink };

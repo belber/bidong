@@ -2,8 +2,20 @@ import hmac
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .config import settings
+
+bearer = HTTPBearer(auto_error=False)
+
+
+def get_admin_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> str:
+    if creds is None or not decode_admin_token(creds.credentials):
+        raise HTTPException(status_code=401, detail="需登录管理后台")
+    return "admin"
 
 
 def verify_password(password: str) -> bool:
