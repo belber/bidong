@@ -1,4 +1,4 @@
-// 左右滑动切换收藏夹视图：左滑 → 列表，右滑 → 网格。
+// 左右滑动切换收藏夹视图：左滑 → 网格，右滑 → 列表。
 // 判定故意保守：横向位移要够长、且明显压过纵向，否则信息流里的上下滚动会被抢走。
 const { VIEW_LIST, VIEW_GRID } = require('./viewPref.js');
 
@@ -22,7 +22,7 @@ function nextViewForSwipe(input) {
     return null;
   }
 
-  const next = dx < 0 ? VIEW_LIST : VIEW_GRID;
+  const next = dx < 0 ? VIEW_GRID : VIEW_LIST;
   return next === view ? null : next;
 }
 

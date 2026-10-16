@@ -26,14 +26,14 @@ function pageView(view) {
 }
 
 describe('收藏夹左右滑动切换视图', () => {
-  test('左滑到列表，右滑回网格，并写入本地缓存', () => {
+  test('右滑到列表，左滑回网格，并写入本地缓存', () => {
     const { ctx, stored } = pageView('grid');
 
-    swipe(ctx, 300, 400, 180, 404); // 左滑
+    swipe(ctx, 180, 400, 300, 396); // 右滑
     expect(ctx.data.view).toBe('list');
     expect(stored.collect_view).toBe('list');
 
-    swipe(ctx, 180, 400, 300, 396); // 右滑
+    swipe(ctx, 300, 400, 180, 404); // 左滑
     expect(ctx.data.view).toBe('grid');
     expect(stored.collect_view).toBe('grid');
   });
@@ -50,7 +50,7 @@ describe('收藏夹左右滑动切换视图', () => {
   test('轻微横向抖动不切视图', () => {
     const { ctx } = pageView('grid');
 
-    swipe(ctx, 200, 400, 180, 402);
+    swipe(ctx, 180, 400, 200, 402);
 
     expect(ctx.data.view).toBe('grid');
   });
@@ -59,7 +59,7 @@ describe('收藏夹左右滑动切换视图', () => {
     const { ctx } = pageView('grid');
     ctx.setData({ editing: true });
 
-    swipe(ctx, 300, 400, 180, 400);
+    swipe(ctx, 180, 400, 300, 400);
 
     expect(ctx.data.view).toBe('grid');
   });
@@ -68,7 +68,7 @@ describe('收藏夹左右滑动切换视图', () => {
     const { ctx } = pageView('grid');
     ctx.setData({ showRobotGuide: true });
 
-    swipe(ctx, 300, 400, 180, 400);
+    swipe(ctx, 180, 400, 300, 400);
 
     expect(ctx.data.view).toBe('grid');
   });
@@ -90,7 +90,7 @@ describe('收藏夹左右滑动切换视图', () => {
     global.wx.navigateTo = (o) => nav.push(o.url);
     ctx.data.cards = [{ id: 'a', bvid: 'BV1' }];
 
-    swipe(ctx, 300, 400, 180, 400);
+    swipe(ctx, 180, 400, 300, 400);
     ctx.onCardTap({ currentTarget: { dataset: { id: 'a' } } });
     expect(nav).toEqual([]);
 
