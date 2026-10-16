@@ -1,7 +1,7 @@
 const api = require('../../utils/api.js');
 const { formatDuration, formatDateTime } = require('../../utils/format.js');
 const { mapOrigin } = require('../../utils/origin.js');
-const { downloadMediaParallel, downloadUrlErrorType, configuredCandidates } = require('../../utils/mediaDownload.js');
+const { downloadMediaParallel, downloadUrlErrorType, configuredCandidates, classifyError } = require('../../utils/mediaDownload.js');
 const {
   initialExports,
   beginExport,
@@ -260,8 +260,8 @@ Page({
       title: r.title,
       upName: r.up_name,
       partition: r.partition || '',
-      // 抖音没有分区，基本信息里这一行换成抖音号
-      douyinId: r.up_mid || '',
+      // 抖音没有分区，基本信息里这一行换成抖音号（后端 author_id）
+      douyinId: r.author_id || '',
       pubText: formatDateTime(r.pubdate),
       tags,
       tagsText: tags.join(' '),
@@ -378,7 +378,8 @@ Page({
     this._sessionId = newSessionId();
     this.fetchDouyinCandidates(kind)
       .then((res) => {
-        if (!res.configured.length) {
+        const autoCandidates = configuredCandidates(res.all);
+        if (!autoCandidates.length) {
           // 一个候选都没登记进微信白名单，直接给复制链接的办法
           this.reportDownload('resolve', 'fail', {
             kind,
@@ -389,7 +390,7 @@ Page({
           this.openFallback(res.all);
           return;
         }
-        this.saveMedia(res.configured, kind);
+        this.saveMedia(autoCandidates, kind);
       })
       .catch((err) => {
         const msg = (err && err.message) || '取下载地址失败';
@@ -597,11 +598,13 @@ Page({
       return api.downloadUrl(this.data.cardId, 'audio').then((data) => {
         const list = data.candidates || [];
         const ready = configuredCandidates(list);
-        const pick = (ready.length ? ready : list)[0];
-        if (!pick) {
-          throw new Error('没有可用的音频地址');
+        if (!ready.length) {
+          // 一个候选都没登记进微信白名单：直链给了也下不动，走兜底让用户复制链接。
+          const err = new Error('暂无可用的已配置下载域名');
+          err.code = 'domain_not_configured';
+          throw err;
         }
-        return { url: pick.url, header: {} };
+        return { url: ready[0].url, header: {} };
       });
     }
     return api.download(this.data.cardId, 'audio');
@@ -665,11 +668,17 @@ Page({
         },
         fail: (err) => {
           this.setData({ exports: failExport(this.data.exports, kind) });
+          const domainBlocked = classifyError(null, err) === 'domain_not_configured';
           this.reportDownload('download', 'fail', {
             kind,
-            error_type: 'wx_error',
+            error_type: domainBlocked ? 'domain_not_configured' : 'wx_error',
             error_message: (err && err.errMsg) || 'download failed'
           });
+          // 抖音音频是 CDN 直链，域名没登记进微信白名单时只能复制链接去浏览器下载
+          if (domainBlocked && this.data.isDouyin && kind === 'audio') {
+            this.openExportFallback(kind);
+            return;
+          }
           toast('下载失败');
         }
       });
@@ -693,11 +702,30 @@ Page({
       this.setData({ exports: failExport(this.data.exports, kind) });
       this.reportDownload('download', 'fail', {
         kind,
-        error_type: 'wx_error',
+        error_type: (err && err.code) === 'domain_not_configured' ? 'domain_not_configured' : 'wx_error',
         error_message: (err && err.message) || 'request failed'
       });
+      if ((err && err.code) === 'domain_not_configured') {
+        this.openExportFallback(kind);
+        return;
+      }
       toast('获取下载地址失败');
     });
+  },
+
+  // 抖音音频直连 CDN，域名没登记到微信白名单时小程序内根本下不动，
+  // 这时给出一条「复制链接用浏览器打开」的路（B站 音频走后端中转，不会走到这）。
+  // 按钮仍是「重试」，弹窗只是额外的一条路；复制的是重新取到的新直链，抖音直链有时效。
+  openExportFallback(kind) {
+    this.setData({ exports: failExport(this.data.exports, kind) });
+    api.downloadUrl(this.data.cardId, kind).then((data) => {
+      const list = data.candidates || [];
+      const ready = configuredCandidates(list);
+      const pick = (ready.length ? ready : list)[0];
+      if (pick) {
+        this.openFallback([pick]);
+      }
+    }).catch(() => {});
   },
 
   shareExport(kind) {

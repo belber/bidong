@@ -11,6 +11,7 @@ import pytest
 
 from app.config import settings
 from app.models import BiliCdnDomain, User, VideoCard
+from app.services import config_store
 from app.services.douyin_provider import DETAIL_API
 from app.time import utcnow_naive
 
@@ -27,6 +28,9 @@ def _real_candidates(monkeypatch):
 def _seed_card(db_engine, platform="douyin"):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()
+    # 没有配置会话时 provider 会直接快速失败，不会发请求；这些用例要的是取候选
+    config_store.set_douyin_cookie(db, "sessionid=x; sid_tt=x; uid_tt=x")
+    db.commit()
     user = db.query(User).filter(User.openid == "dev_user1").first()
     if user is None:
         user = User(openid="dev_user1")
@@ -176,4 +180,4 @@ def test_session_dead_surfaces_clearly(client, auth_headers, db_engine):
         f"/api/cards/{card_id}/download-url", params={"kind": "video"}, headers=auth_headers
     )
     assert resp.status_code == 502
-    assert "会话" in resp.json()["message"]
+    assert resp.json()["message"] == "服务维护中，请稍后再试"

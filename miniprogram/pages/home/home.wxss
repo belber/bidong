@@ -66,10 +66,11 @@
 .parse-btn {
   margin-top: 10rpx;
   font-size: 32rpx;
-  padding: 9rpx 0 11rpx;
+  padding: 12rpx 0 14rpx;
   border-radius: 22rpx;
-  /* 主文案 + 平台说明两行；min-height 让「解析中」状态和常态等高，避免按钮跳一下 */
-  min-height: 86rpx;
+  /* 主文案 + 平台说明两行；min-height 让「解析中」状态和常态等高，避免按钮跳一下。
+     比最初的 86rpx 略高一档就够，太高反而是个突兀的色块 */
+  min-height: 96rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -79,7 +80,7 @@
 
 /* 平台说明压在主文案下面一层：字号小、轻微透明，不抢焦点 */
 .parse-sub {
-  margin-top: 3rpx;
+  margin-top: 4rpx;
   font-size: 20rpx;
   font-weight: 400;
   letter-spacing: 0.04em;
@@ -171,7 +172,8 @@
 }
 
 .guide-card {
-  margin-top: 10rpx;
+  /* 和解析按钮之间留够呼吸：真机上按钮和卡片贴太近会显得挤 */
+  margin-top: 28rpx;
   padding: 14rpx 16rpx;
   background: #FFFDFE;
   border: 3rpx dashed #F0C9D4;
@@ -406,10 +408,13 @@
 }
 
 .ad-banner {
-  /* 预留 20:7 固定高度：广告异步加载前后布局不变，滚动范围计算正确 */
+  /* 高度交给广告组件自己决定：真机素材比 20:7 更扁时，固定高度会在广告下方空出一条。
+     代价是广告加载完成后下方内容会轻微下移（原来靠固定高度锁住布局）。 */
   width: calc(100vw - 48rpx);
-  height: calc((100vw - 48rpx) * 7 / 20);
-  margin-top: 8rpx;
+  height: auto;
+  /* 和「如何获取链接」区块拉开：广告是页尾的独立一条，不要贴着内容卡。
+     间距挂在这里（而不是卡片的 margin-bottom），广告加载失败被 wx:if 隐藏时不会留下孤立空白 */
+  margin-top: 36rpx;
   border-radius: 16rpx;
   overflow: hidden;
 }

@@ -83,6 +83,38 @@ def test_note_uses_note_source_url(db, meta):
     assert card.source_url == f"https://www.douyin.com/note/{AWEME_ID}"
 
 
+def test_stores_douyin_id_not_sec_uid(db, meta):
+    """up_mid 存抖音号（用户能搜到人），不是 sec_uid（主页链接里那串超长 ID）。
+
+    线上踩过：sec_uid 有 77 字符，up_mid 是 VARCHAR(32)，PostgreSQL 直接
+    StringDataRightTruncation 导致整次解析 500。
+    """
+    card = collect_douyin.collect_douyin(db, _user(db), meta, fetch_cover=_cover_fetcher)
+    assert card.up_mid == meta.author_unique_id == "74305918298"
+    assert card.up_mid != meta.author_sec_uid
+    assert len(meta.author_sec_uid) > 32  # 就是它超长
+
+
+def test_every_string_field_fits_its_column(db, meta):
+    """SQLite 不校验 VARCHAR 长度、PostgreSQL 校验，本地测试抓不到超长。
+
+    这里按列定义手工校验一遍，把「本地全绿、线上 500」挡在提交前。
+    """
+    card = collect_douyin.collect_douyin(db, _user(db), meta, fetch_cover=_cover_fetcher)
+    for column in VideoCard.__table__.columns:
+        limit = getattr(column.type, "length", None)
+        value = getattr(card, column.name, None)
+        if limit and isinstance(value, str):
+            assert len(value) <= limit, f"{column.name} 超长：{len(value)} > {limit}"
+
+
+def test_long_author_name_is_clamped(db, meta):
+    """昵称超过列宽时裁掉，而不是让整次解析 500。"""
+    meta.author_name = "很长的昵称" * 60  # 300 字
+    card = collect_douyin.collect_douyin(db, _user(db), meta, fetch_cover=_cover_fetcher)
+    assert len(card.up_name) <= VideoCard.__table__.columns["up_name"].type.length
+
+
 def test_same_user_can_hold_both_platforms(db, meta):
     from app.services.collect import collect_video_by_bvid  # noqa: F401  仅确认模块可导入
 

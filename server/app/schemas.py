@@ -93,6 +93,8 @@ class CardOut(BaseModel):
     bvid: str
     title: str
     up_name: str
+    # 平台内的作者 ID：B站 是 UID，抖音是抖音号（用户能拿去搜到人的那串）
+    author_id: str = ""
     partition: str
     duration: int
     pubdate: int
@@ -141,6 +143,7 @@ class PublicCardOut(BaseModel):
     platform: str = "bilibili"
     title: str
     up_name: str
+    author_id: str = ""
     partition: str = ""
     duration: int = 0
     pubdate: int = 0

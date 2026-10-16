@@ -19,6 +19,19 @@ from .tags import get_or_create_tag
 CoverFetcher = Callable[[str], tuple[bytes, str]]
 
 
+def fit(model, field: str, value: str) -> str:
+    """把值裁到列定义的长度以内。
+
+    SQLite 不校验 VARCHAR 长度，PostgreSQL 校验——所以本地测试全绿、线上直接
+    500（StringDataRightTruncation）。列定义本身就是唯一事实来源，这里按它裁。
+    只用于纯展示字段；ID 类字段裁了就变成错误数据，宁可让它报错。
+    """
+    column = model.__table__.columns.get(field)
+    limit = getattr(getattr(column, "type", None), "length", None)
+    text = value or ""
+    return text[:limit] if limit else text
+
+
 def _http_cover_fetcher(url: str) -> tuple[bytes, str]:
     """封面是公开图片，不需要登录态，也不校验 Referer。"""
     resp = httpx.get(url, timeout=20, follow_redirects=True)
@@ -56,7 +69,8 @@ def collect_douyin(
         dirty = False
         for field, value in (
             ("title", _label(meta)),
-            ("up_name", meta.author_name),
+            ("up_name", fit(VideoCard, "up_name", meta.author_name)),
+            ("up_mid", fit(VideoCard, "up_mid", meta.author_unique_id)),
             ("duration", meta.duration),
             ("pubdate", meta.created_at),
         ):
@@ -83,8 +97,10 @@ def collect_douyin(
         bvid=meta.aweme_id,
         title=_label(meta),
         cover_url=cover_url,
-        up_name=meta.author_name,
-        up_mid=meta.author_sec_uid,
+        up_name=fit(VideoCard, "up_name", meta.author_name),
+        # 抖音号（author.unique_id）才是用户能拿去抖音搜到人的字段；
+        # sec_uid 是主页链接里那串 MS4wLjABAAAA…，比这一列宽得多，别往这塞。
+        up_mid=fit(VideoCard, "up_mid", meta.author_unique_id),
         partition="",
         desc=(meta.title or "")[:500],
         source_url=source_url(meta.aweme_id, meta.kind),

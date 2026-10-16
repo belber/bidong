@@ -8,6 +8,7 @@ import pytest
 import respx
 
 from app.errors import AppError
+from app.services import douyin_provider
 from app.services.douyin_provider import DETAIL_API, DouyinProvider
 
 FIXTURE = Path(__file__).parent / "fixtures" / "douyin_detail_video.json"
@@ -68,7 +69,31 @@ class TestFetchDetail:
         respx.get(DETAIL_API).mock(return_value=httpx.Response(200, content=b""))
         with pytest.raises(AppError) as exc:
             provider.fetch_detail(AWEME_ID)
-        assert "会话" in exc.value.message
+        # 对外含糊：用户看不懂「会话」「Cookie」，也不该看到运维操作指引
+        assert exc.value.message == douyin_provider.MAINTENANCE_MESSAGE
+        assert "会话" not in exc.value.message
+        assert "Cookie" not in exc.value.message
+        # 对内精确：运营要靠这个分类排障
+        assert exc.value.error_type == "douyin_session_invalid"
+
+    def test_missing_cookie_fails_fast_without_network(self):
+        """没配会话就不该白跑一趟接口。"""
+        p = DouyinProvider(cookie="")
+        try:
+            with pytest.raises(AppError) as exc:
+                p.fetch_detail(AWEME_ID)
+        finally:
+            p.close()
+        assert exc.value.message == douyin_provider.MAINTENANCE_MESSAGE
+        assert exc.value.error_type == "douyin_session_missing"
+
+    @respx.mock
+    def test_non_json_body_uses_generic_message(self, provider):
+        respx.get(DETAIL_API).mock(return_value=httpx.Response(200, content=b"<html>" * 400))
+        with pytest.raises(AppError) as exc:
+            provider.fetch_detail(AWEME_ID)
+        assert exc.value.message == douyin_provider.BUSY_MESSAGE
+        assert exc.value.error_type == "douyin_bad_response"
 
     @respx.mock
     def test_non_json_body_raises(self, provider):

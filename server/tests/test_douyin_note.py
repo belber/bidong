@@ -25,6 +25,19 @@ AWEME_ID = "7300000000000000000"
 NOTE_IMAGE = "https://p26-sign.douyinpic.com/a.jpeg"
 
 
+@pytest.fixture(autouse=True)
+def _with_cookie(db_engine):
+    """没有会话时 provider 会快速失败，这里统一配上。"""
+    from sqlalchemy.orm import sessionmaker as _sm
+
+    from app.services import config_store as _cs
+
+    db = _sm(bind=db_engine, autoflush=False, expire_on_commit=False)()
+    _cs.set_douyin_cookie(db, "sessionid=x; sid_tt=x; uid_tt=x")
+    db.commit()
+    db.close()
+
+
 def _note_detail(*, with_images: bool) -> dict:
     detail = json.loads(FIXTURE.read_text(encoding="utf-8"))["aweme_detail"]
     detail["aweme_id"] = AWEME_ID

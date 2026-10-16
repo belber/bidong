@@ -15,6 +15,7 @@ def card_to_out(card: VideoCard) -> CardOut:
         bvid=card.bvid,
         title=card.title,
         up_name=card.up_name,
+        author_id=card.up_mid,
         partition=card.partition,
         duration=card.duration,
         pubdate=card.pubdate,

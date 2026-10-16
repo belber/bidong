@@ -30,6 +30,12 @@ MIN_VALID_BYTES = 1024
 # 接口把图文作品按这个理由过滤掉
 NOTE_FILTER_REASON = "images_base"
 
+# 给用户看的文案：会话失效、接口异常这类问题都属于我方内部故障，
+# 用户既看不懂也帮不上忙，说细了只会让人以为是自己链接的问题。
+# 真实原因走 error_type 落进 parse_log，运营在管理端看得到。
+MAINTENANCE_MESSAGE = "服务维护中，请稍后再试"
+BUSY_MESSAGE = "服务繁忙，请稍后再试"
+
 
 def _filter_reason(payload: dict) -> str:
     """接口拒绝返回作品时给的过滤理由。"""
@@ -86,6 +92,11 @@ class DouyinProvider:
         )
 
     def fetch_detail(self, aweme_id: str) -> dict:
+        if not self.cookie:
+            # 没配会话就别白跑一趟接口了；对用户统一说维护中
+            raise AppError(
+                502, MAINTENANCE_MESSAGE, error_type="douyin_session_missing"
+            )
         last_error: Exception | None = None
         for base in HOSTS:
             try:
@@ -103,14 +114,14 @@ class DouyinProvider:
                 if len(resp.content) < MIN_VALID_BYTES:
                     raise AppError(
                         502,
-                        "抖音会话失效：接口返回空包，请到「账号/Cookie」重新更新",
+                        MAINTENANCE_MESSAGE,
                         error_type="douyin_session_invalid",
                     ) from exc
                 raise AppError(
-                    502, "抖音返回的不是 JSON", error_type="douyin_bad_response"
+                    502, BUSY_MESSAGE, error_type="douyin_bad_response"
                 ) from exc
             if not isinstance(payload, dict):
-                raise AppError(502, "抖音返回的不是 JSON", error_type="douyin_bad_response")
+                raise AppError(502, BUSY_MESSAGE, error_type="douyin_bad_response")
 
             detail = payload.get("aweme_detail") or {}
             if not detail:
@@ -127,7 +138,7 @@ class DouyinProvider:
                 )
             return detail
 
-        raise AppError(502, "解析服务繁忙，请稍后重试", error_type="douyin_busy") from last_error
+        raise AppError(502, BUSY_MESSAGE, error_type="douyin_busy") from last_error
 
     def resolve(self, text: str):
         """链接 → 结构化结果，业务层的主入口。"""

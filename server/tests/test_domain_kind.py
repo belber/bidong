@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
 from app.models import BiliCdnDomain, User, VideoCard
-from app.services import media_download
+from app.services import config_store, media_download
 from app.services.douyin_provider import DETAIL_API
 from app.time import utcnow_naive
 
@@ -135,6 +135,8 @@ def test_douyin_download_records_kind(client, auth_headers, db_engine):
     respx.get(DETAIL_API).mock(return_value=httpx.Response(200, content=fixture.read_bytes()))
 
     db = _session(db_engine)
+    config_store.set_douyin_cookie(db, "sessionid=x; sid_tt=x; uid_tt=x")
+    db.commit()
     user = db.query(User).filter(User.openid == "dev_user1").first()
     if user is None:
         user = User(openid="dev_user1")

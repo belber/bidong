@@ -54,6 +54,7 @@ def public_card(
         platform=card.platform,
         title=card.title,
         up_name=card.up_name,
+        author_id=card.up_mid,
         partition=card.partition,
         duration=card.duration,
         pubdate=card.pubdate,

@@ -186,3 +186,18 @@ describe('抖音音频走导出状态机（和 B站 一致）', () => {
     expect(body).toContain("if (kind !== 'video')");
   });
 });
+
+describe('结果页抖音号', () => {
+  const wxml = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.wxml'), 'utf8'
+  );
+  const js = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.js'), 'utf8'
+  );
+
+  test('抖音号取自后端 author_id（曾误读 up_mid，字段没暴露导致永远为空）', () => {
+    expect(js).toContain('douyinId: r.author_id');
+    expect(js).not.toContain('douyinId: r.up_mid');
+    expect(wxml).toContain('抖音号');
+  });
+});

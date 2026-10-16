@@ -4,13 +4,26 @@ import json
 from pathlib import Path
 
 import httpx
+import pytest
 import respx
 
+from app.services import config_store
 from app.services.douyin_provider import DETAIL_API
 
 FIXTURE = Path(__file__).parent / "fixtures" / "douyin_detail_video.json"
 AWEME_ID = "7685688911658323392"
 COVER_URL_PREFIX = "https://p26-sign.douyinpic.com"
+
+
+@pytest.fixture(autouse=True)
+def _with_douyin_cookie(db_engine):
+    """没配会话时 provider 会直接快速失败，这些用例要的是解析本身。"""
+    from sqlalchemy.orm import sessionmaker
+
+    db = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)()
+    config_store.set_douyin_cookie(db, "sessionid=x; sid_tt=x; uid_tt=x")
+    db.commit()
+    db.close()
 
 
 def _mock_douyin():
@@ -39,6 +52,8 @@ def test_parse_douyin_video(client, auth_headers):
     assert data["bvid"] == AWEME_ID
     assert data["title"] == "给我39个粉丝更新一下#萌妹子 #男高"
     assert data["up_name"] == "Dustinsuperstar"
+    # 结果页「抖音号」那一行读的是 author_id；原来后端没暴露它，前端永远是空的
+    assert data["author_id"] == "74305918298"
     assert data["partition"] == ""  # 抖音没有分区
     assert data["duration"] == 13
     assert data["source_url"] == f"https://www.douyin.com/video/{AWEME_ID}"
@@ -91,7 +106,12 @@ def test_parse_douyin_session_dead_reports_clearly(client, auth_headers):
         headers=auth_headers,
     )
     assert resp.status_code == 502
-    assert "会话" in resp.json()["message"]
+    body = resp.json()
+    # 前端只该看到含糊的「维护中」，不该看到会话/Cookie 这类内部术语
+    assert body["message"] == "服务维护中，请稍后再试"
+    assert "会话" not in body["message"]
+    assert "Cookie" not in body["message"]
+    assert body["error_type"] == "douyin_session_invalid"
 
 
 @respx.mock
