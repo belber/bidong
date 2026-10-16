@@ -1,9 +1,55 @@
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 from sqlalchemy.orm import Session
 
 from ..models import BiliCdnDomain, DownloadEvent, User, VideoCard
 from ..time import utcnow_naive
+
+
+def _content_length(value) -> int:
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def remote_size(url: str, headers: dict | None = None, timeout: float = 10.0) -> int:
+    """问 CDN 要文件大小（字节），拿不到就返回 0。
+
+    先 HEAD；有些 CDN 不认 HEAD，退化成 `Range: bytes=0-0` 只取一个字节，
+    从 `Content-Range` 里读总长。大小只是结果页展示用的辅助信息，
+    任何异常都不该冒泡出去把整个接口带崩。
+    """
+    if not url:
+        return 0
+    base = dict(headers or {})
+    try:
+        resp = httpx.head(url, headers=base, timeout=timeout, follow_redirects=True)
+        if resp.status_code < 400:
+            size = _content_length(resp.headers.get("content-length"))
+            if size > 0:
+                return size
+    except Exception:  # noqa: BLE001 - 取不到大小不算错误
+        pass
+    try:
+        resp = httpx.get(
+            url,
+            headers={**base, "Range": "bytes=0-0"},
+            timeout=timeout,
+            follow_redirects=True,
+        )
+        if resp.status_code < 400:
+            total = (resp.headers.get("content-range") or "").rsplit("/", 1)[-1]
+            size = _content_length(total) if total else 0
+            if size > 0:
+                return size
+            if resp.status_code == 200:
+                # 服务器忽略了 Range，回的是整个文件
+                return _content_length(resp.headers.get("content-length"))
+    except Exception:  # noqa: BLE001
+        pass
+    return 0
 
 
 def url_host(url: str) -> str:

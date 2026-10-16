@@ -291,6 +291,8 @@ Page({
       const labels = {};
       if (sizes.watermarked) labels.watermarked = '约 ' + formatSize(sizes.watermarked);
       if (sizes.clean) labels.clean = '约 ' + formatSize(sizes.clean);
+      // 抖音同样报大小：视频用后端 detail 里的 data_size，音频由后端 HEAD 一次 CDN
+      if (sizes.video) labels.video = '约 ' + formatSize(sizes.video);
       if (sizes.audio) labels.audio = '约 ' + formatSize(sizes.audio);
       this.setData({ mediaSize: labels });
     }).catch(() => {});

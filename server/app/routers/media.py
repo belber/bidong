@@ -114,6 +114,36 @@ def _streams(client: BiliClient, card: VideoCard, kind: str) -> list[dict]:
     raise AppError(400, "未知下载类型")
 
 
+def _douyin_media_sizes(card: VideoCard, db: Session) -> dict:
+    """抖音各下载类型的文件大小。
+
+    视频大小就写在 detail 的 `play_addr.data_size` 里——解析流程本来就取过一次 detail，
+    所以视频这一项不额外发请求；音频的 `play_url` 没有大小字段，只能 HEAD 一次 CDN。
+    某项拿不到就不返回这个键，前端回落成描述文案。
+    """
+    switches = config_store.douyin_switches(db)
+    sizes: dict[str, int] = {}
+    if not (switches.get("video") or switches.get("audio")):
+        return sizes
+
+    provider = DouyinProvider(cookie=config_store.douyin_cookie(db))
+    try:
+        meta = douyin.meta_from_detail(provider.fetch_detail(card.bvid))
+    finally:
+        provider.close()
+
+    if switches.get("video"):
+        url = meta.video_urls[0] if meta.video_urls else ""
+        size = meta.video_size or media_download.remote_size(url)
+        if size > 0:
+            sizes["video"] = size
+    if switches.get("audio") and meta.audio_urls:
+        size = media_download.remote_size(meta.audio_urls[0])
+        if size > 0:
+            sizes["audio"] = size
+    return sizes
+
+
 @router.get("/api/cards/{card_id}/media-options", response_model=list[MediaOption])
 def media_options(
     card_id: int,
@@ -432,6 +462,12 @@ def media_size(
 ):
     """返回各下载类型的文件大小（字节）。"""
     card = _get_owned_card(db, user, card_id)
+    if card.platform == "douyin":
+        try:
+            return _douyin_media_sizes(card, db)
+        except AppError:
+            # 会话失效这类已知失败：大小只是展示信息，静默回落成描述文案
+            return {}
     switches = config_store.media_switches(db)
     result = {}
     client = BiliClient()

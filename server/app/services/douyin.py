@@ -51,6 +51,8 @@ class DouyinMeta:
     created_at: int  # unix 秒
     cover_url: str
     video_urls: list[str] = field(default_factory=list)
+    # 视频文件大小（字节）。detail 的 play_addr 自带，取不到就是 0。
+    video_size: int = 0
     audio_urls: list[str] = field(default_factory=list)
     image_urls: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
@@ -66,6 +68,16 @@ def _urls(node) -> list[str]:
 def _first_url(node) -> str:
     urls = _urls(node)
     return urls[0] if urls else ""
+
+
+def _data_size(node) -> int:
+    """play_addr 自带的文件大小：有它就不必再问 CDN 一次。"""
+    if not isinstance(node, dict):
+        return 0
+    try:
+        return max(int(node.get("data_size") or 0), 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _tags(detail: dict) -> list[str]:
@@ -114,6 +126,7 @@ def meta_from_detail(detail: dict) -> DouyinMeta:
         created_at=int(detail.get("create_time") or 0),
         cover_url=_first_url(video.get("cover")) or _first_url(video.get("origin_cover")),
         video_urls=_urls(video.get("play_addr")),
+        video_size=_data_size(video.get("play_addr")),
         audio_urls=_urls(music.get("play_url")),
         image_urls=image_urls,
         tags=_tags(detail),

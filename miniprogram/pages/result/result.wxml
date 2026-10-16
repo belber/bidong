@@ -94,7 +94,7 @@
 
     <view class="field export-field" wx:if="{{isDouyin && media.clean && !publicView}}">
       <text class="label">视频</text>
-      <view class="content muted">无水印，直接在手机上保存</view>
+      <view class="content muted">{{mediaSize.video || '无水印，直接在手机上保存'}}</view>
       <text
         class="action {{downloading && activeKind === 'video' ? 'disabled' : ''}}"
         bindtap="onDownloadDouyin"
@@ -108,7 +108,7 @@
 
     <view class="field export-field" wx:if="{{isDouyin && media.audio && !publicView}}">
       <text class="label">音频</text>
-      <view class="content muted">原声 / BGM</view>
+      <view class="content muted">{{mediaSize.audio || '原声 / BGM'}}</view>
       <text
         class="action {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
         bindtap="onExportTap"
