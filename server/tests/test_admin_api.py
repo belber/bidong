@@ -1,4 +1,5 @@
 import tempfile
+from datetime import timedelta
 
 import httpx
 import pytest
@@ -143,6 +144,66 @@ def test_parse_summary_and_detail(admin_client, db_engine):
         "/api/admin/stats/parse/detail?source=local&result=fail", headers=_auth(token)
     ).json()
     assert detail["total"] == 2
+
+
+def test_parse_trend_buckets_by_shanghai_date(admin_client, db_engine):
+    """解析趋势按上海时区日期分桶，和关注 / 下载 / 访问几个页面同一口径。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    db.add(ParseLog(source="local", input="BV1xx411c7mD", bvid="BV1xx411c7mD", ok=True))
+    db.add(ParseLog(source="local", input="BV1yy411c7mD", ok=False, reason="network_timeout"))
+    db.add(ParseLog(source="local", input="BV1zz411c7mD", ok=False, reason="network_timeout"))
+    # 今天之外的记录不该被算进「今天」，但要在范围内
+    db.add(
+        ParseLog(
+            source="local",
+            input="BV1aa411c7mD",
+            ok=True,
+            created_at=utcnow_naive() - timedelta(days=1),
+        )
+    )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get("/api/admin/stats/parse?source=local&days=7", headers=_auth(token)).json()
+
+    assert len(data["trend"]) == 7
+    assert data["trend"][-1]["ok"] == 1
+    assert data["trend"][-1]["fail"] == 2
+    assert data["trend"][-2]["ok"] == 1
+    assert data["trend"][-2]["fail"] == 0
+    assert data["trend"][0] == {"date": data["trend"][0]["date"], "ok": 0, "fail": 0}
+
+
+def test_parse_trend_all_history_only_lists_days_with_data(admin_client, db_engine):
+    """days=0 是「全部历史」：只给有数据的日期，不铺一堆空柱子。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    db.add(
+        ParseLog(
+            source="local",
+            input="BV1aa411c7mD",
+            ok=True,
+            created_at=utcnow_naive() - timedelta(days=9),
+        )
+    )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get("/api/admin/stats/parse?source=local&days=0", headers=_auth(token)).json()
+
+    assert len(data["trend"]) == 1
+    assert data["trend"][0]["ok"] == 1
+
+
+def test_admin_parse_view_has_trend_chart(admin_client):
+    html = admin_client.get("/admin/index.html").text
+    assert 'id="chart-parse"' in html
+    assert 'drawChart("chart-parse"' in html
+    # 平台切换要同时作用于卡片与趋势，别只筛明细
+    assert '"/stats/parse?source=local&days=" + days + "&platform=" + platform' in html
 
 
 def test_features_and_schedule_config(admin_client):

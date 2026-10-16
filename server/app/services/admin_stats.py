@@ -382,10 +382,12 @@ def activation_detail(
 
 
 def parse_summary(db: Session, source: str, days: int = 30, platform: str = "") -> dict:
-    start = _range_start_utc(days)
-    filters = [ParseLog.source == source, ParseLog.created_at >= start]
+    # days=0 和下载监控一致，表示全部历史（只影响接口，页面给的是 7 / 30 / 90）
+    filters = [ParseLog.source == source]
     if platform:
         filters.append(ParseLog.platform == platform)
+    if days > 0:
+        filters.append(ParseLog.created_at >= _range_start_utc(days))
     base = db.query(ParseLog).filter(*filters)
     total = base.count()
     ok = base.filter(ParseLog.ok.is_(True)).count()
@@ -396,11 +398,30 @@ def parse_summary(db: Session, source: str, days: int = 30, platform: str = "") 
         .group_by(ParseLog.reason)
         .all()
     )
+
+    # 趋势和关注 / 下载 / 访问几个页面同一口径：按上海时区日期分桶。
+    # 成功和失败分开数，图上是堆叠柱——一眼能看出解析量掉没掉、失败集中在哪几天。
+    per_day: dict[str, dict[str, int]] = {}
+    for created_at, row_ok in db.query(ParseLog.created_at, ParseLog.ok).filter(*filters).all():
+        bucket = per_day.setdefault(
+            _shanghai_date(created_at).isoformat(), {"ok": 0, "fail": 0}
+        )
+        bucket["ok" if row_ok else "fail"] += 1
+    dates = sorted(per_day) if days <= 0 else _date_labels(days)
+
     return {
         "total": total,
         "ok": ok,
         "fail": fail,
         "fail_by_reason": [{"reason": r or "other", "count": c} for r, c in reasons],
+        "trend": [
+            {
+                "date": d,
+                "ok": per_day.get(d, {}).get("ok", 0),
+                "fail": per_day.get(d, {}).get("fail", 0),
+            }
+            for d in dates
+        ],
     }
 
 
@@ -414,12 +435,11 @@ def parse_detail(
     size: int = 20,
     platform: str = "",
 ) -> dict:
-    filters = [
-        ParseLog.source == source,
-        ParseLog.created_at >= _range_start_utc(days),
-    ]
+    filters = [ParseLog.source == source]
     if platform:
         filters.append(ParseLog.platform == platform)
+    if days > 0:  # 同下载监控：days=0 是全部历史
+        filters.append(ParseLog.created_at >= _range_start_utc(days))
     if q:
         like = f"%{q}%"
         filters.append(

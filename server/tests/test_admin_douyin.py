@@ -121,6 +121,8 @@ def test_parse_monitor_filters_by_platform(admin_client, db_engine):
     assert dy["ok"] == 1
     assert dy["fail"] == 1
     assert {"reason": "douyin_session_invalid", "count": 1} in dy["fail_by_reason"]
+    # 趋势也跟着平台筛：抖音的柱子只算抖音那两条
+    assert sum(x["ok"] + x["fail"] for x in dy["trend"]) == 2
 
     detail = admin_client.get(
         "/api/admin/stats/parse/detail",
