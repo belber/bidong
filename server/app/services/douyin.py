@@ -6,6 +6,7 @@
 
 import re
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 from ..errors import AppError
 
@@ -80,6 +81,36 @@ def _data_size(node) -> int:
         return 0
 
 
+# `play_addr.url_list` 里混着两类地址：
+#   1. 直出媒体的 CDN（`*.douyinvod.com/.../video/tos/...`）——客户端能直接下
+#   2. 跳转型（`*.amemv.com/aweme/v1/play/?...`）——返回 302 + 几百字节的 text/plain
+#      跳转页，真实文件还要再跳一到两次、落到动态第三方域名
+# 小程序只看 HTTP 200，会把第 2 类的跳转页当成视频存下来（下载成功但打不开），
+# 而且重定向的落地域名是动态的，域名白名单也配不全。所以候选只保留直出地址。
+_PLAY_REDIRECT_PATH = "/aweme/v1/play/"
+
+
+def is_direct_media_url(url: str) -> bool:
+    """直出媒体的 CDN 地址才允许直接交给客户端下载。"""
+    if not isinstance(url, str):
+        return False
+    try:
+        path = urlparse(url).path
+    except ValueError:
+        return False
+    return _PLAY_REDIRECT_PATH not in path
+
+
+def direct_media_urls(urls: list[str]) -> list[str]:
+    """丢掉跳转型地址；整组都是跳转型（罕见）时退回原列表。
+
+    退回是为了不让这类作品直接变成「没有该类型的内容」——前端拿到跳转页会判失败，
+    仍能走「复制链接用浏览器打开」的兜底弹窗。
+    """
+    direct = [u for u in urls if is_direct_media_url(u)]
+    return direct or list(urls)
+
+
 def _tags(detail: dict) -> list[str]:
     """话题标签优先取 text_extra.hashtag_name，缺失时退回从文案里抠 #。"""
     names = [
@@ -125,9 +156,9 @@ def meta_from_detail(detail: dict) -> DouyinMeta:
         duration=round(duration_ms / 1000),
         created_at=int(detail.get("create_time") or 0),
         cover_url=_first_url(video.get("cover")) or _first_url(video.get("origin_cover")),
-        video_urls=_urls(video.get("play_addr")),
+        video_urls=direct_media_urls(_urls(video.get("play_addr"))),
         video_size=_data_size(video.get("play_addr")),
-        audio_urls=_urls(music.get("play_url")),
+        audio_urls=direct_media_urls(_urls(music.get("play_url"))),
         image_urls=image_urls,
         tags=_tags(detail),
         stats={

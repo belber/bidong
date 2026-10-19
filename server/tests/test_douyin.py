@@ -68,8 +68,11 @@ class TestMetaFromDetail:
 
     def test_collects_media_urls(self):
         meta = douyin.meta_from_detail(fixture_detail())
-        assert len(meta.video_urls) == 4
+        # play_addr 的 4 条里混着 2 条 /aweme/v1/play/ 跳转型地址（回 302 + HTML 跳转页，
+        # 客户端会把它当视频存下来），只保留 2 条直出 CDN
+        assert len(meta.video_urls) == 2
         assert all(u.startswith("http") for u in meta.video_urls)
+        assert all("/aweme/v1/play/" not in u for u in meta.video_urls)
         assert len(meta.audio_urls) == 2
         assert meta.cover_url.startswith("http")
 

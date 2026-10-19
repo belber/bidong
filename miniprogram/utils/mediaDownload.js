@@ -23,6 +23,64 @@ function classifyError(statusCode, err) {
   return 'unknown';
 }
 
+// 抖音的 `/aweme/v1/play/` 这类候选会回 HTTP 200，但 body 只有几百字节，
+// 是个 text/plain 的 HTML 跳转页（真实文件还要再跳一到两次、落到动态第三方域名）。
+// 只按状态码判成功，就会把跳转页改名成 .mp4 存进相册——用户看到的是「下载成功但打不开」。
+// 所以下载完先闻一下文件头：像网页/JSON 的直接判失败，继续试下一个候选。
+const HEAD_BYTES = 64;
+// 只嗅探小文件：正常视频/音频不可能只有几百字节，大文件不读也就不会占内存。
+const SNIFF_MAX_BYTES = 256 * 1024;
+
+function headToText(value) {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  let bytes = null;
+  if (value instanceof ArrayBuffer) {
+    bytes = new Uint8Array(value);
+  } else if (ArrayBuffer.isView(value)) {
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else if (value.buffer instanceof ArrayBuffer) {
+    bytes = new Uint8Array(value.buffer);
+  }
+  if (!bytes) {
+    return '';
+  }
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    out += String.fromCharCode(bytes[i]);
+  }
+  return out;
+}
+
+function looksLikeWebPageOrJson(head) {
+  return /^\s*(<|\{|\[)/.test(head || '');
+}
+
+// 读不到文件系统接口或读失败时一律放行：宁可漏判，也不要把正常下载误杀成失败。
+function looksLikeNonMediaFile(tempFilePath) {
+  try {
+    if (!tempFilePath || !wx.getFileSystemManager) {
+      return false;
+    }
+    const fs = wx.getFileSystemManager();
+    if (!fs || typeof fs.statSync !== 'function' || typeof fs.readFileSync !== 'function') {
+      return false;
+    }
+    const size = (fs.statSync(tempFilePath) || {}).size || 0;
+    if (size <= 0 || size > SNIFF_MAX_BYTES) {
+      return false;
+    }
+    const head = headToText(fs.readFileSync(tempFilePath, undefined, 0, HEAD_BYTES));
+    return looksLikeWebPageOrJson(head);
+  } catch (e) {
+    return false;
+  }
+}
+
 // download-url 阶段失败时区分：
 // - 后端明确返回 error_type（例如 domain_not_registered）时直接采用
 // - 其他 HTTP 错误归为 http_error
@@ -50,7 +108,7 @@ function startDownloadAttempt(item, index, options) {
       // 视频文件较大，放长到 30 分钟，避免默认 60 秒超时把下载掐断。
       timeout: options.timeout || 1800000,
       success: function (res) {
-        if (res.statusCode === 200) {
+        if (res.statusCode === 200 && !looksLikeNonMediaFile(res.tempFilePath)) {
           if (options.report) {
             options.report({
               stage: 'download',
@@ -66,14 +124,16 @@ function startDownloadAttempt(item, index, options) {
           resolve({ tempFilePath: res.tempFilePath, host: item.host, candidateIndex: index });
         } else {
           const errMsg = (res.errMsg || res.error || '') || '';
+          // 状态码 200 但内容不是媒体：典型是跳转型地址回的 HTML 跳转页
+          const notMedia = res.statusCode === 200;
           if (options.report) {
             options.report({
               stage: 'download',
               status: 'fail',
               host: item.host,
               candidate_index: index,
-              error_type: classifyError(res.statusCode, { errMsg: errMsg }),
-              error_message: errMsg,
+              error_type: notMedia ? 'not_media' : classifyError(res.statusCode, { errMsg: errMsg }),
+              error_message: notMedia ? '返回的不是媒体文件（疑似跳转页）' : errMsg,
               http_status: res.statusCode,
               wx_err_msg: errMsg
             });
@@ -225,7 +285,7 @@ function downloadMedia(candidates, options) {
         url: item.url,
         header: opts.header || {},
         success: function (res) {
-          if (res.statusCode === 200) {
+          if (res.statusCode === 200 && !looksLikeNonMediaFile(res.tempFilePath)) {
             reportSuccess(item, index);
             resolve({
               tempFilePath: res.tempFilePath,
@@ -234,7 +294,14 @@ function downloadMedia(candidates, options) {
             });
           } else {
             const errMsg = (res.errMsg || res.error || '') || '';
-            reportFail(item, index, classifyError(res.statusCode, { errMsg: errMsg }), res.statusCode, errMsg);
+            const notMedia = res.statusCode === 200;
+            reportFail(
+              item,
+              index,
+              notMedia ? 'not_media' : classifyError(res.statusCode, { errMsg: errMsg }),
+              res.statusCode,
+              notMedia ? '返回的不是媒体文件（疑似跳转页）' : errMsg
+            );
             resolve(null);
           }
         },
@@ -265,5 +332,6 @@ module.exports = {
   domainFromUrl,
   downloadUrlErrorType,
   downloadMedia,
-  downloadMediaParallel
+  downloadMediaParallel,
+  looksLikeWebPageOrJson
 };

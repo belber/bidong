@@ -12,6 +12,7 @@ import pytest
 from app.config import settings
 from app.models import BiliCdnDomain, User, VideoCard
 from app.services import config_store
+from app.services.douyin import direct_media_urls
 from app.services.douyin_provider import DETAIL_API
 from app.time import utcnow_naive
 
@@ -92,6 +93,38 @@ def test_domains_get_recorded(client, auth_headers, db_engine):
     hosts = [r.host for r in db.query(BiliCdnDomain).all()]
     assert any(h.endswith("douyinvod.com") for h in hosts)
     db.close()
+
+
+def test_direct_media_urls_drops_play_redirects():
+    """`/aweme/v1/play/` 是跳转型地址，不能当候选交给客户端。"""
+    urls = [
+        "https://v81-cold.douyinvod.com/e3c/video/tos/cn/x/?mime_type=video_mp4",
+        "https://api-play-hl.amemv.com/aweme/v1/play/?video_id=v1&line=0",
+        "https://api-hl.amemv.com/aweme/v1/play/?video_id=v1&line=1",
+    ]
+    assert direct_media_urls(urls) == [urls[0]]
+
+
+def test_direct_media_urls_falls_back_when_all_are_redirects():
+    """全是跳转型地址（罕见）时退回原列表，让前端走兜底复制链接。"""
+    urls = ["https://api-hl.amemv.com/aweme/v1/play/?video_id=v1"]
+    assert direct_media_urls(urls) == urls
+
+
+@respx.mock
+def test_video_candidates_exclude_play_redirect_urls(client, auth_headers, db_engine):
+    """`/aweme/v1/play/` 返回 302 + 几百字节 text/plain 跳转页，小程序会把跳转页
+    当成视频存下来（下载成功但打不开），所以候选里不能出现它。"""
+    _mock_detail()
+    card_id = _seed_card(db_engine)
+    data = client.get(
+        f"/api/cards/{card_id}/download-url", params={"kind": "video"}, headers=auth_headers
+    ).json()
+
+    urls = [c["url"] for c in data["candidates"]]
+    assert urls
+    assert all("/aweme/v1/play/" not in url for url in urls)
+    assert all("douyinvod.com" in url for url in urls)
 
 
 @respx.mock

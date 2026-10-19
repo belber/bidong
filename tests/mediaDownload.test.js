@@ -3,8 +3,12 @@ const {
   domainFromUrl,
   downloadMedia,
   downloadUrlErrorType,
-  configuredCandidates
+  configuredCandidates,
+  looksLikeWebPageOrJson
 } = require('../miniprogram/utils/mediaDownload.js');
+
+const MP4_HEAD = Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]);
+const REDIRECT_PAGE = Buffer.from('<a href="https://n98-v-ncdnon.douyinvod.com/x">302</a>');
 
 describe('classifyError', () => {
   test('识别微信合法域名未配置', () => {
@@ -69,6 +73,87 @@ describe('domainFromUrl', () => {
 
   test('空链接返回空字符串', () => {
     expect(domainFromUrl('')).toBe('');
+  });
+});
+
+describe('looksLikeWebPageOrJson', () => {
+  test('HTML 跳转页判定为非媒体', () => {
+    expect(looksLikeWebPageOrJson('<a href="https://n98-v-ncdnon.douyinvod.com/x">302</a>'))
+      .toBe(true);
+    expect(looksLikeWebPageOrJson('\n  <!DOCTYPE html>')).toBe(true);
+  });
+
+  test('JSON 错误体判定为非媒体', () => {
+    expect(looksLikeWebPageOrJson('{"status_code":8,"status_msg":"expired"}')).toBe(true);
+    expect(looksLikeWebPageOrJson('[{"a":1}]')).toBe(true);
+  });
+
+  test('空内容与正常文件头都放行', () => {
+    expect(looksLikeWebPageOrJson('')).toBe(false);
+    expect(looksLikeWebPageOrJson('\u0000\u0000\u0000 ftypisom')).toBe(false);
+  });
+});
+
+// 抖音的 `/aweme/v1/play/` 候选会回 200 + 几百字节的 HTML 跳转页。
+// 只按状态码判成功就会把跳转页当视频存进相册（下载成功但打不开）。
+function wxWithFiles(files) {
+  return {
+    downloadFile: jest.fn((opts) => {
+      const tempFilePath = opts.url.includes('amemv') ? '/tmp/redirect' : '/tmp/video.mp4';
+      opts.success({ statusCode: 200, tempFilePath });
+      return { abort: jest.fn(), onProgressUpdate() {} };
+    }),
+    getFileSystemManager: () => ({
+      statSync: (filePath) => ({ size: files[filePath] ? files[filePath].length : 0 }),
+      readFileSync: (filePath) => files[filePath]
+    })
+  };
+}
+
+describe('downloadMedia 下载内容校验', () => {
+  const candidates = [
+    { url: 'https://api-play-hl.amemv.com/aweme/v1/play/?video_id=1', host: 'api-play-hl.amemv.com' },
+    { url: 'https://v81-cold.douyinvod.com/x.mp4', host: 'v81-cold.douyinvod.com' }
+  ];
+
+  afterEach(() => {
+    delete global.wx;
+  });
+
+  test('候选回了 200 但内容是跳转页时不算成功，继续试下一个', async () => {
+    global.wx = wxWithFiles({ '/tmp/redirect': REDIRECT_PAGE, '/tmp/video.mp4': MP4_HEAD });
+
+    const result = await downloadMedia(candidates);
+    expect(result.tempFilePath).toBe('/tmp/video.mp4');
+    expect(result.candidateIndex).toBe(1);
+    expect(global.wx.downloadFile).toHaveBeenCalledTimes(2);
+  });
+
+  test('跳转页按 not_media 上报，便于管理端区分失败原因', async () => {
+    const events = [];
+    global.wx = wxWithFiles({ '/tmp/redirect': REDIRECT_PAGE, '/tmp/video.mp4': MP4_HEAD });
+
+    await downloadMedia(candidates, {
+      report(evt) {
+        events.push(evt);
+      }
+    });
+
+    const failEvent = events.find((e) => e.status === 'fail');
+    expect(failEvent.error_type).toBe('not_media');
+    expect(failEvent.host).toBe('api-play-hl.amemv.com');
+  });
+
+  test('拿不到文件系统接口时放行，不误杀正常下载', async () => {
+    const urls = [candidates[1]];
+    global.wx = {
+      downloadFile: jest.fn((opts) => {
+        opts.success({ statusCode: 200, tempFilePath: '/tmp/video.mp4' });
+      })
+    };
+
+    const result = await downloadMedia(urls);
+    expect(result.tempFilePath).toBe('/tmp/video.mp4');
   });
 });
 
@@ -229,6 +314,30 @@ describe('downloadMediaParallel', () => {
         return task;
       })
     };
+
+    await expect(downloadMediaParallel(candidates)).rejects.toEqual(
+      expect.objectContaining({ allFailed: true })
+    );
+  });
+
+  test('并发候选里拿到跳转页的那个不算成功', async () => {
+    const candidates = [
+      { url: 'https://api-play-hl.amemv.com/aweme/v1/play/?video_id=1', host: 'api-play-hl.amemv.com' },
+      { url: 'https://v81-cold.douyinvod.com/x.mp4', host: 'v81-cold.douyinvod.com' }
+    ];
+    global.wx = wxWithFiles({ '/tmp/redirect': REDIRECT_PAGE, '/tmp/video.mp4': MP4_HEAD });
+
+    const result = await downloadMediaParallel(candidates);
+    expect(result.tempFilePath).toBe('/tmp/video.mp4');
+    expect(result.candidateIndex).toBe(1);
+  });
+
+  test('并发候选全是跳转页时整体失败', async () => {
+    const candidates = [
+      { url: 'https://api-play-hl.amemv.com/aweme/v1/play/?video_id=1', host: 'api-play-hl.amemv.com' },
+      { url: 'https://api-hl.amemv.com/aweme/v1/play/?video_id=1', host: 'api-hl.amemv.com' }
+    ];
+    global.wx = wxWithFiles({ '/tmp/redirect': REDIRECT_PAGE });
 
     await expect(downloadMediaParallel(candidates)).rejects.toEqual(
       expect.objectContaining({ allFailed: true })

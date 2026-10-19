@@ -666,6 +666,20 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 - 客户端只尝试 `configured=true` 的候选；失败弹「换一种方式保存」
 - 抖音 CDN 域名同样纳入域名治理（见 §13.6）
 
+候选里**只放直出媒体的 CDN 地址**（2026-10-16 修）。`play_addr.url_list` 混着两类：
+
+- 直出媒体：`*.douyinvod.com/.../video/tos/...`，`200 video/mp4`，客户端能直接下；
+- 跳转型：`*.amemv.com/aweme/v1/play/?...`，回 `302` + 几百字节 `text/plain` 的 HTML 跳转页，
+  真实文件还要再跳一到两次、落到动态第三方域名（`n98-*.douyinvod.com`、`*.sjxydc.com` 之类）。
+
+跳转型地址交给客户端只会得到「下载成功但打不开」（跳转页被当视频存了），而且落地域名动态、
+白名单配不全。所以解析层用 `direct_media_urls` 过滤掉；整组都是跳转型（罕见）才退回原列表，
+让用户走兜底复制链接。
+
+客户端下载后要**先闻文件头再算成功**（同一原因）：状态码 200 但内容以 `<` / `{` / `[` 开头
+（HTML 跳转页、JSON 错误体）时按 `not_media` 上报并继续试下一个候选，不落相册。
+只嗅探 256KB 以内的小文件——正常视频不会这么小，大文件不读也就不会占内存。
+
 ### 13.4 数据模型
 
 - `video_card` 增加 `platform`（`bilibili` / `douyin`，默认 `bilibili`），唯一约束由 `(user_id, bvid)` 改为 `(user_id, platform, bvid)`。
