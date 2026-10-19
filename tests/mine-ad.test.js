@@ -1,6 +1,4 @@
-// 我的页两条广告位：都在菜单卡片下方的留白里上下叠放——
-// 上面那条是原来的位置（mine-top），下面那条是新加的（mine-bottom）。
-// 该页没有列表内容、底部留白超过半屏，两条横幅补曝光；出错时只隐藏出错的那一条。
+// 我的页只保留一条底部横幅（mine-top），出错时隐藏容器。
 const path = require('path');
 const fs = require('fs');
 const { loadPage } = require('./helpers/page.js');
@@ -21,53 +19,41 @@ function adOffsets(wxml) {
   return offsets;
 }
 
-describe('我的页两个广告位', () => {
-  test('页面数据里准备两条广告位，slotKey 与 unit-id 各自独立', () => {
+describe('我的页底部广告位', () => {
+  test('页面数据里只准备一条广告位', () => {
     const { ctx } = loadPage(MINE_JS);
 
-    expect([ctx.data.mineTop.slotKey, ctx.data.mineBottom.slotKey]).toEqual(['mine-top', 'mine-bottom']);
+    expect(ctx.data.mineTop.slotKey).toBe('mine-top');
     // 页面只读 config，不写死 id：换广告位只改 config/ads.js
     expect(ctx.data.mineTop.unitId).toBe(ADS.MINE_BANNER_TOP);
-    expect(ctx.data.mineBottom.unitId).toBe(ADS.MINE_BANNER_BOTTOM);
     expect(ctx.data.mineTop.adError).toBe(false);
-    expect(ctx.data.mineBottom.adError).toBe(false);
+    expect(ctx.data.mineBottom).toBeUndefined();
   });
 
-  test('上面那条加载失败，只隐藏上面那条', () => {
+  test('加载失败时隐藏广告容器', () => {
     const { ctx } = loadPage(MINE_JS);
 
     ctx.onAdError(adFail('mine-top'));
 
     expect(ctx.data.mineTop.adError).toBe(true);
-    expect(ctx.data.mineBottom.adError).toBe(false);
   });
 
-  test('下面那条加载失败，只隐藏下面那条', () => {
-    const { ctx } = loadPage(MINE_JS);
-
-    ctx.onAdError(adFail('mine-bottom'));
-
-    expect(ctx.data.mineBottom.adError).toBe(true);
-    expect(ctx.data.mineTop.adError).toBe(false);
-  });
-
-  test('WXML：两条横幅都排在菜单卡片下方，先旧位（上）后新位（下）', () => {
+  test('WXML：只渲染一条横幅，并排在菜单卡片下方', () => {
     const menuIdx = MINE_WXML.indexOf('class="menu card"');
-    const [upperAd, lowerAd] = adOffsets(MINE_WXML);
+    const [adOffset] = adOffsets(MINE_WXML);
 
-    expect(adOffsets(MINE_WXML)).toHaveLength(2);
+    expect(adOffsets(MINE_WXML)).toHaveLength(1);
     expect(menuIdx).toBeGreaterThan(-1);
     // 绑定卡片与菜单卡片之间不放广告
     expect(MINE_WXML.indexOf('class="bind card"')).toBeLessThan(menuIdx);
-    expect(menuIdx).toBeLessThan(upperAd);
-    expect(MINE_WXML.slice(upperAd, lowerAd)).toContain('mineTop.unitId');
-    expect(MINE_WXML.slice(lowerAd)).toContain('mineBottom.unitId');
+    expect(menuIdx).toBeLessThan(adOffset);
+    expect(MINE_WXML.slice(adOffset)).toContain('mineTop.unitId');
+    expect(MINE_WXML).not.toContain('mineBottom');
   });
 
-  test('WXML：两条广告各带 slot 标识、按各自的 error 隐藏', () => {
-    expect(MINE_WXML.match(/data-slot="\{\{mine[A-Za-z]+\.slotKey\}\}"/g)).toHaveLength(2);
-    expect(MINE_WXML.match(/binderror="onAdError"/g)).toHaveLength(2);
+  test('WXML：广告带 slot 标识并按 error 隐藏', () => {
+    expect(MINE_WXML.match(/data-slot="\{\{mine[A-Za-z]+\.slotKey\}\}"/g)).toHaveLength(1);
+    expect(MINE_WXML.match(/binderror="onAdError"/g)).toHaveLength(1);
     expect(MINE_WXML).toContain('wx:if="{{!mineTop.adError}}"');
-    expect(MINE_WXML).toContain('wx:if="{{!mineBottom.adError}}"');
   });
 });

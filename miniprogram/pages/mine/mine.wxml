@@ -38,12 +38,8 @@
     </view>
   </view>
 
-  <!-- 我的页底部两条横幅：上条是原「我的页底部」位，下条是新建位 -->
+  <!-- 我的页底部横幅 -->
   <view class="ad-banner" wx:if="{{!mineTop.adError}}">
     <ad unit-id="{{mineTop.unitId}}" binderror="onAdError" data-slot="{{mineTop.slotKey}}" />
-  </view>
-
-  <view class="ad-banner" wx:if="{{!mineBottom.adError}}">
-    <ad unit-id="{{mineBottom.unitId}}" binderror="onAdError" data-slot="{{mineBottom.slotKey}}" />
   </view>
 </view>

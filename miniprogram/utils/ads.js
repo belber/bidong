@@ -55,29 +55,28 @@ function buildMonthAdGroups(groups) {
   );
 }
 
-// 我的页底部的两条横幅：贴在菜单卡片下方的留白里，上下叠放，
-// 先旧位（mine-top）后新位（mine-bottom）。该页没有列表内容、留白超过半屏，
-// 单条横幅填不满所以放两条；出错时按 slotKey 只隐藏出错的那一条，另一条照常展示。
-function buildMineAds() {
-  return [
-    { slotKey: 'mine-top', unitId: ADS_CONFIG.MINE_BANNER_TOP },
-    { slotKey: 'mine-bottom', unitId: ADS_CONFIG.MINE_BANNER_BOTTOM }
-  ].map((slot) => Object.assign({ id: 'ad-' + slot.slotKey, adError: false }, slot));
+// 我的页底部只保留一条横幅，贴在菜单卡片下方的留白里。
+function buildMineAd() {
+  return {
+    id: 'ad-mine-top',
+    slotKey: 'mine-top',
+    unitId: ADS_CONFIG.MINE_BANNER_TOP,
+    adError: false
+  };
 }
 
 const AD_UNIT_IDS = {
   homeBanner: ADS_CONFIG.HOME_BANNER,
   collectFeed: ADS_CONFIG.COLLECT_FEED,
   resultBanner: ADS_CONFIG.RESULT_BANNER,
-  mineBannerTop: ADS_CONFIG.MINE_BANNER_TOP,
-  mineBannerBottom: ADS_CONFIG.MINE_BANNER_BOTTOM
+  mineBannerTop: ADS_CONFIG.MINE_BANNER_TOP
 };
 
 module.exports = {
   buildFeedGroups,
   buildMonthAdGroups,
   buildFeedAd,
-  buildMineAds,
+  buildMineAd,
   COLLECT_FEED_INTERVAL,
   AD_UNIT_IDS
 };

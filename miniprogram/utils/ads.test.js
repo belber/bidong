@@ -2,7 +2,7 @@ const {
   buildFeedGroups,
   buildMonthAdGroups,
   buildFeedAd,
-  buildMineAds,
+  buildMineAd,
   COLLECT_FEED_INTERVAL,
   AD_UNIT_IDS
 } = require('./ads');
@@ -31,32 +31,18 @@ describe('collect feed ad slots', () => {
     expect(AD_UNIT_IDS.homeBanner).toBe('adunit-2b1d1372956d1cf1');
     expect(AD_UNIT_IDS.collectFeed).toBe('adunit-c956d609cf9f653b');
     expect(AD_UNIT_IDS.resultBanner).toBe('adunit-f522117f9e3fd28b');
-    // 两条横幅都在我的页底部上下叠放：上面那条沿用原「我的页底部」广告位，
-    // 下面那条是新建的；曝光/点击按广告位分开统计。
+    // 我的页只保留原「我的页底部」广告位。
     expect(AD_UNIT_IDS.mineBannerTop).toBe('adunit-0eb305e833051a6a');
-    expect(AD_UNIT_IDS.mineBannerBottom).toBe('adunit-0e7a81112e9dcd7a');
+    expect(AD_UNIT_IDS).not.toHaveProperty('mineBannerBottom');
     expect(COLLECT_FEED_INTERVAL).toBe(5);
   });
 
-  test('我的页两条横幅位：slotKey 与 unit-id 各自独立', () => {
-    const slots = buildMineAds();
+  test('我的页只生成底部横幅位', () => {
+    const slot = buildMineAd();
 
-    expect(slots.map((s) => s.slotKey)).toEqual(['mine-top', 'mine-bottom']);
-    expect(slots.map((s) => s.unitId)).toEqual([
-      AD_UNIT_IDS.mineBannerTop,
-      AD_UNIT_IDS.mineBannerBottom
-    ]);
-    slots.forEach((s) => expect(s.adError).toBe(false));
-  });
-
-  test('我的页两条广告位互不影响：slotKey 与 unit-id 都各是各的', () => {
-    const slots = buildMineAds();
-    const keys = slots.map((s) => s.slotKey);
-    const units = slots.map((s) => s.unitId);
-
-    expect(new Set(keys).size).toBe(keys.length);
-    // 分开建广告位：报表才分得清是哪个位置在出量
-    expect(new Set(units).size).toBe(units.length);
+    expect(slot.slotKey).toBe('mine-top');
+    expect(slot.unitId).toBe(AD_UNIT_IDS.mineBannerTop);
+    expect(slot.adError).toBe(false);
   });
 
   test('creates an ad for the empty collection state', () => {
