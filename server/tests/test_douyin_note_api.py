@@ -1,3 +1,4 @@
+import base64
 import json
 
 import httpx
@@ -11,6 +12,7 @@ from app.services.douyin_provider import DETAIL_API
 AWEME_ID = "7300000000000000000"
 BASE = "https://dtk.example"
 NOTE_URL = f"https://www.douyin.com/note/{AWEME_ID}"
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"x" * 128
 
 CONTENT = {
     "platform": "douyin",
@@ -156,7 +158,11 @@ def test_parse_note_uses_configured_third_party_api(client, auth_headers, db_eng
         )
     )
     respx.get(url__startswith="https://p3.douyinpic.com").mock(
-        return_value=httpx.Response(200, content=b"jpeg", headers={"content-type": "image/jpeg"})
+        return_value=httpx.Response(
+            200,
+            content=JPEG_BYTES,
+            headers={"content-type": "image/jpeg"},
+        )
     )
 
     resp = client.post(
@@ -180,3 +186,17 @@ def test_parse_note_uses_configured_third_party_api(client, auth_headers, db_eng
     candidates = download.json()["candidates"]
     assert len(candidates) == 2
     assert candidates[0]["url"] == "https://p3.douyinpic.com/image~tplv.jpeg"
+
+    blob = client.get(
+        f"/api/cards/{data['id']}/images-data",
+        headers=auth_headers,
+    )
+    assert blob.status_code == 200
+    payload = blob.json()
+    assert len(payload["items"]) == 2
+    assert payload["items"][0]["mime"] == "image/jpeg"
+    assert base64.b64decode(payload["items"][0]["base64"]).startswith(b"\xff\xd8\xff")
+
+
+def test_douyin_images_data_requires_login(client):
+    assert client.get("/api/cards/1/images-data").status_code == 401

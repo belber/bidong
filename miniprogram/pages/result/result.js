@@ -91,6 +91,69 @@ function saveToAlbum(saveFn, filePath) {
   });
 }
 
+function ensureAlbumPermission() {
+  return new Promise((resolve, reject) => {
+    if (!wx.getSetting) {
+      resolve();
+      return;
+    }
+    wx.getSetting({
+      success(res) {
+        const setting = res.authSetting || {};
+        const state = setting['scope.writePhotosAlbum'];
+        if (state === true) {
+          resolve();
+          return;
+        }
+        if (state === false) {
+          reject({ errMsg: 'auth deny scope.writePhotosAlbum' });
+          return;
+        }
+        wx.authorize({
+          scope: 'scope.writePhotosAlbum',
+          success: resolve,
+          fail: reject
+        });
+      },
+      fail: reject
+    });
+  });
+}
+
+function showAlbumPermissionGuide() {
+  wx.showModal({
+    title: '需要相册权限',
+    content: '请在设置中允许“保存到相册”，然后重试。',
+    confirmText: '去设置',
+    success(res) {
+      if (res.confirm && wx.openSetting) {
+        wx.openSetting();
+      }
+    }
+  });
+}
+
+function writeImageFile(filePath, data) {
+  return new Promise((resolve, reject) => {
+    wx.getFileSystemManager().writeFile({
+      filePath,
+      data,
+      success: resolve,
+      fail: reject
+    });
+  });
+}
+
+function saveImageToAlbum(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.saveImageToPhotosAlbum({
+      filePath,
+      success: resolve,
+      fail: reject
+    });
+  });
+}
+
 function shareLocalFile(localPath, filename) {
   if (!wx.shareFileMessage) {
     toast('当前微信版本不支持文件分享');
@@ -406,68 +469,95 @@ Page({
       });
   },
 
-  // 图文：一次拿全部图片，逐张下载保存，中途失败就报个数
+  // 图文：后端下载图片并返回数据；小程序只走已配置的 request 域名。
   onSaveImages() {
     if (this.data.savingImages) {
       return;
     }
     this._sessionId = newSessionId();
-    this.fetchDouyinCandidates('image')
-      .then((res) => {
-        const list = res.configured.length ? res.configured : res.all;
+    api.douyinImages(this.data.cardId)
+      .then((payload) => {
+        const list = payload.items || [];
         if (!list.length) {
-          toast('没有可保存的图片');
+          const message = '图片下载失败，请稍后重试';
+          this.reportDownload('resolve', 'fail', {
+            kind: 'image',
+            error_type: 'image_data',
+            error_message: message
+          });
+          toast(message);
           return;
         }
         this.setData({ savingImages: true, imageProgress: '0/' + list.length, imagePercent: 0 });
         let done = 0;
-        let failed = 0;
+        let failed = (payload.failed || []).length;
+        let lastError = '';
+        const finish = () => {
+          this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+          this.reportDownload('save', failed ? 'fail' : 'success', {
+            kind: 'image',
+            error_type: failed ? 'wx_save_image' : '',
+            error_message: failed ? (lastError || failed + ' 张保存失败') : '',
+            wx_err_msg: lastError
+          });
+          toast(failed ? '已保存 ' + done + ' 张，' + failed + ' 张失败' : '已保存 ' + done + ' 张图片');
+        };
         const next = (i) => {
           if (i >= list.length) {
-            this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
-            this.reportDownload('save', failed ? 'fail' : 'success', {
-              kind: 'image',
-              error_type: failed ? 'permission' : '',
-              error_message: failed ? failed + ' 张保存失败' : ''
-            });
-            toast(failed ? '已保存 ' + done + ' 张，' + failed + ' 张失败' : '已保存 ' + done + ' 张图片');
+            finish();
             return;
           }
+          const item = list[i];
           this.setData({
             imageProgress: i + '/' + list.length,
             imagePercent: Math.round((i / list.length) * 100)
           });
-          wx.downloadFile({
-            url: list[i].url,
-            success: (r) => {
-              if (r.statusCode !== 200) {
-                failed += 1;
-                next(i + 1);
-                return;
-              }
-              wx.saveImageToPhotosAlbum({
-                filePath: r.tempFilePath,
-                success: () => {
-                  done += 1;
-                  next(i + 1);
-                },
-                fail: () => {
-                  failed += 1;
-                  next(i + 1);
-                }
-              });
-            },
-            fail: () => {
-              failed += 1;
+          let buffer;
+          try {
+            buffer = wx.base64ToArrayBuffer(item.base64);
+          } catch (err) {
+            failed += 1;
+            lastError = (err && err.errMsg) || '图片数据解码失败';
+            next(i + 1);
+            return;
+          }
+          const filePath = wx.env.USER_DATA_PATH + '/douyin-' + this.data.bvid + '-' +
+            Date.now() + '-' + (i + 1) + '.' + (item.ext || 'jpg');
+          writeImageFile(filePath, buffer)
+            .then(() => saveImageToAlbum(filePath))
+            .then(() => {
+              done += 1;
               next(i + 1);
-            }
-          });
+            })
+            .catch((err) => {
+              failed += 1;
+              lastError = (err && err.errMsg) || (err && err.message) || '保存失败';
+              next(i + 1);
+            });
         };
-        next(0);
+        ensureAlbumPermission()
+          .then(() => next(0))
+          .catch((err) => {
+            this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+            const wxErr = (err && err.errMsg) || 'auth deny scope.writePhotosAlbum';
+            this.reportDownload('save', 'fail', {
+              kind: 'image',
+              error_type: 'album_permission',
+              error_message: '未获得相册权限',
+              wx_err_msg: wxErr
+            });
+            showAlbumPermissionGuide();
+          });
       })
       .catch((err) => {
         this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
-        toast((err && err.message) || '取图片地址失败');
+        const message = (err && err.message) || '图片下载失败';
+        this.reportDownload('resolve', 'fail', {
+          kind: 'image',
+          error_type: 'image_data',
+          error_message: message
+        });
+        toast(message);
       });
   },
 

@@ -212,6 +212,9 @@ module.exports = {
     const idx = arguments.length > 3 && arguments[3] ? '&index=' + arguments[3] : '';
     return request('GET', '/api/cards/' + id + '/download-url?kind=' + kind + suffix + idx);
   },
+  douyinImages(id) {
+    return request('GET', '/api/cards/' + id + '/images-data');
+  },
   reportDownloadEvent(payload) {
     return request('POST', '/api/download-events', payload);
   },

@@ -1,3 +1,4 @@
+import base64
 import httpx
 import xml.etree.ElementTree as ET
 from fastapi import APIRouter, Depends
@@ -43,6 +44,9 @@ def _require_enabled(kind: str, db: Session) -> None:
 
 
 DOUYIN_KIND_SWITCH = {"video": "video", "audio": "audio", "image": "images"}
+MAX_IMAGE_ITEMS = 20
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
+MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024
 
 
 def _douyin_download_url(card: VideoCard, kind: str, index: int, db: Session) -> dict:
@@ -102,6 +106,65 @@ def _douyin_download_url(card: VideoCard, kind: str, index: int, db: Session) ->
         notify.send_unconfigured_domain_alert(db, host, card.bvid)
 
     return {"kind": kind, "qn": None, "expires_at": None, "candidates": candidates}
+
+
+def _image_mime(content: bytes) -> tuple[str, str]:
+    if content.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg", "jpg"
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png", "png"
+    return "", ""
+
+
+@router.get("/api/cards/{card_id}/images-data")
+def douyin_images_data(
+    card_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """图文专用：服务端取图片字节，绕开微信动态 CDN 域名和 WebP 相册兼容问题。"""
+    card = _get_owned_card(db, user, card_id)
+    if card.platform != "douyin":
+        raise AppError(400, "不是抖音作品")
+    data = _douyin_download_url(card, "image", 0, db)
+    items = []
+    failed = []
+    total_bytes = 0
+    for index, candidate in enumerate(data["candidates"][:MAX_IMAGE_ITEMS], start=1):
+        url = candidate.get("url") or ""
+        try:
+            resp = httpx.get(
+                url,
+                timeout=20,
+                follow_redirects=True,
+                headers={"User-Agent": UA, "Referer": "https://www.douyin.com/"},
+            )
+            content = resp.content
+            if resp.status_code != 200:
+                failed.append({"index": index, "reason": f"http_{resp.status_code}"})
+                continue
+            if not content or len(content) > MAX_IMAGE_BYTES:
+                failed.append({"index": index, "reason": "invalid_size"})
+                continue
+            mime, ext = _image_mime(content)
+            if not mime:
+                failed.append({"index": index, "reason": "not_image"})
+                continue
+            if total_bytes + len(content) > MAX_TOTAL_IMAGE_BYTES:
+                failed.append({"index": index, "reason": "total_too_large"})
+                continue
+            total_bytes += len(content)
+            items.append({
+                "index": index,
+                "mime": mime,
+                "ext": ext,
+                "base64": base64.b64encode(content).decode(),
+            })
+        except Exception:
+            failed.append({"index": index, "reason": "network"})
+    if not items:
+        raise AppError(502, "图片下载失败，请稍后重试")
+    return {"total": len(data["candidates"]), "items": items, "failed": failed}
 
 
 def _streams(client: BiliClient, card: VideoCard, kind: str) -> list[dict]:

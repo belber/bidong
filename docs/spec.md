@@ -753,6 +753,11 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
   `/api/cards/{id}/media-size` 的抖音分支返回 `video` / `audio` 两个键，B站 分支的 `watermarked` / `clean` / `audio` 不变。
   大小只是展示信息：拿不到就不显示，接口不因此报错（会话失效等已知失败静默回落成描述文案）。
 - 图文作品的媒体卡列出图片缩略图 + 「保存全部」，支持单张保存；带 BGM 才显示「音频」行。
+- **图文保存改走服务端数据接口（2026-10-21）**：动态 `*.douyinpic.com` 地址不再要求小程序配置
+  `downloadFile` 合法域名。小程序调用已配置在 `request` 白名单中的
+  `GET /api/cards/{id}/images-data`，后端现取图片、限制类型和总大小后返回 JPEG/PNG 的
+  Base64 数据；小程序用 `wx.base64ToArrayBuffer` 写成本地 `.jpg/.png` 再保存相册。
+  这样解决动态 CDN 域名和 WebP 兼容问题；音频仍沿用现有直链/导出链路。
 - 音频行失败口径同 §10.3：抖音音频是 CDN 直链，域名未登记到微信白名单时除了按钮变「重试」，还要弹「换一种方式保存」。
 - 底部：分享 + 「去抖音查看」（复制作品链接 + 提示打开抖音 App）。
 

@@ -149,6 +149,36 @@ describe('抖音下载的进度反馈', () => {
   });
 });
 
+describe('抖音图文通过服务端数据保存', () => {
+  const js = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/pages/result/result.js'), 'utf8'
+  );
+  const api = fs.readFileSync(
+    path.join(__dirname, '../miniprogram/utils/api.js'), 'utf8'
+  );
+
+  test('API 客户端提供图文数据接口', () => {
+    expect(api).toContain('douyinImages(id)');
+    expect(api).toContain("'/api/cards/' + id + '/images-data'");
+  });
+
+  test('保存图片使用服务端数据、base64 和本地文件', () => {
+    const block = js.slice(js.indexOf('onSaveImages()'), js.indexOf('onOpenDouyin()'));
+    expect(block).toContain('api.douyinImages(this.data.cardId)');
+    expect(block).toContain('wx.base64ToArrayBuffer');
+    expect(js).toContain('writeFile');
+    expect(js).toContain('wx.saveImageToPhotosAlbum');
+    expect(block).not.toContain("api.downloadUrl(this.data.cardId, 'image')");
+  });
+
+  test('保存失败上报准确的微信错误并处理相册权限', () => {
+    const block = js.slice(js.indexOf('onSaveImages()'), js.indexOf('onOpenDouyin()'));
+    expect(block).toContain('wx_err_msg');
+    expect(js).toContain("scope.writePhotosAlbum");
+    expect(js).toContain('wx.openSetting');
+  });
+});
+
 describe('抖音音频走导出状态机（和 B站 一致）', () => {
   const wxml = fs.readFileSync(
     path.join(__dirname, '../miniprogram/pages/result/result.wxml'), 'utf8'
