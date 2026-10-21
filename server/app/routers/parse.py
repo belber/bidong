@@ -20,7 +20,7 @@ from ..services import collect_douyin as collect_douyin_service
 from ..services import config_store, link_platform, notify, repost_source, tracking
 from ..services.bilibili import BiliClient
 from ..services.collect import card_to_out, collect_video_by_bvid
-from ..services.douyin_provider import DouyinProvider
+from ..services.douyin_provider import build_douyin_provider
 from ..services.parse_cache import parse_cache
 
 router = APIRouter(tags=["parse"])
@@ -60,13 +60,14 @@ def parse(
 def _parse_douyin(payload: ParseRequest, user: User, db: Session) -> ParseResult:
     """抖音：解析 → 建卡 → 返回。所有媒体直链交给客户端自己去 CDN 拉，服务端不中转。"""
     start = time.monotonic()
-    provider = DouyinProvider(cookie=config_store.douyin_cookie(db))
+    provider = build_douyin_provider(db)
     aweme_id = None
     try:
         meta = provider.resolve(payload.url)
         aweme_id = meta.aweme_id
         card = collect_douyin_service.collect_douyin(db, user, meta, source="local")
     except Exception as exc:  # noqa: BLE001
+        logger.exception("douyin parse failed")
         db.rollback()
         tracking.log_parse(
             db,
@@ -179,6 +180,7 @@ def _parse_bilibili(payload: ParseRequest, user: User, db: Session) -> ParseResu
             db, user, bvid, source="local"
         )
     except Exception as exc:  # noqa: BLE001
+        logger.exception("bilibili parse failed")
         db.rollback()
         tracking.log_parse(
             db,

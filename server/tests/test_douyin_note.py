@@ -103,6 +103,51 @@ class TestFilteredResponse:
         assert meta.image_urls == []
 
 
+class TestThirdPartyFallback:
+    @respx.mock
+    def test_filtered_note_uses_third_party_fetcher(self):
+        body = {
+            "status_code": 0,
+            "filter_detail": {"filter_reason": "images_base"},
+            "aweme_detail": {},
+        }
+        respx.get(DETAIL_API).mock(
+            return_value=httpx.Response(200, content=json.dumps(body).encode())
+        )
+        fallback = _note_detail(with_images=True)
+        p = DouyinProvider(
+            cookie="sessionid=x; sid_tt=x; uid_tt=x",
+            note_fetcher=lambda aweme_id: fallback,
+        )
+        try:
+            meta = douyin.meta_from_detail(p.fetch_detail(AWEME_ID))
+        finally:
+            p.close()
+        assert meta.kind == "note"
+        assert meta.image_urls == [NOTE_IMAGE]
+
+    @respx.mock
+    def test_partial_note_without_images_uses_third_party_fetcher(self):
+        body = {
+            "status_code": 0,
+            "filter_detail": {"filter_reason": "images_base"},
+            "aweme_detail": _note_detail(with_images=False),
+        }
+        respx.get(DETAIL_API).mock(
+            return_value=httpx.Response(200, content=json.dumps(body).encode())
+        )
+        fallback = _note_detail(with_images=True)
+        p = DouyinProvider(
+            cookie="sessionid=x; sid_tt=x; uid_tt=x",
+            note_fetcher=lambda aweme_id: fallback,
+        )
+        try:
+            meta = douyin.meta_from_detail(p.fetch_detail(AWEME_ID))
+        finally:
+            p.close()
+        assert meta.image_urls == [NOTE_IMAGE]
+
+
 @respx.mock
 def test_parse_note_reports_unsupported_flag(client, auth_headers):
     body = {

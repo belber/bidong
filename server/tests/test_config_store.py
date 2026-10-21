@@ -110,6 +110,31 @@ def test_alert_config_roundtrip(db_engine):
     db.close()
 
 
+def test_douyin_note_api_config_roundtrip(db_engine):
+    db = _db(db_engine)
+    cfg = cs.douyin_note_api_config(db)
+    assert cfg["enabled"] is False
+    assert cfg["base_url"] == ""
+    assert cfg["api_key"] == ""
+    assert cfg["wait_seconds"] == 20
+
+    cs.set_douyin_note_api_config(
+        db,
+        enabled=True,
+        base_url="https://dtk.example/",
+        api_key="dtk_test_key",
+        wait_seconds=12,
+    )
+    cfg = cs.douyin_note_api_config(db)
+    assert cfg == {
+        "enabled": True,
+        "base_url": "https://dtk.example",
+        "api_key": "dtk_test_key",
+        "wait_seconds": 12,
+    }
+    db.close()
+
+
 def test_fault_alert_enabled_defaults_true_and_can_be_disabled(db_engine):
     db = _db(db_engine)
     cs.set_alert_config(db, alert_fault_enabled=True)

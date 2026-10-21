@@ -36,6 +36,23 @@ class DouyinNodePayload(BaseModel):
     node: str = Field(pattern="^(tencent|home)$")
 
 
+class DouyinNoteApiPayload(BaseModel):
+    enabled: bool | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    wait_seconds: int | None = Field(default=None, ge=1, le=30)
+
+
+def _note_api_view(db: Session) -> dict:
+    cfg = config_store.douyin_note_api_config(db)
+    return {
+        "enabled": cfg["enabled"],
+        "configured": bool(cfg["base_url"] and cfg["api_key"]),
+        "base_url": cfg["base_url"],
+        "wait_seconds": cfg["wait_seconds"],
+    }
+
+
 def probe_aweme_id(db: Session) -> str:
     row = db.query(AdminConfig).filter(AdminConfig.key == PROBE_AWEME_ID_KEY).first()
     return (row.value if row and row.value else "") or DEFAULT_PROBE_AWEME_ID
@@ -64,6 +81,7 @@ def douyin_session(
         "parse_node": config_store.douyin_parse_node(db),
         "probe_aweme_id": probe_aweme_id(db),
         "switches": config_store.douyin_switches(db),
+        "note_api": _note_api_view(db),
     }
     if probe:
         data["probe"] = _health(db) if configured else {
@@ -124,3 +142,20 @@ def update_douyin_node(
     config_store.set_douyin_parse_node(db, payload.node)
     db.commit()
     return {"node": config_store.douyin_parse_node(db)}
+
+
+@router.put("/douyin/note-api")
+def update_douyin_note_api(
+    payload: DouyinNoteApiPayload,
+    _: str = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    config_store.set_douyin_note_api_config(
+        db,
+        enabled=payload.enabled,
+        base_url=payload.base_url,
+        api_key=payload.api_key,
+        wait_seconds=payload.wait_seconds,
+    )
+    db.commit()
+    return _note_api_view(db)

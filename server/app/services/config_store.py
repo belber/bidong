@@ -46,6 +46,7 @@ def seed_defaults(db: Session) -> None:
         "alert_cookie_enabled": settings.alert_cookie_enabled,
         "alert_domain_enabled": settings.alert_domain_enabled,
         "alert_fault_enabled": settings.alert_fault_enabled,
+        "douyin_note_api_enabled": settings.douyin_note_api_enabled,
         "report_enabled": settings.report_enabled,
         "cookie_valid": True,
     }
@@ -55,6 +56,7 @@ def seed_defaults(db: Session) -> None:
         "send_interval": settings.robot_send_interval_seconds,
         "follow_window": settings.robot_follow_window_seconds,
         "cookie_check_interval": settings.cookie_check_interval_seconds,
+        "douyin_note_api_wait_seconds": settings.douyin_note_api_wait_seconds,
         "smtp_port": settings.smtp_port,
     }
     str_defaults = {
@@ -65,6 +67,8 @@ def seed_defaults(db: Session) -> None:
         "smtp_user": settings.smtp_user,
         "smtp_pass": settings.smtp_pass,
         "help_qq_group": settings.help_qq_group,
+        "douyin_note_api_base_url": settings.douyin_note_api_base_url,
+        "douyin_note_api_key": settings.douyin_note_api_key,
     }
     for key, value in bool_defaults.items():
         if get_raw(db, key) is None:
@@ -219,6 +223,10 @@ def set_robot_cookie(db: Session, cookie: dict[str, str]) -> None:
 # ---------------------------------------------------------------------------
 DOUYIN_COOKIE_KEY = "douyin_cookie"
 DOUYIN_NODE_KEY = "douyin_parse_node"
+DOUYIN_NOTE_API_ENABLED_KEY = "douyin_note_api_enabled"
+DOUYIN_NOTE_API_BASE_URL_KEY = "douyin_note_api_base_url"
+DOUYIN_NOTE_API_KEY_KEY = "douyin_note_api_key"
+DOUYIN_NOTE_API_WAIT_SECONDS_KEY = "douyin_note_api_wait_seconds"
 
 # 只保留这几项做「是否配过」的判断，不参与鉴权逻辑（鉴权认整段 Cookie）
 DOUYIN_COOKIE_MARKERS = ("sessionid=", "sid_tt=", "uid_tt=")
@@ -259,6 +267,66 @@ def douyin_parse_node(db: Session) -> str:
 
 def set_douyin_parse_node(db: Session, node: str) -> None:
     set_raw(db, DOUYIN_NODE_KEY, (node or "").strip() or "tencent")
+
+
+def douyin_note_api_config(db: Session) -> dict[str, Any]:
+    return {
+        "enabled": bool(
+            get_bool(
+                db,
+                DOUYIN_NOTE_API_ENABLED_KEY,
+                default=settings.douyin_note_api_enabled,
+            )
+        ),
+        "base_url": (
+            get_raw(db, DOUYIN_NOTE_API_BASE_URL_KEY)
+            or settings.douyin_note_api_base_url
+        ).rstrip("/"),
+        "api_key": (
+            get_raw(db, DOUYIN_NOTE_API_KEY_KEY)
+            or settings.douyin_note_api_key
+        ).strip(),
+        "wait_seconds": max(
+            1,
+            min(
+                30,
+                int(
+                    get_int(
+                        db,
+                        DOUYIN_NOTE_API_WAIT_SECONDS_KEY,
+                        default=settings.douyin_note_api_wait_seconds,
+                    )
+                ),
+            ),
+        ),
+    }
+
+
+def set_douyin_note_api_config(
+    db: Session,
+    *,
+    enabled: bool | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    wait_seconds: int | None = None,
+) -> None:
+    mapping = {
+        DOUYIN_NOTE_API_ENABLED_KEY: (
+            None if enabled is None else str(bool(enabled))
+        ),
+        DOUYIN_NOTE_API_BASE_URL_KEY: (
+            None if base_url is None else (base_url or "").strip().rstrip("/")
+        ),
+        DOUYIN_NOTE_API_KEY_KEY: (
+            None if api_key is None else (api_key or "").strip()
+        ),
+        DOUYIN_NOTE_API_WAIT_SECONDS_KEY: (
+            None if wait_seconds is None else str(max(1, min(30, int(wait_seconds))))
+        ),
+    }
+    for key, value in mapping.items():
+        if value is not None:
+            set_raw(db, key, value)
 
 
 # 抖音能力开关：解析、视频、音频、图文（图文默认开）

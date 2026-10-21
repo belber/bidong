@@ -99,6 +99,36 @@ def test_node_switch(admin_client):
     ).status_code == 422
 
 
+def test_note_api_config_is_admin_only_and_hides_key(admin_client, db_engine):
+    assert admin_client.put(
+        "/api/admin/douyin/note-api",
+        json={"enabled": True},
+    ).status_code == 401
+
+    headers = _auth(admin_client)
+    resp = admin_client.put(
+        "/api/admin/douyin/note-api",
+        json={
+            "enabled": True,
+            "base_url": "https://dtk.example/",
+            "api_key": "dtk_secret_key",
+            "wait_seconds": 15,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["enabled"] is True
+    assert data["base_url"] == "https://dtk.example"
+    assert data["configured"] is True
+    assert data["wait_seconds"] == 15
+    assert "api_key" not in data
+
+    session = admin_client.get("/api/admin/douyin/session", headers=headers).json()
+    assert session["note_api"]["configured"] is True
+    assert "api_key" not in session["note_api"]
+
+
 def test_parse_monitor_filters_by_platform(admin_client, db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()

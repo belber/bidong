@@ -644,13 +644,31 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 | 通道 | 覆盖 | 需要什么 | 实测 |
 |---|---|---|---|
 | A · 移动端 detail | 视频无水印、音频、封面、作者、抖音号、统计 | 专用小号登录态；**不需要签名** | 通 |
-| B · 图文解析 | 图集的图片 URL 列表 | 移动接口对图文一律回 `filter_reason: images_base`，拿不到图片 | **本期不做** |
+| B · 第三方图文解析 | 图集的图片 URL 列表 | 移动接口回 `filter_reason: images_base` 时，调用 DTK v5 兼容的第三方 API | 试点观察 |
 | C · 会话运维 | 让 A 长期不掉线 | 探活 + 告警已经做完；自动保温需要 Chromium | 探活本期做 |
 
-通道 B 的处理（本期结论）：**只用现有接口，不引入浏览器通道**。
+通道 B 的处理（2026-10-21 调整）：
 
-- 接口如果某天开始返回 `images[]`，图文自动就能用——图片下载链路（接口、前端「保存全部」、域名登记）已经铺好并有测试。
-- 接口继续返回 `images_base` 时，作品仍然建卡，结果页媒体卡明确显示「这是抖音图文作品，图片暂不支持保存」。
+- 移动接口正常返回 `images[]` 时，继续走现有直连链路，不额外调用第三方。
+- 移动接口返回 `images_base`，或作品是图文但 `images[]` 为空时，调用 DTK v5 兼容的第三方图文 API：
+  - 提交 `POST /api/v1/parse?wait=N`，请求头 `X-API-Key`；
+  - 若返回 `202 + task_id`，轮询 `GET /api/v1/tasks/{task_id}` 直到完成；
+  - 从归一化结果的 `data.media.images[].url/urls[]` 取图，优先不带 `~tplv` 的原图；
+  - 转换成现有 `DouyinMeta.image_urls`，后续 `/download-url?kind=image`、前端「保存全部」和域名治理完全复用。
+- 第三方通道只在后台启用且 API 地址、Key 都配置时生效；未配置时保持原行为，结果页明确显示「图片暂不支持保存」。
+- 第三方通道失败属于服务故障：走统一内部错误分类、解析日志和 Server 酱故障告警；用户侧不暴露第三方状态码或密钥信息。
+- 第一版只支持静态图片和现有图文原图；live photo 的短视频片段暂不下载。
+
+第三方配置项（管理端「账号/Cookie」页）：
+
+- `enabled`：总开关，默认关闭；
+- `base_url`：DTK v5 实例地址；
+- `api_key`：`X-API-Key`；
+- `wait_seconds`：提交后同步等待秒数，默认 20，超时后转任务轮询。
+
+图文成功率按 `parse_log` 的抖音 `source=local` / `platform=douyin` 记录观察；第三方失败使用独立 `error_type`，便于判断是服务不可用、鉴权失败、超时还是返回无可下载图片。
+
+- 接口如果某天开始直接返回 `images[]`，第三方调用会自动跳过。
 - 这条文案不能和「作品不可见或已被删除」混用：那是两个完全不同的原因，用户会误以为作品被删了。
   `filter_detail.filter_reason == "images_base"` 单独映射成 `douyin_note_unsupported`。
 - 自动保温（用 Chromium 刷新会话）也一并搁置，会话掉线时到管理端手动更新 Cookie。

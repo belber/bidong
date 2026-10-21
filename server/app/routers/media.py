@@ -11,7 +11,7 @@ from ..models import User, VideoCard
 from ..schemas import DownloadEventReport, MediaOption
 from ..config import settings
 from ..services.bilibili import BiliClient, UA
-from ..services.douyin_provider import DouyinProvider
+from ..services.douyin_provider import build_douyin_provider
 from ..services import media_download
 from ..services import notify
 from ..services import config_store, douyin
@@ -57,7 +57,7 @@ def _douyin_download_url(card: VideoCard, kind: str, index: int, db: Session) ->
     if not config_store.douyin_switches(db)[switch]:
         raise AppError(403, "该下载未开放")
 
-    provider = DouyinProvider(cookie=config_store.douyin_cookie(db))
+    provider = build_douyin_provider(db)
     try:
         meta = douyin.meta_from_detail(provider.fetch_detail(card.bvid))
     finally:
@@ -126,7 +126,7 @@ def _douyin_media_sizes(card: VideoCard, db: Session) -> dict:
     if not (switches.get("video") or switches.get("audio")):
         return sizes
 
-    provider = DouyinProvider(cookie=config_store.douyin_cookie(db))
+    provider = build_douyin_provider(db)
     try:
         meta = douyin.meta_from_detail(provider.fetch_detail(card.bvid))
     finally:

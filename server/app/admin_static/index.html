@@ -520,6 +520,7 @@ const renderers = {
 
     let dyHtml = '<p class="muted">抖音会话信息读取失败。</p>';
     if (dy) {
+      const noteApi = dy.note_api || {};
       const dyBadge = !dy.configured
         ? '<span class="tag bad">未配置</span>'
         : '<span class="tag ok">已配置</span>';
@@ -544,6 +545,21 @@ const renderers = {
         <div class="toolbar" style="margin-top:10px">
           <button onclick="updateDouyinCookie()">保存并探活</button>
           <span id="dy-cookie-msg" class="muted"></span>
+        </div>
+        <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px">
+          <h4>第三方图文解析 ${noteApi.configured ? '<span class="tag ok">已配置</span>' : '<span class="tag bad">未配置</span>'}</h4>
+          <p class="muted">移动接口返回 images_base 时调用 DTK v5 兼容 API；只在图文缺少图片时兜底。</p>
+          <label class="switch"><input type="checkbox" id="dy-note-api-enabled" ${noteApi.enabled ? "checked" : ""}/> 启用第三方图文解析</label>
+          <div style="margin:8px 0"><label class="muted">DTK v5 实例地址</label>
+            <input id="dy-note-api-url" value="${esc(noteApi.base_url || "")}" style="margin-top:4px" placeholder="https://your-dtk.example"/></div>
+          <div style="margin:8px 0"><label class="muted">API Key（已配置时留空表示不修改）</label>
+            <input id="dy-note-api-key" type="password" style="margin-top:4px" placeholder="${noteApi.configured ? "已配置，留空不修改" : "dtk_..."}"/></div>
+          <div style="margin:8px 0"><label class="muted">同步等待秒数（1~30）</label>
+            <input id="dy-note-api-wait" type="number" min="1" max="30" value="${noteApi.wait_seconds || 20}" style="margin-top:4px"/></div>
+          <div class="toolbar" style="margin-top:10px">
+            <button onclick="saveDouyinNoteApi()">保存图文 API</button>
+            <span id="dy-note-api-msg" class="muted"></span>
+          </div>
         </div>`;
     }
 
@@ -1541,6 +1557,23 @@ async function updateDouyinCookie() {
     show("cookie");
   } catch (e) {
     showModal("保存失败", e.message, true);
+  }
+}
+
+async function saveDouyinNoteApi() {
+  const msg = document.getElementById("dy-note-api-msg");
+  const key = (document.getElementById("dy-note-api-key").value || "").trim();
+  const body = {
+    enabled: document.getElementById("dy-note-api-enabled").checked,
+    base_url: (document.getElementById("dy-note-api-url").value || "").trim(),
+    wait_seconds: parseInt(document.getElementById("dy-note-api-wait").value || "20", 10)
+  };
+  if (key) body.api_key = key;
+  try {
+    const r = await api("/douyin/note-api", { method: "PUT", body: JSON.stringify(body) });
+    if (msg) msg.textContent = r.configured ? "已保存" : "已保存，但地址或 Key 仍不完整";
+  } catch (e) {
+    if (msg) msg.textContent = "保存失败：" + e.message;
   }
 }
 

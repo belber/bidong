@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # 抖音采集会话：整段 Cookie 头字符串。日常由管理端写入 DB，
     # 这里只是本地开发/首次启动的兜底来源。
     douyin_cookie: str = ""
+    douyin_note_api_enabled: bool = False
+    douyin_note_api_base_url: str = ""
+    douyin_note_api_key: str = ""
+    douyin_note_api_wait_seconds: int = 20
     # 解析节点标识，仅用于展示与排障：tencent（机房）/ home（住宅）
     douyin_parse_node: str = "tencent"
     robot_bili_jct: str = ""

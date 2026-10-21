@@ -43,14 +43,28 @@ def _filter_reason(payload: dict) -> str:
 
 
 class DouyinProvider:
-    def __init__(self, cookie: str, client: httpx.Client | None = None, timeout: float = 25.0):
+    def __init__(
+        self,
+        cookie: str,
+        client: httpx.Client | None = None,
+        timeout: float = 25.0,
+        note_fetcher=None,
+    ):
         self.cookie = (cookie or "").strip()
         self._owns_client = client is None
         self.client = client or httpx.Client(follow_redirects=True, timeout=timeout)
+        self.note_fetcher = note_fetcher
 
     def close(self) -> None:
         if self._owns_client:
             self.client.close()
+        if self.note_fetcher is not None and hasattr(self.note_fetcher, "close"):
+            self.note_fetcher.close()
+
+    def _fetch_note_detail(self, aweme_id: str) -> dict:
+        if hasattr(self.note_fetcher, "fetch_detail"):
+            return self.note_fetcher.fetch_detail(aweme_id)
+        return self.note_fetcher(aweme_id)
 
     # -- 链接 --------------------------------------------------------------
     def resolve_aweme_id(self, text: str) -> str:
@@ -128,6 +142,8 @@ class DouyinProvider:
                 # 图文作品会被接口按 images_base 过滤掉。这不是「作品被删了」，
                 # 文案必须分开，否则用户会以为这条作品不存在。
                 if _filter_reason(payload) == NOTE_FILTER_REASON:
+                    if self.note_fetcher is not None:
+                        return self._fetch_note_detail(aweme_id)
                     raise AppError(
                         422,
                         "这是抖音图文作品，暂不支持解析保存",
@@ -136,6 +152,9 @@ class DouyinProvider:
                 raise AppError(
                     404, "作品不可见或已被删除", error_type="douyin_video_unavailable"
                 )
+            if detail.get("aweme_type") == 68 and not (detail.get("images") or []):
+                if self.note_fetcher is not None:
+                    return self._fetch_note_detail(aweme_id)
             return detail
 
         raise AppError(502, BUSY_MESSAGE, error_type="douyin_busy") from last_error
@@ -159,3 +178,14 @@ class DouyinProvider:
             }
         except Exception as exc:  # noqa: BLE001 - 探活要把异常变成结果返回
             return {"ok": False, "status_code": 0, "bytes": 0, "error": str(exc)}
+
+
+def build_douyin_provider(db) -> DouyinProvider:
+    """生产解析入口：移动会话 + 可选第三方图文兜底。"""
+    from . import config_store
+    from .douyin_note_api import build_note_fetcher
+
+    return DouyinProvider(
+        cookie=config_store.douyin_cookie(db),
+        note_fetcher=build_note_fetcher(db),
+    )
