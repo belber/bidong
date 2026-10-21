@@ -40,10 +40,10 @@ CONTENT = {
         "streams": [],
         "images": [
             {
-                "url": "https://p3.douyinpic.com/preview~tplv.jpeg",
+                "url": "https://p3.douyinpic.com/image~tplv.webp",
                 "urls": [
-                    "https://p3.douyinpic.com/original.jpeg",
-                    "https://p3.douyinpic.com/preview~tplv.jpeg",
+                    "https://p3.douyinpic.com/image~tplv.webp",
+                    "https://p3.douyinpic.com/image~tplv.jpeg",
                 ],
             },
             {
@@ -80,7 +80,7 @@ def test_dtk_note_client_sync_success_maps_images():
     assert detail["aweme_type"] == 68
     assert detail["author"]["nickname"] == "作者昵称"
     assert detail["images"][0]["url_list"] == [
-        "https://p3.douyinpic.com/original.jpeg"
+        "https://p3.douyinpic.com/image~tplv.jpeg"
     ]
     assert len(detail["images"]) == 2
 
@@ -179,4 +179,4 @@ def test_parse_note_uses_configured_third_party_api(client, auth_headers, db_eng
     assert download.status_code == 200
     candidates = download.json()["candidates"]
     assert len(candidates) == 2
-    assert candidates[0]["url"] == "https://p3.douyinpic.com/original.jpeg"
+    assert candidates[0]["url"] == "https://p3.douyinpic.com/image~tplv.jpeg"

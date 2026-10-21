@@ -31,6 +31,14 @@ def _best_image_url(item: dict) -> str:
             candidates.append(value)
     if not candidates:
         return ""
+    # 微信相册保存对 WebP 兼容性不稳定；同图有 JPEG/PNG 镜像时优先使用。
+    album_friendly = [
+        u
+        for u in candidates
+        if u.split("?", 1)[0].lower().endswith((".jpg", ".jpeg", ".png"))
+    ]
+    if album_friendly:
+        return album_friendly[0]
     plain = [u for u in candidates if "~tplv" not in u]
     return (plain or candidates)[0]
 

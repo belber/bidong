@@ -653,7 +653,8 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 - 移动接口返回 `images_base`，或作品是图文但 `images[]` 为空时，调用 DTK v5 兼容的第三方图文 API：
   - 提交 `POST /api/v1/parse?wait=N`，请求头 `X-API-Key`；
   - 若返回 `202 + task_id`，轮询 `GET /api/v1/tasks/{task_id}` 直到完成；
-  - 从归一化结果的 `data.media.images[].url/urls[]` 取图，优先不带 `~tplv` 的原图；
+  - 从归一化结果的 `data.media.images[].url/urls[]` 取图。微信 `saveImageToPhotosAlbum`
+    对 WebP 兼容性不稳定，因此优先选同图的 JPEG / PNG 镜像，其次才选不带 `~tplv` 的 WebP；
   - 转换成现有 `DouyinMeta.image_urls`，后续 `/download-url?kind=image`、前端「保存全部」和域名治理完全复用。
 - 第三方通道只在后台启用且 API 地址、Key 都配置时生效；未配置时保持原行为，结果页明确显示「图片暂不支持保存」。
 - 第三方通道失败属于服务故障：走统一内部错误分类、解析日志和 Server 酱故障告警；用户侧不暴露第三方状态码或密钥信息。
