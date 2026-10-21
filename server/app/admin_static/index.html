@@ -136,7 +136,7 @@ let currentView = "overview";
 const charts = {};
 const S = {
   follow: { days: 30, q: "" },
-  parse: { source: "local", days: 30, q: "", platform: "" },
+  parse: { source: "local", days: 30, q: "", platform: "", page: 1, size: 20 },
   visit: { days: 30, q: "" },
   download: { mode: "session", days: 30, q: "", page: 1, size: 20, platform: "" },
   sources: { page: 1, size: 20, q: "", platform: "", status: "" },
@@ -415,26 +415,41 @@ const renderers = {
   },
 
   async parse(el) {
-    const { source, days, q, platform } = S.parse;
-    const rangeOpts = [7,30,90].map(d => `<option value="${d}" ${d===days?"selected":""}>近${d}天</option>`).join("");
+    const { source, days, q, platform, page, size } = S.parse;
+    const rangeOpts = [[0,"全部历史"],[7,"近7天"],[30,"近30天"],[90,"近90天"]]
+      .map(([value, text]) => `<option value="${value}" ${value===days?"selected":""}>${text}</option>`).join("");
     const platformTabs = `
       <div class="toolbar">
-        <button class="pill ${platform===''?'active':''}" onclick="S.parse.platform=''; S.parse.q=''; show('parse')">全部平台</button>
-        <button class="pill ${platform==='bilibili'?'active':''}" onclick="S.parse.platform='bilibili'; S.parse.source='local'; S.parse.q=''; show('parse')">B站</button>
-        <button class="pill ${platform==='douyin'?'active':''}" onclick="S.parse.platform='douyin'; S.parse.source='local'; S.parse.q=''; show('parse')">抖音</button>
+        <button class="pill ${platform===''?'active':''}" onclick="setParsePlatform('')">全部平台</button>
+        <button class="pill ${platform==='bilibili'?'active':''}" onclick="setParsePlatform('bilibili')">B站</button>
+        <button class="pill ${platform==='douyin'?'active':''}" onclick="setParsePlatform('douyin')">抖音</button>
       </div>`;
     // @评论触发是 B站 评论机器人专属，抖音下没有这一维
     const sourceTabs = platform === 'douyin' ? '' : `
-        <button class="pill ${source==='local'?'active':''}" onclick="S.parse.source='local'; S.parse.q=''; show('parse')">贴链接解析</button>
-        <button class="pill ${source==='robot'?'active':''}" onclick="S.parse.source='robot'; S.parse.q=''; show('parse')">@评论触发</button>`;
+        <button class="pill ${source==='local'?'active':''}" onclick="setParseSource('local')">贴链接解析</button>
+        <button class="pill ${source==='robot'?'active':''}" onclick="setParseSource('robot')">@评论触发</button>`;
     const tabs = `
       ${platformTabs}
       <div class="toolbar">${sourceTabs}
-        <input placeholder="搜索" value="${esc(q)}" onchange="S.parse.q=this.value; show('parse')" style="min-width:180px"/>
-        <select onchange="S.parse.days=parseInt(this.value); show('parse')">${rangeOpts}</select>
+        <input id="parse-q" placeholder="搜索" value="${esc(q)}" style="min-width:180px"
+          onkeydown="if (event.key === 'Enter') searchParse()"/>
+        <button onclick="searchParse()">查询</button>
+        <select onchange="parseDays(this.value)">${rangeOpts}</select>
+        <button class="ghost" onclick="resetParse()">重置</button>
       </div>`;
-    const range = qs({ q, days, platform, page: 1, size: 20 });
+    const range = qs({ q, days, platform, page, size });
     const rangeSuffix = range ? "&" + range.slice(1) : "";
+    const pager = (det) => {
+      const pages = det.pages || Math.max(1, Math.ceil(det.total / size));
+      return `<div class="toolbar" style="justify-content:flex-end">
+        <span class="muted">共 ${fmt(det.total)} 条 · 第 ${det.page || page} / ${pages || 1} 页</span>
+        <button class="ghost" onclick="parsePage(-1)" ${page <= 1 ? "disabled" : ""}>上一页</button>
+        <button class="ghost" onclick="parsePage(1)" ${page >= pages ? "disabled" : ""}>下一页</button>
+        <select onchange="parseSize(this.value)">
+          ${[20, 50, 100].map(n => `<option value="${n}" ${n === size ? "selected" : ""}>${n} 条/页</option>`).join("")}
+        </select>
+      </div>`;
+    };
 
     if (source === 'robot') {
       const s = await api("/stats/at?days=" + days);
@@ -454,7 +469,7 @@ const renderers = {
           <h3>明细</h3>
           <table><thead><tr><th>时间</th><th>评论正文</th><th>发起者</th><th>视频</th><th>结果</th><th>失败原因</th></tr></thead>
           <tbody>${det.items.map(atRow).join("")}</tbody></table>
-          <p class="muted">共 ${fmt(det.total)} 条</p>
+          ${pager(det)}
         </div>`;
       drawChart("chart-at", chart => chart.setOption({
         tooltip: { trigger: "axis" }, grid: { left: 40, right: 20, top: 20, bottom: 30 },
@@ -481,7 +496,7 @@ const renderers = {
         <h3>明细</h3>
         <table><thead><tr><th>时间</th><th>发起者</th><th>完整链接</th><th>视频名称</th><th>BVID</th><th>结果</th><th>失败原因</th></tr></thead>
         <tbody>${det.items.map(localRow).join("")}</tbody></table>
-        <p class="muted">共 ${fmt(det.total)} 条</p>
+        ${pager(det)}
       </div>`;
     drawChart("chart-parse", chart => chart.setOption({
       tooltip: { trigger: "axis" }, legend: { data: ["成功", "失败"] },
@@ -1409,6 +1424,42 @@ async function pushSearch(scope) {
   show("crawler");
 }
 
+function setParsePlatform(platform) {
+  S.parse.platform = platform;
+  if (platform) S.parse.source = "local";
+  S.parse.q = "";
+  S.parse.page = 1;
+  show("parse");
+}
+function setParseSource(source) {
+  S.parse.source = source;
+  S.parse.q = "";
+  S.parse.page = 1;
+  show("parse");
+}
+function searchParse() {
+  S.parse.q = (document.getElementById("parse-q").value || "").trim();
+  S.parse.page = 1;
+  show("parse");
+}
+function parseDays(value) {
+  S.parse.days = parseInt(value, 10) || 0;
+  S.parse.page = 1;
+  show("parse");
+}
+function parsePage(delta) {
+  S.parse.page = Math.max(1, S.parse.page + delta);
+  show("parse");
+}
+function parseSize(value) {
+  S.parse.size = parseInt(value, 10) || 20;
+  S.parse.page = 1;
+  show("parse");
+}
+function resetParse() {
+  S.parse = { source: "local", days: 30, q: "", platform: "", page: 1, size: 20 };
+  show("parse");
+}
 function setDownloadMode(mode) {
   S.download.mode = mode;
   S.download.page = 1;

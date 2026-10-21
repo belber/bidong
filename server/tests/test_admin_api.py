@@ -206,6 +206,78 @@ def test_admin_parse_view_has_trend_chart(admin_client):
     assert '"/stats/parse?source=local&days=" + days + "&platform=" + platform' in html
 
 
+def test_parse_detail_supports_history_pagination(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    now = utcnow_naive()
+    for i in range(25):
+        db.add(
+            ParseLog(
+                source="local",
+                input=f"BV1xx411c{i:02d}",
+                bvid=f"BV1xx411c{i:02d}",
+                ok=i % 2 == 0,
+                reason="" if i % 2 == 0 else "network_timeout",
+                created_at=now - timedelta(minutes=i),
+            )
+        )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get(
+        "/api/admin/stats/parse/detail?source=local&days=0&page=2&size=20",
+        headers=_auth(token),
+    ).json()
+
+    assert data["total"] == 25
+    assert data["page"] == 2
+    assert data["size"] == 20
+    assert data["pages"] == 2
+    assert len(data["items"]) == 5
+
+
+def test_at_detail_supports_all_history_and_pagination(admin_client, db_engine):
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    old = utcnow_naive() - timedelta(days=120)
+    for i in range(22):
+        db.add(
+            AtEvent(
+                feed_id=f"old-{i}",
+                bili_uid=str(1000 + i),
+                bvid=f"BV1yy411c{i:02d}",
+                result="collected",
+                created_at=old + timedelta(minutes=i),
+            )
+        )
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get(
+        "/api/admin/stats/at/detail?days=0&page=2&size=20",
+        headers=_auth(token),
+    ).json()
+
+    assert data["total"] == 22
+    assert data["page"] == 2
+    assert data["size"] == 20
+    assert data["pages"] == 2
+    assert len(data["items"]) == 2
+
+
+def test_admin_parse_view_has_history_pagination_controls(admin_client):
+    html = admin_client.get("/admin/index.html").text
+    assert "全部历史" in html
+    assert "parsePage(-1)" in html
+    assert "parsePage(1)" in html
+    assert "parseSize(this.value)" in html
+    assert "S.parse.page" in html
+    assert "S.parse.size" in html
+    assert '"/stats/parse/detail?source=local" + rangeSuffix' in html
+
+
 def test_features_and_schedule_config(admin_client):
     token = _login(admin_client).json()["token"]
     resp = admin_client.put(

@@ -113,9 +113,9 @@ def at_stats(
 @router.get("/stats/at/detail")
 def at_detail(
     q: str = "",
-    days: int = Query(30),
-    page: int = Query(1),
-    size: int = Query(20),
+    days: int = Query(30, ge=0),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -158,9 +158,9 @@ def parse_detail(
     source: str = Query("local", pattern="^(local|robot)$"),
     q: str = "",
     result: str = Query("", pattern="^(ok|fail)?$"),
-    days: int = Query(30),
-    page: int = Query(1),
-    size: int = Query(20),
+    days: int = Query(30, ge=0),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     platform: str = Query("", pattern="^(bilibili|douyin)?$"),
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),

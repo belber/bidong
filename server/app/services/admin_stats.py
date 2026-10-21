@@ -213,38 +213,46 @@ def follow_monitor_detail(
 
 
 def at_summary(db: Session, days: int = 30) -> dict:
-    start = _range_start_utc(days)
+    filters = [AtEvent.created_at >= _range_start_utc(days)] if days > 0 else []
     total = db.query(AtEvent).count()
     today = db.query(AtEvent).filter(AtEvent.created_at >= _range_start_utc(1)).count()
     created_ats = [
         dt
         for (dt,) in db.query(AtEvent.created_at)
-        .filter(AtEvent.created_at >= start)
+        .filter(*filters)
         .all()
     ]
     collected = (
         db.query(AtEvent)
-        .filter(AtEvent.created_at >= start, AtEvent.result == "collected")
+        .filter(*filters, AtEvent.result == "collected")
         .count()
     )
     failed = (
         db.query(AtEvent)
-        .filter(AtEvent.created_at >= start, AtEvent.result == "parse_failed")
+        .filter(*filters, AtEvent.result == "parse_failed")
         .count()
     )
     reasons = (
         db.query(AtEvent.reason, func.count(AtEvent.id))
         .filter(
-            AtEvent.created_at >= start,
+            *filters,
             AtEvent.result == "parse_failed",
         )
         .group_by(AtEvent.reason)
         .all()
     )
+    if days > 0:
+        trend = _trend_from_created_at(created_ats, days)
+    else:
+        counts: dict[str, int] = {}
+        for dt in created_ats:
+            key = _shanghai_date(dt).isoformat()
+            counts[key] = counts.get(key, 0) + 1
+        trend = [{"date": d, "count": counts[d]} for d in sorted(counts)]
     return {
         "total": total,
         "today": today,
-        "trend": _trend_from_created_at(created_ats, days),
+        "trend": trend,
         "collected": collected,
         "failed": failed,
         "fail_by_reason": [{"reason": r or "other", "count": c} for r, c in reasons],
@@ -264,7 +272,8 @@ def at_detail(
             | (AtEvent.comment.like(like))
             | (AtEvent.video_title.like(like))
         )
-    query = query.filter(AtEvent.created_at >= _range_start_utc(days))
+    if days > 0:
+        query = query.filter(AtEvent.created_at >= _range_start_utc(days))
     total = query.count()
     items = (
         query.order_by(AtEvent.created_at.desc())
@@ -285,6 +294,9 @@ def at_detail(
                 titles[bvid] = title or ""
     return {
         "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size,
         "items": [
             {
                 "created_at": _shanghai_date(e.created_at).isoformat()
@@ -361,6 +373,9 @@ def activation_detail(
                 fail_reason[uid] = reason
     return {
         "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size,
         "items": [
             {
                 "created_at": _shanghai_date(e.created_at).isoformat()
@@ -474,6 +489,9 @@ def parse_detail(
                 titles[bvid] = title or ""
     return {
         "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size,
         "items": [
             {
                 "created_at": _fmt_dt_sh(p.created_at),
