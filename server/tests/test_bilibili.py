@@ -6,6 +6,9 @@ from app.errors import AppError
 from app.services.bilibili import BiliClient
 
 
+GENERIC_USER_ERROR = "管理员正在解决中，请稍后再试"
+
+
 @respx.mock
 def test_resolve_bv_accepts_url_and_bv():
     client = BiliClient()
@@ -75,6 +78,76 @@ def test_get_video_maps_fields():
     assert meta.favorite == 300
     assert meta.coin == 40
     assert meta.danmaku == 500
+    client.close()
+
+
+@respx.mock
+def test_get_video_warms_anonymous_session_and_reuses_cookies():
+    respx.get("https://www.bilibili.com/").mock(
+        return_value=httpx.Response(
+            200,
+            headers=[
+                ("set-cookie", "buvid3=anon-buvid3; Domain=.bilibili.com; Path=/"),
+                ("set-cookie", "b_nut=1790000000; Domain=.bilibili.com; Path=/"),
+            ],
+            text="ok",
+        )
+    )
+    seen = {}
+
+    def view_route(request):
+        seen["cookie"] = request.headers.get("cookie", "")
+        return httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "bvid": "BV1xx411c7mD",
+                    "title": "标题",
+                    "pic": "//i0.hdslb.com/bfs/archive/a.jpg",
+                    "owner": {"name": "UP主", "mid": 1},
+                    "tname": "知识",
+                    "duration": 1,
+                    "pubdate": 1,
+                },
+            },
+        )
+
+    respx.get("https://api.bilibili.com/x/web-interface/view?bvid=BV1xx411c7mD").mock(
+        side_effect=view_route
+    )
+
+    client = BiliClient()
+    client.get_video("BV1xx411c7mD")
+    assert "buvid3=anon-buvid3" in seen["cookie"]
+    assert "b_nut=1790000000" in seen["cookie"]
+    client.close()
+
+
+@respx.mock
+def test_get_video_maps_412_to_generic_risk_control_error():
+    respx.get("https://www.bilibili.com/").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"set-cookie": "buvid3=anon-buvid3; Domain=.bilibili.com; Path=/"},
+            text="ok",
+        )
+    )
+    respx.get("https://api.bilibili.com/x/web-interface/view?bvid=BV1xx411c7mD").mock(
+        return_value=httpx.Response(
+            412,
+            headers={"content-type": "text/html"},
+            text="<html>risk control</html>",
+        )
+    )
+
+    client = BiliClient()
+    with pytest.raises(AppError) as exc:
+        client.get_video("BV1xx411c7mD")
+
+    assert exc.value.status_code == 503
+    assert exc.value.error_type == "bilibili_risk_control"
+    assert exc.value.message == GENERIC_USER_ERROR
     client.close()
 
 

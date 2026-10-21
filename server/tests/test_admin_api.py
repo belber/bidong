@@ -772,6 +772,7 @@ def test_operations_config_and_serverchan_test(admin_client):
             "serverchan_sendkey": "SCTtestkey",
             "alert_cookie_enabled": False,
             "alert_domain_enabled": True,
+            "alert_fault_enabled": False,
             "report_enabled": True,
             "report_time": "08:30",
         },
@@ -781,6 +782,7 @@ def test_operations_config_and_serverchan_test(admin_client):
     data = put.json()
     assert data["serverchan_sendkey"] == "SCTtestkey"
     assert data["alert_cookie_enabled"] is False
+    assert data["alert_fault_enabled"] is False
     assert data["report_enabled"] is True
     assert data["report_time"] == "08:30"
 

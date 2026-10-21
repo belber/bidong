@@ -110,6 +110,15 @@ def test_alert_config_roundtrip(db_engine):
     db.close()
 
 
+def test_fault_alert_enabled_defaults_true_and_can_be_disabled(db_engine):
+    db = _db(db_engine)
+    cs.set_alert_config(db, alert_fault_enabled=True)
+    assert cs.alert_config(db)["alert_fault_enabled"] is True
+    cs.set_alert_config(db, alert_fault_enabled=False)
+    assert cs.alert_config(db)["alert_fault_enabled"] is False
+    db.close()
+
+
 def test_cookie_status_roundtrip(db_engine):
     db = _db(db_engine)
     status = cs.cookie_status(db)

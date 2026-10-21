@@ -1,10 +1,12 @@
 import time
+import logging
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import get_current_user
+from ..errors import AppError
 from ..models import User, VideoCard
 from ..schemas import (
     MediaAvailability,
@@ -15,13 +17,33 @@ from ..schemas import (
     VideoStats,
 )
 from ..services import collect_douyin as collect_douyin_service
-from ..services import config_store, link_platform, repost_source, tracking
+from ..services import config_store, link_platform, notify, repost_source, tracking
 from ..services.bilibili import BiliClient
 from ..services.collect import card_to_out, collect_video_by_bvid
 from ..services.douyin_provider import DouyinProvider
 from ..services.parse_cache import parse_cache
 
 router = APIRouter(tags=["parse"])
+SERVICE_FAULT_MESSAGE = "管理员正在解决中，请稍后再试"
+logger = logging.getLogger("bidong")
+
+
+def _handle_parse_failure(db: Session, exc: Exception, *, platform: str, payload, bvid=None):
+    reason = tracking.classify_error(exc)
+    if tracking.is_service_fault(exc):
+        try:
+            notify.send_parse_fault_alert(
+                db,
+                platform=platform,
+                reason=reason,
+                input_url=payload.url,
+                bvid=bvid,
+                error=exc,
+            )
+        except Exception:  # noqa: BLE001 告警失败不能影响用户请求
+            logger.exception("parse fault alert failed")
+        raise AppError(503, SERVICE_FAULT_MESSAGE, error_type=reason) from exc
+    raise exc
 
 
 @router.post("/api/parse", response_model=ParseResult)
@@ -58,7 +80,13 @@ def _parse_douyin(payload: ParseRequest, user: User, db: Session) -> ParseResult
             reason=tracking.classify_error(exc),
             duration_ms=tracking.elapsed_ms(start),
         )
-        raise
+        _handle_parse_failure(
+            db,
+            exc,
+            platform="douyin",
+            payload=payload,
+            bvid=aweme_id,
+        )
     finally:
         provider.close()
 
@@ -163,7 +191,13 @@ def _parse_bilibili(payload: ParseRequest, user: User, db: Session) -> ParseResu
             reason=tracking.classify_error(exc),
             duration_ms=tracking.elapsed_ms(start),
         )
-        raise
+        _handle_parse_failure(
+            db,
+            exc,
+            platform="bilibili",
+            payload=payload,
+            bvid=bvid,
+        )
     tracking.log_parse(
         db,
         source="local",

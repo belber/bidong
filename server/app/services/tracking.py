@@ -58,6 +58,13 @@ def classify_send_error(exc: Exception) -> str:
     return "other"
 
 
+def is_service_fault(exc: Exception) -> bool:
+    """解析链路是否属于需要管理员介入的服务故障。"""
+    if isinstance(exc, AppError):
+        return int(exc.status_code or 0) >= 500
+    return True
+
+
 # ---------------------------------------------------------------------------
 # 事件落库
 # ---------------------------------------------------------------------------

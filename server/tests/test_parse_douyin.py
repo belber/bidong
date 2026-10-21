@@ -105,10 +105,10 @@ def test_parse_douyin_session_dead_reports_clearly(client, auth_headers):
         json={"url": f"https://www.douyin.com/video/{AWEME_ID}"},
         headers=auth_headers,
     )
-    assert resp.status_code == 502
+    assert resp.status_code == 503
     body = resp.json()
-    # 前端只该看到含糊的「维护中」，不该看到会话/Cookie 这类内部术语
-    assert body["message"] == "服务维护中，请稍后再试"
+    # 前端只该看到统一维护提示，不该看到会话/Cookie 这类内部术语
+    assert body["message"] == "管理员正在解决中，请稍后再试"
     assert "会话" not in body["message"]
     assert "Cookie" not in body["message"]
     assert body["error_type"] == "douyin_session_invalid"

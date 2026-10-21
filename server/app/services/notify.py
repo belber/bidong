@@ -1,5 +1,6 @@
 import smtplib
-from datetime import datetime, timedelta
+import threading
+from datetime import datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
 
@@ -10,6 +11,10 @@ from . import config_store
 
 DOMAIN_ALERT_INTERVAL = timedelta(hours=24)
 SERVERCHAN_API = "https://sctapi.ftqq.com/{sendkey}.send"
+FAULT_ALERT_TYPES_KEY = "fault_alert_sent_types"
+FAULT_ALERT_LAST_DATE_KEY = "fault_alert_last_date"
+SHANGHAI = timezone(timedelta(hours=8), name="Asia/Shanghai")
+_fault_alert_lock = threading.Lock()
 
 
 def _build_message(subject: str, body: str, to_email: str) -> MIMEText:
@@ -104,6 +109,63 @@ def send_notification(db: Session, subject: str, body: str, *, kind: str = "") -
     if cfg.get("serverchan_sendkey"):
         sent["serverchan"] = send_serverchan(db, subject, body)
     return sent
+
+
+def send_fault_alert(
+    db: Session,
+    fault_type: str,
+    subject: str,
+    body: str,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """服务故障告警：同类型永久一次，同一自然日最多一条，仅走 Server 酱。"""
+    fault_type = (fault_type or "").strip()
+    if not fault_type:
+        return False
+    cfg = config_store.alert_config(db)
+    if not cfg["alert_fault_enabled"] or not (cfg.get("serverchan_sendkey") or "").strip():
+        return False
+
+    current = now or datetime.now(SHANGHAI)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=SHANGHAI)
+    today = current.astimezone(SHANGHAI).date().isoformat()
+
+    # API 进程内串行化检查与发送，避免并发故障请求突破每日上限。
+    with _fault_alert_lock:
+        sent_types = config_store.get_json(db, FAULT_ALERT_TYPES_KEY, []) or []
+        if fault_type in sent_types:
+            return False
+        if config_store.get_raw(db, FAULT_ALERT_LAST_DATE_KEY) == today:
+            return False
+        if not send_serverchan(db, subject, body):
+            return False
+        config_store.set_json(db, FAULT_ALERT_TYPES_KEY, sent_types + [fault_type])
+        config_store.set_raw(db, FAULT_ALERT_LAST_DATE_KEY, today)
+        return True
+
+
+def send_parse_fault_alert(
+    db: Session,
+    *,
+    platform: str,
+    reason: str,
+    input_url: str,
+    bvid: str | None,
+    error: Exception,
+) -> bool:
+    fault_type = f"{platform}:{reason}"
+    body = (
+        f"平台：{platform}\n"
+        f"故障类型：{reason}\n"
+        f"时间：{datetime.now(SHANGHAI).isoformat(timespec='seconds')}\n"
+        f"输入：{(input_url or '')[:500]}\n"
+        f"稿件：{bvid or '—'}\n"
+        f"异常：{type(error).__name__}: {str(error)[:500]}\n\n"
+        f"用户侧已统一提示「管理员正在解决中，请稍后再试」。"
+    )
+    return send_fault_alert(db, fault_type, f"壁咚咚解析故障：{platform}", body)
 
 
 def send_unconfigured_domain_alert(db: Session, host: str, bvid: str = "") -> bool:

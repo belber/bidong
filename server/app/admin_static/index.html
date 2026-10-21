@@ -648,7 +648,9 @@ const renderers = {
         <h3>告警设置</h3>
         <label class="switch"><input type="checkbox" id="alert-cookie" ${a.alert_cookie_enabled ? "checked" : ""}/> Cookie 失效告警</label>
         <label class="switch"><input type="checkbox" id="alert-domain" ${a.alert_domain_enabled ? "checked" : ""}/> 未配置域名告警</label>
+        <label class="switch"><input type="checkbox" id="alert-fault" ${a.alert_fault_enabled ? "checked" : ""}/> 解析服务故障告警</label>
         <p class="muted">未配置域名告警按域名去重，同一域名 24 小时内只提醒一次。</p>
+        <p class="muted">解析服务故障只走 Server 酱；同一故障类型只发一次，每天最多一条。</p>
       </div>
       <div class="panel">
         <h3>每日运营报告</h3>
@@ -1305,6 +1307,7 @@ function operationsBody() {
     serverchan_sendkey: document.getElementById("serverchan-key").value.trim(),
     alert_cookie_enabled: document.getElementById("alert-cookie").checked,
     alert_domain_enabled: document.getElementById("alert-domain").checked,
+    alert_fault_enabled: document.getElementById("alert-fault").checked,
     report_enabled: document.getElementById("report-on").checked,
     report_time: document.getElementById("report-time").value || "09:00",
     smtp_host: document.getElementById("alert-host").value,

@@ -15,6 +15,8 @@ UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
+ANONYMOUS_HOME = "https://www.bilibili.com/"
+SERVICE_FAULT_MESSAGE = "管理员正在解决中，请稍后再试"
 
 # B站移动端 appkey（公开值，yt-dlp 等工具通用）
 _APP_KEY = "4409e2ce8ffd12b8"
@@ -65,9 +67,34 @@ class BiliClient:
             timeout=10,
             headers={"User-Agent": UA, "Referer": "https://www.bilibili.com/"},
         )
+        self._anonymous_session_ready = False
 
     def close(self) -> None:
         self.client.close()
+
+    def _ensure_anonymous_session(self) -> None:
+        """预热匿名 Cookie；失败时仍继续，交给业务请求决定是否报错。"""
+        if self._anonymous_session_ready:
+            return
+        self._anonymous_session_ready = True
+        try:
+            self.client.get(ANONYMOUS_HOME)
+        except Exception:
+            pass
+
+    def _raise_service_status(self, resp: httpx.Response) -> None:
+        if resp.status_code in (412, 429):
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_risk_control",
+            )
+        if resp.status_code >= 500:
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_api_unavailable",
+            )
 
     def resolve_bvid(self, url: str) -> str:
         text = (url or "").strip()
@@ -94,16 +121,35 @@ class BiliClient:
         return m.group(0)
 
     def get_video(self, bvid: str) -> VideoMeta:
+        self._ensure_anonymous_session()
         try:
             resp = self.client.get(
                 "https://api.bilibili.com/x/web-interface/view",
                 params={"bvid": bvid},
             )
+        except Exception as exc:
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_network",
+            ) from exc
+        self._raise_service_status(resp)
+        try:
             data = resp.json()
         except Exception as exc:
-            raise AppError(502, "B站接口请求失败") from exc
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_bad_response",
+            ) from exc
 
         if data.get("code") != 0 or not data.get("data"):
+            if data.get("code") in (-412, -429):
+                raise AppError(
+                    503,
+                    SERVICE_FAULT_MESSAGE,
+                    error_type="bilibili_risk_control",
+                )
             raise AppError(404, "视频不存在或已被删除")
 
         d = data["data"]
@@ -133,6 +179,7 @@ class BiliClient:
         )
 
     def get_tags(self, bvid: str) -> list[str]:
+        self._ensure_anonymous_session()
         try:
             resp = self.client.get(
                 "https://api.bilibili.com/x/tag/archive/tags",
@@ -167,6 +214,7 @@ class BiliClient:
         """拉取视频字幕，返回 [{t: 秒, text: 内容}, ...]。失败或无字幕时返回空列表。"""
         if not cid:
             return []
+        self._ensure_anonymous_session()
         try:
             params = WbiSigner(self.client).sign({"bvid": bvid, "cid": str(cid)})
             resp = self.client.get("https://api.bilibili.com/x/player/wbi/v2", params=params)
@@ -225,6 +273,7 @@ class BiliClient:
     def get_playurl(self, bvid: str, cid: int, fnval: int = 16, platform: str = "") -> dict:
         if not cid:
             return {"durl": [], "video": [], "audio": []}
+        self._ensure_anonymous_session()
         try:
             raw = {"bvid": bvid, "cid": str(cid), "fnval": str(fnval), "fourk": "1"}
             if platform:
@@ -233,11 +282,33 @@ class BiliClient:
             resp = self.client.get(
                 "https://api.bilibili.com/x/player/wbi/playurl", params=params
             )
+        except Exception as exc:
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_network",
+            ) from exc
+        self._raise_service_status(resp)
+        try:
             data = resp.json()
         except Exception as exc:
-            raise AppError(502, "获取播放地址失败") from exc
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_bad_response",
+            ) from exc
         if data.get("code") != 0 or not data.get("data"):
-            raise AppError(502, "获取播放地址失败")
+            if data.get("code") in (-412, -429):
+                raise AppError(
+                    503,
+                    SERVICE_FAULT_MESSAGE,
+                    error_type="bilibili_risk_control",
+                )
+            raise AppError(
+                503,
+                SERVICE_FAULT_MESSAGE,
+                error_type="bilibili_api_unavailable",
+            )
 
         d = data["data"]
         dash = d.get("dash") or {}

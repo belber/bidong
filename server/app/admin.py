@@ -809,6 +809,7 @@ class AlertPayload(BaseModel):
     serverchan_sendkey: str | None = None
     alert_cookie_enabled: bool | None = None
     alert_domain_enabled: bool | None = None
+    alert_fault_enabled: bool | None = None
     report_enabled: bool | None = None
     report_time: str | None = None
     smtp_host: str | None = None
@@ -838,6 +839,7 @@ def set_alert(
         serverchan_sendkey=payload.serverchan_sendkey,
         alert_cookie_enabled=payload.alert_cookie_enabled,
         alert_domain_enabled=payload.alert_domain_enabled,
+        alert_fault_enabled=payload.alert_fault_enabled,
         report_enabled=payload.report_enabled,
         report_time=payload.report_time,
         smtp_host=payload.smtp_host,

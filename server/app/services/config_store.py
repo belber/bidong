@@ -45,6 +45,7 @@ def seed_defaults(db: Session) -> None:
         "alert_enabled": settings.alert_enabled,
         "alert_cookie_enabled": settings.alert_cookie_enabled,
         "alert_domain_enabled": settings.alert_domain_enabled,
+        "alert_fault_enabled": settings.alert_fault_enabled,
         "report_enabled": settings.report_enabled,
         "cookie_valid": True,
     }
@@ -352,6 +353,9 @@ def alert_config(db: Session) -> dict[str, Any]:
         "alert_domain_enabled": bool(
             get_bool(db, "alert_domain_enabled", default=settings.alert_domain_enabled)
         ),
+        "alert_fault_enabled": bool(
+            get_bool(db, "alert_fault_enabled", default=settings.alert_fault_enabled)
+        ),
         "report_enabled": bool(
             get_bool(db, "report_enabled", default=settings.report_enabled)
         ),
@@ -371,6 +375,7 @@ def set_alert_config(
     serverchan_sendkey: str | None = None,
     alert_cookie_enabled: bool | None = None,
     alert_domain_enabled: bool | None = None,
+    alert_fault_enabled: bool | None = None,
     report_enabled: bool | None = None,
     report_time: str | None = None,
     smtp_host: str | None = None,
@@ -387,6 +392,9 @@ def set_alert_config(
         ),
         "alert_domain_enabled": (
             None if alert_domain_enabled is None else str(alert_domain_enabled)
+        ),
+        "alert_fault_enabled": (
+            None if alert_fault_enabled is None else str(alert_fault_enabled)
         ),
         "report_enabled": (None if report_enabled is None else str(report_enabled)),
         "report_time": report_time,

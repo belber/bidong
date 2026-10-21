@@ -1,6 +1,7 @@
 import respx
 from sqlalchemy.orm import sessionmaker
 
+from app.errors import AppError
 from app.models import VideoCard
 from app.services import repost_source
 from app.services.parse_cache import parse_cache
@@ -45,6 +46,54 @@ def test_parse_auto_collect_and_idempotent(client, auth_headers):
 def test_parse_invalid_url(client, auth_headers):
     resp = client.post("/api/parse", json={"url": "https://example.com/abc"}, headers=auth_headers)
     assert resp.status_code == 400
+
+
+def test_parse_service_fault_hides_internal_error_and_sends_alert(
+    client, auth_headers, monkeypatch
+):
+    from app.routers import parse as parse_router
+
+    calls = []
+
+    def fail_collect(*args, **kwargs):
+        raise AppError(
+            502,
+            "B站接口请求失败",
+            error_type="bilibili_risk_control",
+        )
+
+    monkeypatch.setattr(parse_router, "collect_video_by_bvid", fail_collect)
+    monkeypatch.setattr(
+        parse_router.notify,
+        "send_parse_fault_alert",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or True,
+    )
+
+    resp = client.post("/api/parse", json={"url": BVID}, headers=auth_headers)
+
+    assert resp.status_code == 503
+    assert resp.json()["message"] == "管理员正在解决中，请稍后再试"
+    assert len(calls) == 1
+
+
+def test_parse_invalid_url_does_not_send_fault_alert(client, auth_headers, monkeypatch):
+    from app.routers import parse as parse_router
+
+    calls = []
+    monkeypatch.setattr(
+        parse_router.notify,
+        "send_parse_fault_alert",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or True,
+    )
+
+    resp = client.post(
+        "/api/parse",
+        json={"url": "https://example.com/abc"},
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 400
+    assert calls == []
 
 
 @respx.mock

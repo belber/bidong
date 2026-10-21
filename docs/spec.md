@@ -67,6 +67,15 @@ B站机器人账号(cookie) ──▶ 监听 worker ──▶ 解析 @指令 ─
 1. 小程序 `request` 要配合法域名，B站接口反爬需要固定 IP + UA，放后端最稳；
 2. B站封面 `pic` 是 `http://` 且会防盗链，必须下载转存，不能直接外链。
 
+- **B站匿名会话（2026-10-21 定稿）**：`BiliClient` 在首次请求业务 API 前先访问
+  `https://www.bilibili.com/`，取得并复用匿名 Cookie（至少 `buvid3`、`b_nut`）。
+  实测生产服务器不携带该 Cookie 请求 `x/web-interface/view` 会返回 HTTP 412 + HTML
+  风控页；完成匿名会话预热后同一请求返回 HTTP 200 + JSON。
+- B站返回 412/429 时归类为 `bilibili_risk_control`；网络异常、5xx、非 JSON 分别归类为
+  `bilibili_network`、`bilibili_api_unavailable`、`bilibili_bad_response`。
+  下游解析链路中的服务故障统一对用户返回「管理员正在解决中，请稍后再试」，
+  不暴露 B站状态码、风控页或内部异常信息。
+
 ---
 
 ## 3. 技术选型
@@ -444,8 +453,19 @@ Phase 1：机器人触发
 
 1. 机器人 Cookie 失效：仅在「曾经校验有效 → 本次失效」时触发，避免首次配置误报。
 2. B站 CDN 未配置域名：`download-url` 登记域名时，若发现 `is_configured=false`，触发告警。
+3. 解析服务故障：B站 / 抖音解析出现 5xx 级服务故障时触发。故障类型由
+   `平台 + error_type` 组成，例如 `bilibili:bilibili_risk_control`。
 
 未配置域名告警按 host 去重，同一 host 24 小时内只告警一次；只有任一通道发送成功后才记录告警时间，避免通道未配置时吞掉后续通知。
+
+解析服务故障告警只走 Server 酱，不跟随邮件开关：
+
+- 同一 `fault_type` 只发送一次，修复后再次出现也不重复发送；
+- 按北京时间自然日计算，故障告警每天最多发送一条；
+- 只有 Server 酱发送成功后才同时记录该类型与当日日期，发送失败可在后续请求中重试；
+- 管理端提供「解析服务故障告警」总开关，默认开启。
+
+用户侧不展示内部故障原因，统一提示「管理员正在解决中，请稍后再试」。
 
 Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send`，参数 `title` 和 `desp`。
 
