@@ -222,6 +222,9 @@ Phase 1：机器人触发
 
 > Phase 0 不提供 `POST /api/cards`；解析即收藏。Phase 1 机器人由 worker 直接写库，也不走该接口。
 > Phase 1 提供 `POST /api/binding`（粘贴激活码绑定）、`GET /api/binding`（查绑定状态）与 `DELETE /api/binding`（解绑）。
+> **审核专用激活码（2026-10-24）**：`REVIEWER_ACTIVATION_CODES`（默认 `YVVQKMLKAE`）里的码**可重复使用**——
+> 每个微信用户各建一条「微信审核专用」绑定，内部激活码存成 `<审核码>-<user_id>`，不消耗原码；
+> 同一用户重复提交幂等返回已有绑定，解绑后也能重绑；已绑定普通账号的用户仍不能借审核码换绑。
 
 > 公开配置中的 `robot_guide` 同时控制首页引导、我的页引导以及「关于」页的机器人亮点文案展示。
 
