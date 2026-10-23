@@ -59,14 +59,20 @@
 
     <view class="field">
       <text class="label">标签</text>
-      <view class="content"><text wx:if="{{tagsText}}">{{tagsText}}</text><text wx:else class="muted">无标签</text></view>
-      <text class="action" bindtap="onCopyTag" data-field="tags">复制</text>
+      <view class="content {{tagsLong && !tagsExpanded ? 'clamp-2' : ''}}"><text wx:if="{{tagsText}}">{{tagsText}}</text><text wx:else class="muted">无标签</text></view>
+      <view class="ops">
+        <text class="action" wx:if="{{tagsLong}}" bindtap="onToggleField" data-field="tags">{{tagsExpanded ? '收起' : '展开'}}</text>
+        <text class="action" bindtap="onCopyTag" data-field="tags">复制</text>
+      </view>
     </view>
 
     <view class="field">
       <text class="label">简介</text>
-      <view class="content">{{desc || '无简介'}}</view>
-      <text class="action" bindtap="onCopyTag" data-field="desc">复制</text>
+      <view class="content {{descLong && !descExpanded ? 'clamp-2' : ''}}">{{desc || '无简介'}}</view>
+      <view class="ops">
+        <text class="action" wx:if="{{descLong}}" bindtap="onToggleField" data-field="desc">{{descExpanded ? '收起' : '展开'}}</text>
+        <text class="action" bindtap="onCopyTag" data-field="desc">复制</text>
+      </view>
     </view>
   </view>
 
@@ -82,11 +88,11 @@
       </view>
     </view>
 
-    <view class="field export-field" wx:if="{{isDouyin && media.clean && !publicView}}">
+    <view class="field export-field download-field" wx:if="{{isDouyin && media.clean && !publicView}}">
       <text class="label">视频</text>
       <view class="content muted">{{mediaSize.video || '无水印，直接在手机上保存'}}</view>
       <text
-        class="action {{downloading && activeKind === 'video' ? 'disabled' : ''}}"
+        class="action download-btn {{downloading && activeKind === 'video' ? 'disabled' : ''}}"
         bindtap="onDownloadDouyin"
         data-kind="video"
       >{{downloading && activeKind === 'video' ? downloadProgress + '%' : '下载'}}</text>
@@ -100,7 +106,7 @@
       <text class="label">音频</text>
       <view class="content muted">{{mediaSize.audio || '原声 / BGM'}}</view>
       <text
-        class="action {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
+        class="action download-btn {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
         bindtap="onExportTap"
         data-kind="audio"
       >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
@@ -120,25 +126,25 @@
       <text class="label">图片</text>
       <view class="content muted">共 {{imageCount}} 张</view>
       <text
-        class="action {{savingImages ? 'disabled' : ''}}"
+        class="action download-btn {{savingImages ? 'disabled' : ''}}"
         bindtap="onSaveImages"
-      >{{savingImages ? (imageStatus || '保存中…') : '保存全部'}}</text>
+      >{{savingImages ? '保存中' : '保存全部'}}</text>
       <view class="export-progress" wx:if="{{savingImages}}">
         <view class="export-track"><view class="progress-bar" style="width: {{imagePercent}}%"></view></view>
         <text class="export-progress-text">{{imageStatus || '正在保存…'}}</text>
       </view>
     </view>
 
-    <view class="field" wx:if="{{!isDouyin && media.watermarked && !publicView}}">
+    <view class="field download-field" wx:if="{{!isDouyin && media.watermarked && !publicView}}">
       <text class="label">视频</text>
       <view class="content muted">{{mediaSize.watermarked || '单文件流，含音频'}}</view>
-      <text class="action" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
+      <text class="action download-btn" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
     </view>
 
-    <view class="field" wx:if="{{!isDouyin && media.clean && !publicView}}">
+    <view class="field download-field" wx:if="{{!isDouyin && media.clean && !publicView}}">
       <text class="label">无水印视频</text>
       <view class="content muted">{{mediaSize.clean || '高清视频轨，不含音频'}}</view>
-      <text class="action" bindtap="onDownloadVideo" data-kind="clean">下载</text>
+      <text class="action download-btn" bindtap="onDownloadVideo" data-kind="clean">下载</text>
     </view>
 
     <view class="field export-field" wx:if="{{!isDouyin && media.audio && !publicView}}">
@@ -147,7 +153,7 @@
       <view class="content muted" wx:else>这条视频没有单独的音轨，下载上面的「视频」即可（视频里含声音）</view>
       <text
         wx:if="{{!audioUnavailable}}"
-        class="action {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
+        class="action download-btn {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
         bindtap="onExportTap"
         data-kind="audio"
       >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
@@ -277,5 +283,12 @@
     </view>
   </view>
 
+  <view wx:if="{{loadingVisible}}" class="countdown-mask">
+    <view class="countdown-card">
+      <view class="countdown-track"><view class="countdown-bar"></view></view>
+      <view class="countdown-text">{{loadingText}}</view>
+      <view class="countdown-sub">{{loadingSub}}</view>
+    </view>
+  </view>
 
 </view>

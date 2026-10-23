@@ -1,4 +1,4 @@
-<custom-navbar />
+<custom-navbar title="壁咚咚藏链阁·视频下载" compact="{{true}}" />
 
 <view class="page">
   <view class="bind card" wx:if="{{showRobotGuide}}">

@@ -69,6 +69,13 @@
   color: #2b1e23;
 }
 
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .muted,
 .content.muted {
   color: #b7aab0;
@@ -379,6 +386,11 @@
 
 .export-field {
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.download-field {
+  align-items: center;
 }
 
 .export-progress {
@@ -406,6 +418,33 @@
   border-color: #fb7299;
 }
 
+.action.download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132rpx;
+  height: 56rpx;
+  padding: 0 24rpx;
+  border-radius: 28rpx;
+  background: #fb7299;
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 6rpx 16rpx rgba(251, 114, 153, 0.28);
+}
+
+.action.download-btn.primary {
+  background: #e94f7f;
+}
+
+.action.download-btn.disabled {
+  background: #e7c6d2;
+  color: #ffffff;
+  box-shadow: none;
+  opacity: 0.9;
+}
+
 .action.disabled {
   opacity: 0.6;
 }
@@ -416,4 +455,61 @@
   margin: 24rpx 0 48rpx;
   border-radius: 16rpx;
   overflow: hidden;
+}
+
+.countdown-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(43, 30, 35, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdown-card {
+  width: 360rpx;
+  padding: 40rpx 32rpx 36rpx;
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  box-shadow: 0 16rpx 48rpx rgba(43, 30, 35, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.countdown-track {
+  width: 100%;
+  height: 12rpx;
+  border-radius: 6rpx;
+  background: #F7D5E0;
+  overflow: hidden;
+}
+
+.countdown-bar {
+  width: 42%;
+  height: 100%;
+  border-radius: 6rpx;
+  background: linear-gradient(90deg, #FB7299, #FF9DB9);
+  animation: countdown-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes countdown-slide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(260%); }
+}
+
+.countdown-text {
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2B1E23;
+}
+
+.countdown-sub {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #9A8A90;
+  text-align: center;
+  line-height: 1.5;
 }
