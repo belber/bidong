@@ -163,6 +163,8 @@ def test_client_bypasses_system_proxy(monkeypatch):
     DtkNoteClient(BASE, "dtk_test_key")
 
     assert captured.get("trust_env") is False
+    # 连接/握手单独限时，坏网络不会再卡 35 秒
+    assert captured["timeout"].connect == 8.0
 
 
 @respx.mock

@@ -145,7 +145,10 @@ class DtkNoteClient:
         self.poll_interval = max(0.0, float(poll_interval))
         self._owns_client = client is None
         self.client = client or httpx.Client(
-            follow_redirects=True, timeout=timeout, trust_env=False
+            follow_redirects=True,
+            # 连接/握手单独限时：坏代理或网络不通时 8 秒就失败，别让用户等 35 秒
+            timeout=httpx.Timeout(connect=8.0, read=timeout, write=timeout, pool=8.0),
+            trust_env=False,
         )
 
     def close(self) -> None:
