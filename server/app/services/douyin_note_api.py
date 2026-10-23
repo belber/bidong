@@ -16,6 +16,17 @@ from ..errors import AppError
 from . import config_store
 
 SERVICE_MESSAGE = "管理员正在解决中，请稍后再试"
+# 第三方是公网 HTTPS 服务：本机 Clash 之类的系统代理会让 TLS 握手随机失败，
+# 固定直连更稳定；网络类错误再重试一次。
+NETWORK_RETRIES = 1
+RETRY_BACKOFF_SECONDS = 0.4
+# 第三方熔断时记住恢复时间，短时间内直接快速失败，不让用户每单都干等 20 秒
+_CIRCUIT_UNTIL = 0.0
+
+
+def _cool_down(seconds: float) -> None:
+    global _CIRCUIT_UNTIL
+    _CIRCUIT_UNTIL = time.monotonic() + min(max(float(seconds), 5.0), 300.0)
 
 
 def _first_url(items: Any) -> str:
@@ -94,6 +105,8 @@ def dtk_content_to_detail(content: dict) -> dict:
         },
         "images": [{"url_list": [url]} for url in image_urls],
         "music": {
+            # 图集的 BGM 经常只给 id、不给 play_url，带下去供 provider 二次查询
+            "music_id": str(music.get("music_id") or ""),
             "play_url": {
                 "url_list": [music["play_url"]] if music.get("play_url") else []
             }
@@ -131,32 +144,53 @@ class DtkNoteClient:
         self.wait_seconds = max(1, min(30, int(wait_seconds)))
         self.poll_interval = max(0.0, float(poll_interval))
         self._owns_client = client is None
-        self.client = client or httpx.Client(follow_redirects=True, timeout=timeout)
+        self.client = client or httpx.Client(
+            follow_redirects=True, timeout=timeout, trust_env=False
+        )
 
     def close(self) -> None:
         if self._owns_client:
             self.client.close()
 
     def _request(self, method: str, path: str, **kwargs) -> tuple[int, dict]:
+        global _CIRCUIT_UNTIL
         if not self.base_url or not self.api_key:
             raise AppError(
                 502,
                 SERVICE_MESSAGE,
                 error_type="douyin_note_api_not_configured",
             )
-        try:
-            resp = self.client.request(
-                method,
-                self.base_url + path,
-                headers={"X-API-Key": self.api_key},
-                **kwargs,
+        if time.monotonic() < _CIRCUIT_UNTIL:
+            raise AppError(
+                502,
+                SERVICE_MESSAGE,
+                error_type="douyin_note_api_endpoint_circuit_open",
             )
-        except Exception as exc:  # noqa: BLE001
+        resp: httpx.Response | None = None
+        last_exc: Exception | None = None
+        for attempt in range(NETWORK_RETRIES + 1):
+            try:
+                resp = self.client.request(
+                    method,
+                    self.base_url + path,
+                    headers={"X-API-Key": self.api_key},
+                    **kwargs,
+                )
+                break
+            except httpx.TransportError as exc:
+                last_exc = exc
+                if attempt < NETWORK_RETRIES:
+                    time.sleep(RETRY_BACKOFF_SECONDS)
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                break
+        if resp is None:
+            _cool_down(30)
             raise AppError(
                 502,
                 SERVICE_MESSAGE,
                 error_type="douyin_note_api_network",
-            ) from exc
+            ) from last_exc
         if resp.status_code in (401, 403):
             raise AppError(
                 502,
@@ -166,19 +200,28 @@ class DtkNoteClient:
         try:
             body = resp.json()
         except Exception as exc:  # noqa: BLE001
+            _cool_down(30)
             raise AppError(
                 502,
                 SERVICE_MESSAGE,
                 error_type="douyin_note_api_bad_response",
             ) from exc
         if not isinstance(body, dict):
+            _cool_down(30)
             raise AppError(
                 502,
                 SERVICE_MESSAGE,
                 error_type="douyin_note_api_bad_response",
             )
         if body.get("success") is False:
-            code = str((body.get("error") or {}).get("code") or "unknown")
+            error = body.get("error") or {}
+            code = str(error.get("code") or "unknown")
+            if code.lower() == "endpoint_circuit_open":
+                try:
+                    wait = float(error.get("retry_after") or 30)
+                except (TypeError, ValueError):
+                    wait = 30.0
+                _cool_down(wait)
             raise AppError(
                 502,
                 SERVICE_MESSAGE,

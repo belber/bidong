@@ -2,9 +2,11 @@ import base64
 import json
 
 import httpx
+import pytest
 import respx
 from sqlalchemy.orm import sessionmaker
 
+from app.errors import AppError
 from app.services import config_store
 from app.services.douyin_note_api import DtkNoteClient, dtk_content_to_detail
 from app.services.douyin_provider import DETAIL_API
@@ -13,6 +15,11 @@ AWEME_ID = "7300000000000000000"
 BASE = "https://dtk.example"
 NOTE_URL = f"https://www.douyin.com/note/{AWEME_ID}"
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"x" * 128
+
+
+@pytest.fixture(autouse=True)
+def _reset_circuit(monkeypatch):
+    monkeypatch.setattr("app.services.douyin_note_api._CIRCUIT_UNTIL", 0.0)
 
 CONTENT = {
     "platform": "douyin",
@@ -127,6 +134,97 @@ def test_dtk_content_to_detail_uses_plain_title_first_line():
     detail = dtk_content_to_detail(content)
     assert detail["desc"] == "第一行标题\n第二行正文"
     assert detail["music"]["play_url"]["url_list"] == ["https://music.example/a.mp3"]
+
+
+def test_dtk_content_to_detail_keeps_music_id_when_play_url_missing():
+    """图集的 BGM 只给 music_id、不给 play_url，得把 id 带下去才能二次查。"""
+    content = json.loads(json.dumps(CONTENT))
+    content["music"] = {"music_id": "7656608884938197002", "play_url": None, "title": "时光里的光"}
+
+    detail = dtk_content_to_detail(content)
+
+    assert detail["music"]["music_id"] == "7656608884938197002"
+    assert detail["music"]["play_url"]["url_list"] == []
+
+
+def test_client_bypasses_system_proxy(monkeypatch):
+    """本机 Clash 的系统代理会让 TLS 握手随机失败；第三方通道固定直连。"""
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("app.services.douyin_note_api.httpx.Client", FakeClient)
+
+    DtkNoteClient(BASE, "dtk_test_key")
+
+    assert captured.get("trust_env") is False
+
+
+@respx.mock
+def test_network_error_retries_once_then_succeeds():
+    route = respx.post(f"{BASE}/api/v1/parse").mock(
+        side_effect=[
+            httpx.ConnectError("[SSL: UNEXPECTED_EOF_WHILE_READING]"),
+            httpx.Response(200, json={"success": True, "data": {}}),
+        ]
+    )
+    client = DtkNoteClient(BASE, "dtk_test_key", wait_seconds=1, poll_interval=0)
+    try:
+        status, body = client._request("POST", "/api/v1/parse", json={"url": NOTE_URL})
+    finally:
+        client.close()
+
+    assert route.call_count == 2
+    assert status == 200
+    assert body["success"] is True
+
+
+@respx.mock
+def test_network_error_twice_still_gives_friendly_message():
+    respx.post(f"{BASE}/api/v1/parse").mock(
+        side_effect=httpx.ConnectError("[SSL: UNEXPECTED_EOF_WHILE_READING]")
+    )
+    client = DtkNoteClient(BASE, "dtk_test_key", wait_seconds=1, poll_interval=0)
+    try:
+        with pytest.raises(AppError) as exc:
+            client._request("POST", "/api/v1/parse", json={"url": NOTE_URL})
+    finally:
+        client.close()
+
+    assert exc.value.status_code == 502
+    assert exc.value.error_type == "douyin_note_api_network"
+
+
+@respx.mock
+def test_circuit_open_cools_down_and_fails_fast(monkeypatch):
+    """第三方熔断后别每单都等 20 秒：本地记住 retry_after，期间直接失败。"""
+    monkeypatch.setattr("app.services.douyin_note_api._CIRCUIT_UNTIL", 0.0)
+    route = respx.post(f"{BASE}/api/v1/parse").mock(
+        return_value=httpx.Response(
+            503,
+            json={
+                "success": False,
+                "error": {"code": "ENDPOINT_CIRCUIT_OPEN", "retry_after": 30},
+            },
+        )
+    )
+    client = DtkNoteClient(BASE, "dtk_test_key", wait_seconds=1, poll_interval=0)
+    try:
+        with pytest.raises(AppError) as first:
+            client._request("POST", "/api/v1/parse", json={"url": NOTE_URL})
+        with pytest.raises(AppError) as second:
+            client._request("POST", "/api/v1/parse", json={"url": NOTE_URL})
+    finally:
+        client.close()
+
+    assert route.call_count == 1
+    assert first.value.status_code == 502
+    assert second.value.error_type == "douyin_note_api_endpoint_circuit_open"
 
 
 @respx.mock

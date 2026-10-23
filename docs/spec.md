@@ -656,6 +656,17 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
   - 从归一化结果的 `data.media.images[].url/urls[]` 取图。微信 `saveImageToPhotosAlbum`
     对 WebP 兼容性不稳定，因此优先选同图的 JPEG / PNG 镜像，其次才选不带 `~tplv` 的 WebP；
   - 转换成现有 `DouyinMeta.image_urls`，后续 `/download-url?kind=image`、前端「保存全部」和域名治理完全复用。
+- **图文的 BGM 要单独补**（2026-10-21 定稿）：图集本身也是带音频的作品，但第三方归一化结果里
+  `music.play_url` 常为 `null`，只给 `music_id`。此时用同一个移动会话请求
+  `aweme/v1/music/detail?music_id=…`，把 `music_info.play_url.url_list` 补回详情，
+  `meta.audio_urls` 自然就有值，结果页照常出现「音频」行、`/download-url?kind=audio` 也能直接下。
+  这一步只做兜底：有 `play_url` 就不发请求；补不到就静默不显示音频行，不影响图片解析。
+- **第三方通道固定直连、网络错误重试一次**（2026-10-24）：`DtkNoteClient` 的 httpx 客户端
+  关闭 `trust_env`，不继承本机系统代理（Clash 之类会让 TLS 握手随机报
+  `UNEXPECTED_EOF_WHILE_READING`）；`httpx.TransportError` 先重试一次（0.4s 退避），
+  仍失败才按服务故障返回「管理员正在解决中」并由解析故障告警接管。
+  第三方返回 `ENDPOINT_CIRCUIT_OPEN` 时按它的 `retry_after` 在本地冷却（5–300s），
+  期间直接快速失败；网络/坏响应也冷却 30s，避免每个用户都干等二三十秒。
 - 第三方通道只在后台启用且 API 地址、Key 都配置时生效；未配置时保持原行为，结果页明确显示「图片暂不支持保存」。
 - 第三方通道失败属于服务故障：走统一内部错误分类、解析日志和 Server 酱故障告警；用户侧不暴露第三方状态码或密钥信息。
 - 第一版只支持静态图片和现有图文原图；live photo 的短视频片段暂不下载。
@@ -753,6 +764,10 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
   `/api/cards/{id}/media-size` 的抖音分支返回 `video` / `audio` 两个键，B站 分支的 `watermarked` / `clean` / `audio` 不变。
   大小只是展示信息：拿不到就不显示，接口不因此报错（会话失效等已知失败静默回落成描述文案）。
 - 图文作品的媒体卡列出图片缩略图 + 「保存全部」，支持单张保存；带 BGM 才显示「音频」行。
+- **媒体区要先说清楚「分开下载」**（2026-10-21 定稿）：抖音图文的图片和音频是两个独立下载项，
+  用户容易以为点一次就能拿到整条作品。所以在「媒体」标题下方、封面之前加一行提示：
+  「抖音图文作品：N 张图片和音频需要分开下载」，只在 `isDouyin && isNote && !publicView` 时显示；
+  图片数量未知时退回「图片和音频需要分开下载」，不显示「0 张」。
 - **图文保存改走服务端数据接口（2026-10-21）**：动态 `*.douyinpic.com` 地址不再要求小程序配置
   `downloadFile` 合法域名。小程序调用已配置在 `request` 白名单中的
   `GET /api/cards/{id}/images-data`，后端现取图片、限制类型和总大小后返回 JPEG/PNG 的

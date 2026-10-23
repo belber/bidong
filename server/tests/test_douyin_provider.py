@@ -13,10 +13,35 @@ from app.services.douyin_provider import DETAIL_API, DouyinProvider
 
 FIXTURE = Path(__file__).parent / "fixtures" / "douyin_detail_video.json"
 AWEME_ID = "7685688911658323392"
+MUSIC_ID = "7656608884938197002"
+MUSIC_DETAIL_API = "https://aweme.snssdk.com/aweme/v1/music/detail/"
+BGM_URL = "https://sf6-cdn-tos.douyinstatic.com/obj/tos-cn-ve-2774/a.mp3"
 
 
 def fixture_body() -> bytes:
     return FIXTURE.read_bytes()
+
+
+def note_detail(play_urls: list[str] | None = None) -> dict:
+    return {
+        "aweme_id": AWEME_ID,
+        "aweme_type": 68,
+        "desc": "图文",
+        "create_time": 0,
+        "video": {"duration": 0, "cover": {"url_list": []}},
+        "images": [{"url_list": ["https://p3.douyinpic.com/a.jpeg"]}],
+        "music": {"music_id": MUSIC_ID, "play_url": {"url_list": list(play_urls or [])}},
+        "author": {"nickname": "n", "unique_id": "u", "sec_uid": "s"},
+        "statistics": {},
+    }
+
+
+def _mock_filtered_note():
+    respx.get(DETAIL_API).mock(
+        return_value=httpx.Response(
+            200, json={"aweme_detail": {}, "filter_detail": {"filter_reason": "images_base"}}
+        )
+    )
 
 
 @pytest.fixture
@@ -133,3 +158,54 @@ class TestProbe:
         result = provider.probe(AWEME_ID)
         assert result["ok"] is False
         assert result["bytes"] == 0
+
+
+class TestNoteBgm:
+    """图集的 BGM：第三方只给 music_id，用移动会话按 id 补 play_url。"""
+
+    @respx.mock
+    def test_bgm_filled_from_music_detail(self):
+        _mock_filtered_note()
+        music = respx.get(MUSIC_DETAIL_API).mock(
+            return_value=httpx.Response(
+                200, json={"music_info": {"play_url": {"url_list": [BGM_URL]}}}
+            )
+        )
+        provider = DouyinProvider(cookie="sessionid=abc", note_fetcher=lambda _id: note_detail())
+        try:
+            detail = provider.fetch_detail(AWEME_ID)
+        finally:
+            provider.close()
+
+        assert music.called
+        assert detail["music"]["play_url"]["url_list"] == [BGM_URL]
+
+    @respx.mock
+    def test_existing_play_url_skips_the_extra_request(self):
+        _mock_filtered_note()
+        music = respx.get(MUSIC_DETAIL_API).mock(
+            return_value=httpx.Response(200, json={"music_info": {}})
+        )
+        provider = DouyinProvider(
+            cookie="sessionid=abc", note_fetcher=lambda _id: note_detail([BGM_URL])
+        )
+        try:
+            detail = provider.fetch_detail(AWEME_ID)
+        finally:
+            provider.close()
+
+        assert not music.called
+        assert detail["music"]["play_url"]["url_list"] == [BGM_URL]
+
+    @respx.mock
+    def test_music_detail_failure_does_not_break_the_note(self):
+        _mock_filtered_note()
+        respx.get(MUSIC_DETAIL_API).mock(return_value=httpx.Response(500, text="boom"))
+        provider = DouyinProvider(cookie="sessionid=abc", note_fetcher=lambda _id: note_detail())
+        try:
+            detail = provider.fetch_detail(AWEME_ID)
+        finally:
+            provider.close()
+
+        assert detail["images"]
+        assert detail["music"]["play_url"]["url_list"] == []

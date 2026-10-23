@@ -206,6 +206,14 @@ def test_admin_parse_view_has_trend_chart(admin_client):
     assert '"/stats/parse?source=local&days=" + days + "&platform=" + platform' in html
 
 
+def test_admin_crawler_page_distinguishes_api_paths(admin_client):
+    """爬虫表里来源=请求头 记的是 API 路径，别把列名写成「页面」误导人。"""
+    html = admin_client.get("/admin/index.html").text
+    assert "爬虫访问路径" in html
+    assert "路径（API / 页面）" in html
+    assert "记的是 API 请求路径" in html
+
+
 def test_parse_detail_supports_history_pagination(admin_client, db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
     db = Session()

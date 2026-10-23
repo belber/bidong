@@ -63,8 +63,57 @@ class DouyinProvider:
 
     def _fetch_note_detail(self, aweme_id: str) -> dict:
         if hasattr(self.note_fetcher, "fetch_detail"):
-            return self.note_fetcher.fetch_detail(aweme_id)
-        return self.note_fetcher(aweme_id)
+            detail = self.note_fetcher.fetch_detail(aweme_id)
+        else:
+            detail = self.note_fetcher(aweme_id)
+        return self._fill_note_bgm(detail)
+
+    def _note_music_urls(self, music_id: str) -> list[str]:
+        """按 music_id 查 BGM 直链（图集详情里常常没有 play_url）。"""
+        try:
+            resp = self.client.get(
+                HOSTS[0] + "/aweme/v1/music/detail/",
+                params={
+                    "music_id": music_id,
+                    "version_code": "9.9.0",
+                    "device_platform": "iphone",
+                    "aid": 1128,
+                },
+                headers={
+                    "User-Agent": IPHONE_UA,
+                    "Referer": REFERER,
+                    "Cookie": self.cookie,
+                },
+            )
+            info = (resp.json() or {}).get("music_info") or {}
+            play = info.get("play_url") or {}
+        except Exception:  # noqa: BLE001 - 补不到 BGM 不该影响图文解析
+            return []
+        urls = play.get("url_list") if isinstance(play, dict) else []
+        return [u for u in (urls or []) if isinstance(u, str) and u.startswith("http")]
+
+    def _fill_note_bgm(self, detail: dict) -> dict:
+        """图集第三方结果只给 music_id 时，补一次 BGM 直链。
+
+        已有 play_url 就不发请求；补不到只是结果页不出现「音频」行，
+        图片解析和保存完全不受影响，所以这里吞掉所有异常。
+        """
+        if not isinstance(detail, dict):
+            return detail
+        music = detail.get("music")
+        if not isinstance(music, dict):
+            music = {}
+            detail["music"] = music
+        play = music.get("play_url")
+        if isinstance(play, dict) and play.get("url_list"):
+            return detail
+        music_id = str(music.get("music_id") or music.get("id_str") or music.get("id") or "")
+        if not music_id:
+            return detail
+        found = self._note_music_urls(music_id)
+        if found:
+            music["play_url"] = {"url_list": found}
+        return detail
 
     # -- 链接 --------------------------------------------------------------
     def resolve_aweme_id(self, text: str) -> str:
