@@ -44,6 +44,13 @@ describe('爬虫场景值上报', () => {
     expect(requests).toHaveLength(0);
   });
 
+  test('场景值是字符串 "1129" 也照样上报', () => {
+    const { app, requests } = loadApp();
+    app.onShow({ scene: '1129', path: 'pages/result/result', query: { bvid: 'BV1x' } });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].data).toMatchObject({ scene: 1129, path: 'pages/result/result' });
+  });
+
   test('没有参数也不炸', () => {
     const { app, requests } = loadApp();
     app.onShow({ scene: 1129, path: 'pages/home/home' });

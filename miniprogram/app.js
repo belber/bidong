@@ -34,13 +34,16 @@ App({
 
   // 爬虫访问时会带场景值 1129：上报一笔，管理端「搜索爬虫」页就能看到它来过
   onShow(options) {
-    if (!options || options.scene !== SCENE_SEARCH_CRAWLER) {
+    // 微信有时把 scene 传成字符串，统一转数字再比；顺便把真实值带给后端
+    const scene = Number(options && options.scene) || 0;
+    if (scene !== SCENE_SEARCH_CRAWLER) {
       return;
     }
     try {
       require('./utils/api.js').reportCrawlerVisit(
         options.path || '',
-        queryString(options.query)
+        queryString(options.query),
+        scene
       );
     } catch (e) {
       // 上报失败不影响小程序使用

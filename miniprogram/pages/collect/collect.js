@@ -270,7 +270,13 @@ Page(Object.assign({
       this.toggleSelect(id);
       return;
     }
-    wx.navigateTo({ url: '/pages/result/result?bvid=' + card.bvid });
+    // 抖音卡片必须带上平台，否则结果页会按 B站 拼出 bilibili.com/video/<抖音id>
+    const platform = card.platform === 'douyin' ? 'douyin' : 'bilibili';
+    wx.navigateTo({
+      url: platform === 'douyin'
+        ? '/pages/result/result?platform=douyin&id=' + card.bvid
+        : '/pages/result/result?bvid=' + card.bvid
+    });
   },
 
   onCardLongPress(e) {

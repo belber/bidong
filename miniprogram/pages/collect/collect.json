@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "navigationBarTitleText": "B站视频收藏整理 · 壁咚咚藏链阁",
+  "navigationBarTitleText": "视频下载记录",
   "usingComponents": {
     "custom-navbar": "/components/navbar/navbar"
   }

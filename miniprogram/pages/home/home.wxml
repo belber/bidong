@@ -22,14 +22,20 @@
     </view>
     <block wx:else>
       <text class="parse-main">解析视频</text>
-      <text class="parse-sub">B站 · 抖音</text>
+      <text class="parse-sub">B站 · 抖音 视频下载与提取</text>
     </block>
     <view wx:if="{{parsing}}" class="shimmer"></view>
   </button>
+  <view class="parse-tip">粘贴链接即可下载、提取视频，音频和封面也能保存到手机</view>
 
   <view class="guide-card">
-    <view class="guide-title">如何获取链接</view>
+    <view class="guide-header" bindtap="onToggleGuide">
+      <view class="guide-title">如何获取链接</view>
+      <text class="guide-toggle">{{guideExpanded ? '收起' : '展开'}}</text>
+    </view>
+    <view class="guide-summary" wx:if="{{!guideExpanded}}">分享 → 复制链接，或 B站评论 @壁咚咚私藏</view>
 
+    <block wx:if="{{guideExpanded}}">
     <view class="way">
       <view class="way-label">方式 1 · 分享 → 复制链接（支持 B站、抖音）</view>
       <view class="share-demo">
@@ -57,22 +63,15 @@
     </view>
 
     <view class="way" wx:if="{{showRobotGuide}}">
-      <view class="way-label">方式 2 · @壁咚咚私藏</view>
+      <view class="way-label">方式 2 · B站评论 @壁咚咚私藏（仅支持 B站）</view>
       <view class="guide-steps">
-        <view class="guide-step">① B站评论@壁咚咚私藏</view>
-        <view class="guide-step">② 进收藏夹查看视频</view>
+        <view class="guide-step"><text class="n">1</text>关注B站用户 壁咚咚私藏</view>
+        <text class="step-arrow">›</text>
+        <view class="guide-step"><text class="n">2</text>评论 @壁咚咚私藏</view>
+        <text class="step-arrow">›</text>
+        <view class="guide-step"><text class="n">3</text>进收藏夹</view>
       </view>
       <view class="demo">
-        <view class="demo-video">
-          <view class="demo-cover">
-            <view class="demo-play">▶</view>
-            <text class="demo-dur">13:24</text>
-          </view>
-          <view class="demo-vmeta">
-            <view class="demo-title">一口气看懂《三体》黑暗森林</view>
-            <view class="demo-sub">木鱼水心 · 45.2万播放</view>
-          </view>
-        </view>
         <view class="demo-comment">
           <view class="demo-avatar"></view>
           <view class="demo-cbody">
@@ -82,6 +81,7 @@
         </view>
       </view>
     </view>
+    </block>
   </view>
 
   <view class="ad-banner" wx:if="{{!homeAdError}}">

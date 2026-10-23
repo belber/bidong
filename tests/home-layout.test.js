@@ -20,8 +20,8 @@ describe('首页排版', () => {
     expect(ruleFor('.guide-card {')).toMatch(/margin-top:\s*28rpx/);
   });
 
-  test('广告与「如何获取链接」区块之间留够间距', () => {
-    expect(ruleFor('.ad-banner {')).toMatch(/margin-top:\s*36rpx/);
+  test('广告紧跟在「如何获取链接」卡片下方，留一点间距', () => {
+    expect(ruleFor('.ad-banner {')).toMatch(/margin-top:\s*28rpx/);
   });
 
   test('广告容器不再按固定比例预留高度', () => {

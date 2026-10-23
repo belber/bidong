@@ -17,6 +17,7 @@ Page(Object.assign({
     platformLabel: '',
     parsing: false,
     showRobotGuide: true,
+    guideExpanded: false,
     homeAdUnitId: AD_UNIT_IDS.homeBanner,
     homeAdError: false
   },
@@ -35,6 +36,10 @@ Page(Object.assign({
   onHomeAdError(e) {
     console.warn('[ad] 首页横幅加载失败', e && e.detail);
     this.setData({ homeAdError: true });
+  },
+
+  onToggleGuide() {
+    this.setData({ guideExpanded: !this.data.guideExpanded });
   },
 
   trackVisit() {

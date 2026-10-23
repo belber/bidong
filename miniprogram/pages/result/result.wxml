@@ -1,4 +1,30 @@
 <view class="page">
+  <!-- 帅哥录屏专属：只有该账号的稿件，后端才会返回 origin -->
+  <view class="card source-card" wx:if="{{origin}}">
+    <view class="sec-title">
+      <text class="bar"></text>
+      <image wx:if="{{origin.accountAvatarUrl}}" class="src-avatar" src="{{origin.accountAvatarUrl}}" mode="aspectFill" />
+      <text>{{origin.accountName}} · 原up主是谁</text>
+      <text class="push"></text>
+      <text class="fan-chip">粉丝专属</text>
+    </view>
+
+    <view class="field">
+      <text class="label">原平台</text>
+      <view class="content {{origin.platformText === '—' ? 'muted' : ''}}">{{origin.platformText}}</view>
+    </view>
+
+    <view class="field">
+      <text class="label">原up主</text>
+      <view class="content {{origin.hasAuthor ? '' : 'muted'}}">{{origin.authorText}}</view>
+      <text class="action" wx:if="{{origin.hasAuthor}}" bindtap="onCopyAuthorName">复制原up账号</text>
+    </view>
+
+    <view class="src-hint" wx:if="{{origin.pending}}">这条的出处还在整理，稍后再来看看</view>
+  </view>
+
+  <view class="visitor-tip" wx:if="{{publicView}}">以访客身份查看 · 登录后才能下载与导出</view>
+
   <view class="card">
     <view class="sec-title"><text class="bar"></text><text>基本信息</text></view>
 
@@ -44,45 +70,9 @@
     </view>
   </view>
 
-  <!-- 帅哥录屏专属：只有该账号的稿件，后端才会返回 origin -->
-  <view class="card source-card" wx:if="{{origin}}">
-    <view class="sec-title">
-      <text class="bar"></text>
-      <image wx:if="{{origin.accountAvatarUrl}}" class="src-avatar" src="{{origin.accountAvatarUrl}}" mode="aspectFill" />
-      <text>{{origin.accountName}} · 原up主是谁</text>
-      <text class="push"></text>
-      <text class="fan-chip">粉丝专属</text>
-    </view>
-
-    <view class="field">
-      <text class="label">原平台</text>
-      <view class="content {{origin.platformText === '—' ? 'muted' : ''}}">{{origin.platformText}}</view>
-    </view>
-
-    <view class="field">
-      <text class="label">原up主</text>
-      <view class="content {{origin.hasAuthor ? '' : 'muted'}}">{{origin.authorText}}</view>
-      <text class="action" wx:if="{{origin.hasAuthor}}" bindtap="onCopyAuthorName">复制原up账号</text>
-    </view>
-
-    <view class="src-hint" wx:if="{{origin.pending}}">这条的出处还在整理，稍后再来看看</view>
-  </view>
-
-  <view class="visitor-tip" wx:if="{{publicView}}">以访客身份查看 · 登录后才能下载与导出</view>
-
-  <view class="card">
-    <view class="sec-title"><text class="bar"></text><text>数据</text></view>
-    <view class="stats-box">
-      <view class="stat"><text class="stat-n">{{stats.like}}</text><text class="stat-l">点赞</text></view>
-      <view class="stat"><text class="stat-n">{{stats.reply}}</text><text class="stat-l">评论</text></view>
-      <view class="stat"><text class="stat-n">{{stats.favorite}}</text><text class="stat-l">收藏</text></view>
-      <view class="stat" wx:if="{{!isDouyin}}"><text class="stat-n">{{stats.coin}}</text><text class="stat-l">投币</text></view>
-      <view class="stat" wx:else><text class="stat-n">{{stats.share}}</text><text class="stat-l">分享</text></view>
-    </view>
-  </view>
-
   <view class="card">
     <view class="sec-title"><text class="bar"></text><text>媒体</text></view>
+    <view class="media-hint" wx:if="{{isDouyin && isNote && !publicView}}">抖音图文作品：{{imageCount ? imageCount + ' 张图片' : '图片'}}和音频需要分开下载</view>
 
     <view class="field">
       <text class="label">封面</text>
@@ -132,10 +122,10 @@
       <text
         class="action {{savingImages ? 'disabled' : ''}}"
         bindtap="onSaveImages"
-      >{{savingImages ? imageProgress : '保存全部'}}</text>
+      >{{savingImages ? (imageStatus || '保存中…') : '保存全部'}}</text>
       <view class="export-progress" wx:if="{{savingImages}}">
         <view class="export-track"><view class="progress-bar" style="width: {{imagePercent}}%"></view></view>
-        <text class="export-progress-text">正在保存第 {{imageProgress}} 张</text>
+        <text class="export-progress-text">{{imageStatus || '正在保存…'}}</text>
       </view>
     </view>
 
@@ -177,6 +167,10 @@
         <text class="progress-text">{{downloadProgress}}%{{downloadSizeText}}</text>
       </view>
     </view>
+  </view>
+
+  <view class="ad-banner" wx:if="{{!resultAdError}}">
+    <ad unit-id="{{resultAdUnitId}}" binderror="onResultAdError" />
   </view>
 
   <view class="card" wx:if="{{!publicView && !isDouyin}}">
@@ -284,7 +278,4 @@
   </view>
 
 
-  <view class="ad-banner" wx:if="{{!resultAdError}}">
-    <ad unit-id="{{resultAdUnitId}}" binderror="onResultAdError" />
-  </view>
 </view>

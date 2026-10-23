@@ -58,22 +58,15 @@
   >
   <block wx:if="{{showRobotGuide}}">
     <view class="guide-card">
-      <view class="guide-title">你还未绑定或未 @过，可以按下面的方式操作</view>
+      <view class="guide-title">B站评论 @壁咚咚私藏，视频自动进收藏夹（仅支持 B站）</view>
       <view class="guide-steps">
-        <view class="guide-step">① B站评论区 @壁咚咚私藏</view>
-        <view class="guide-step">② 进收藏夹查看视频</view>
+        <view class="guide-step"><text class="n">1</text>关注B站用户 壁咚咚私藏</view>
+        <text class="step-arrow">›</text>
+        <view class="guide-step"><text class="n">2</text>评论 @壁咚咚私藏</view>
+        <text class="step-arrow">›</text>
+        <view class="guide-step"><text class="n">3</text>进收藏夹</view>
       </view>
       <view class="demo">
-        <view class="demo-video">
-          <view class="demo-cover">
-            <view class="demo-play">▶</view>
-            <text class="demo-dur">13:24</text>
-          </view>
-          <view class="demo-vmeta">
-            <view class="demo-title">一口气看懂《三体》黑暗森林</view>
-            <view class="demo-sub">木鱼水心 · 45.2万播放</view>
-          </view>
-        </view>
         <view class="demo-comment">
           <view class="demo-avatar"></view>
           <view class="demo-cbody">

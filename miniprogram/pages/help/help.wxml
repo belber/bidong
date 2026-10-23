@@ -26,8 +26,8 @@
       <view class="a">收藏夹卡片右上角「删除」按钮。</view>
     </view>
     <view class="faq">
-      <view class="q">怎么解析 B站视频链接？</view>
-      <view class="a">在首页粘贴 B站视频链接、BV 号或 b23.tv 短链，点「解析视频」即可查看并收藏。</view>
+      <view class="q">怎么下载 / 提取 B站视频？</view>
+      <view class="a">在首页粘贴 B站视频链接、BV 号或 b23.tv 短链，点「解析视频」，进入结果页即可下载或提取视频。</view>
     </view>
     <view class="faq">
       <view class="q">怎么保存视频封面？</view>
@@ -42,8 +42,16 @@
       <view class="a">视频有可用字幕时，可在解析结果页导出 SRT 字幕文件。</view>
     </view>
     <view class="faq">
-      <view class="q">怎么保存视频？</view>
-      <view class="a">在解析结果页选择视频保存，保存后可从手机相册查看。</view>
+      <view class="q">怎么提取视频？</view>
+      <view class="a">粘贴视频链接后点「解析视频」，在结果页点「视频」右侧的「下载」，保存后可从手机相册查看。</view>
+    </view>
+    <view class="faq">
+      <view class="q">支持抖音视频下载吗？</view>
+      <view class="a">支持。在首页粘贴抖音分享链接，即可解析并保存抖音视频；图文作品可分别保存图片和音频。</view>
+    </view>
+    <view class="faq">
+      <view class="q">怎么提取抖音视频？</view>
+      <view class="a">在首页粘贴抖音分享链接，点「解析视频」进入结果页，即可下载或提取抖音视频。</view>
     </view>
     <view class="faq">
       <view class="q">@壁咚咚私藏 没反应？</view>
