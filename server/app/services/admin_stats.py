@@ -433,9 +433,9 @@ def parse_summary(
     )
     reporter_rows = (
         base.with_entities(
-            func.coalesce(VideoSource.reporter, ""), func.count(ParseLog.id)
+            VideoSource.reporter, func.count(ParseLog.id)
         )
-        .group_by(func.coalesce(VideoSource.reporter, ""))
+        .group_by(VideoSource.reporter)
         .all()
     )
 

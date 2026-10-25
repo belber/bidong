@@ -5,6 +5,7 @@ import httpx
 import pytest
 import respx
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
@@ -25,6 +26,7 @@ from app.models import (
     VideoSource,
     VisitEvent,
 )
+from app.services import admin_stats
 from app.time import utcnow_naive
 
 
@@ -188,6 +190,25 @@ def test_parse_monitor_breaks_down_reporter(admin_client, db_engine):
     assert {i["reporter"] for i in filtered["items"]} == {"hol"}
 
 
+def test_parse_summary_groups_reporters_by_joined_column(db_engine):
+    """上报方聚合要按裸列分组，避免 PostgreSQL 拒绝 coalesce 聚合表达式。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(db_engine, "before_cursor_execute", capture)
+    try:
+        admin_stats.parse_summary(db, "local", platform="bilibili")
+    finally:
+        event.remove(db_engine, "before_cursor_execute", capture)
+        db.close()
+
+    assert any("GROUP BY video_source.reporter" in sql for sql in statements)
+
+
 def test_parse_trend_buckets_by_shanghai_date(admin_client, db_engine):
     """解析趋势按上海时区日期分桶，和关注 / 下载 / 访问几个页面同一口径。"""
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
@@ -250,6 +271,17 @@ def test_admin_parse_view_has_trend_chart(admin_client):
     assert "上报方分布" in html
     assert "parseReporter" in html
     assert "<th>上报方</th>" in html
+
+
+def test_admin_charts_load_echarts_from_local_static(admin_client):
+    """管理端图表不能依赖外部 CDN，否则 CDN 不可达时所有趋势图都不显示。"""
+    html = admin_client.get("/admin/").text
+    assert '<script src="/admin/vendor/echarts.min.js"></script>' in html
+
+    script = admin_client.get("/admin/vendor/echarts.min.js")
+    assert script.status_code == 200
+    assert "javascript" in script.headers["content-type"]
+    assert "echarts" in script.text.lower()
 
 
 def test_admin_crawler_page_distinguishes_api_paths(admin_client):
