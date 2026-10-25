@@ -85,6 +85,8 @@ class DownloadEventReport(BaseModel):
 
 class VisitEventRequest(BaseModel):
     path: str = ""
+    env_version: str = ""
+    api_base: str = ""
 
 
 class CardOut(BaseModel):
@@ -161,6 +163,8 @@ class CrawlerVisitRequest(BaseModel):
 
 class BindingRequest(BaseModel):
     code: str
+    env_version: str = ""
+    api_base: str = ""
 
 
 class BindingOut(BaseModel):

@@ -119,3 +119,24 @@ def test_reviewer_code_does_not_bypass_normal_binding(db_engine):
     with pytest.raises(AppError):
         bind(db, 301, "YVVQKMLKAE")
     db.close()
+
+
+def test_bind_records_client_env(db_engine):
+    """绑定记录要带上客户端 envVersion / apiBase，便于排查审核环境。"""
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    issued = issue_activation(db, "888")
+
+    bound = bind(
+        db,
+        401,
+        issued.activation_code,
+        env_version="develop",
+        api_base="http://192.168.31.179:8000",
+    )
+
+    assert bound.env_version == "develop"
+    assert bound.api_base == "http://192.168.31.179:8000"
+    db.close()

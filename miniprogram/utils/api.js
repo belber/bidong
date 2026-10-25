@@ -4,6 +4,19 @@ function baseUrl() {
   return getApp().globalData.apiBase;
 }
 
+// 诊断用：记录客户端运行环境和实际 API 域名，排查审核版/体验版连错地址
+function clientEnv() {
+  let envVersion = '';
+  try {
+    envVersion = wx.getAccountInfoSync().miniProgram.envVersion || '';
+  } catch (e) { /* 老基础库/部分运行容器取不到 */ }
+  let apiBase = '';
+  try {
+    apiBase = baseUrl() || '';
+  } catch (e) { /* 未初始化时留空 */ }
+  return { env_version: envVersion, api_base: apiBase };
+}
+
 // 封面等媒体地址：本地存储后端返回的是相对路径（/media/covers/x.jpg），
 // 用 apiBase 拼成当前环境能访问的地址；COS（生产）返回的是绝对地址，原样使用。
 // 这样开发版换 IP 不用改数据库，生产行为完全不变。
@@ -170,7 +183,7 @@ module.exports = {
     return request('POST', '/api/cards/' + id + '/tags', { tags });
   },
   bind(code) {
-    return request('POST', '/api/binding', { code });
+    return request('POST', '/api/binding', Object.assign({ code }, clientEnv()));
   },
   getBinding() {
     return request('GET', '/api/binding');
@@ -219,7 +232,7 @@ module.exports = {
     return request('POST', '/api/download-events', payload);
   },
   reportVisit(path) {
-    return request('POST', '/api/visit-events', { path });
+    return request('POST', '/api/visit-events', Object.assign({ path }, clientEnv()));
   },
   mediaSize(id) {
     return request('GET', '/api/cards/' + id + '/media-size');

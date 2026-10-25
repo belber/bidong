@@ -15,7 +15,12 @@ def report_visit(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    event = VisitEvent(user_id=user.id, path=(payload.path or "")[:128])
+    event = VisitEvent(
+        user_id=user.id,
+        path=(payload.path or "")[:128],
+        env_version=(payload.env_version or "")[:16],
+        api_base=(payload.api_base or "")[:128],
+    )
     db.add(event)
     db.commit()
     return {"ok": True}

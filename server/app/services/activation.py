@@ -21,7 +21,9 @@ def _reviewer_codes() -> set[str]:
     return {part.strip().upper() for part in raw.split(",") if part.strip()}
 
 
-def _bind_reviewer(db: Session, user_id: int, code: str) -> Binding:
+def _bind_reviewer(
+    db: Session, user_id: int, code: str, env_version: str = "", api_base: str = ""
+) -> Binding:
     """审核码可复用：同一个码给每个微信用户各建一条审核绑定。
 
     每个用户的绑定用 `<审核码>-<user_id>` 做唯一激活码，bili_uid 用随机
@@ -34,6 +36,10 @@ def _bind_reviewer(db: Session, user_id: int, code: str) -> Binding:
         if (existing.activation_code or "") == code or (
             existing.activation_code or ""
         ).startswith(code + "-"):
+            existing.env_version = (env_version or "")[:16]
+            existing.api_base = (api_base or "")[:128]
+            db.commit()
+            db.refresh(existing)
             return existing
         raise AppError(400, "该账号已绑定过 B站账号")
 
@@ -53,6 +59,8 @@ def _bind_reviewer(db: Session, user_id: int, code: str) -> Binding:
         db.add(binding)
     binding.user_id = user_id
     binding.bound_at = utcnow_naive()
+    binding.env_version = (env_version or "")[:16]
+    binding.api_base = (api_base or "")[:128]
     db.commit()
     db.refresh(binding)
     return binding
@@ -81,13 +89,19 @@ def issue_activation(db: Session, bili_uid: str, bili_name: str = "") -> Binding
     return binding
 
 
-def bind(db: Session, user_id: int, code: str) -> Binding:
+def bind(
+    db: Session,
+    user_id: int,
+    code: str,
+    env_version: str = "",
+    api_base: str = "",
+) -> Binding:
     normalized = (code or "").strip().upper()
     if not normalized:
         raise AppError(400, "激活码无效")
 
     if normalized in _reviewer_codes():
-        return _bind_reviewer(db, user_id, normalized)
+        return _bind_reviewer(db, user_id, normalized, env_version, api_base)
 
     binding = db.query(Binding).filter(Binding.activation_code == normalized).first()
     if binding is None:
@@ -101,6 +115,8 @@ def bind(db: Session, user_id: int, code: str) -> Binding:
 
     binding.user_id = user_id
     binding.bound_at = utcnow_naive()
+    binding.env_version = (env_version or "")[:16]
+    binding.api_base = (api_base or "")[:128]
     db.commit()
     db.refresh(binding)
     return binding

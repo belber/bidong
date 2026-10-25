@@ -970,8 +970,8 @@ const renderers = {
           <input placeholder="搜索 openid / 昵称 / 页面" value="${esc(q)}" onchange="S.visit.q=this.value; show('visit')" style="min-width:220px"/>
           <select onchange="S.visit.days=parseInt(this.value); show('visit')">${[7,30,90].map(d=>`<option value="${d}" ${d===days?"selected":""}>近${d}天</option>`).join("")}</select>
         </div>
-        <table><thead><tr><th>访问时间</th><th>用户（openid）</th><th>昵称</th><th>页面</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan=4 class="muted">暂无访问</td></tr>'}</tbody></table>
+        <table><thead><tr><th>访问时间</th><th>用户（openid）</th><th>昵称</th><th>页面</th><th>环境</th><th>API 域名</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan=6 class="muted">暂无访问</td></tr>'}</tbody></table>
         <p class="muted">共 ${fmt(det.total)} 条</p>
         <p class="muted">注：小程序首页按「每个用户每天最多上报一次」统计，所以「上报次数」等于访问天数，UV 才是真实用户数。</p>
       </div>`;
@@ -1106,7 +1106,7 @@ function downloadRow(i) {
 }
 
 function visitRow(i) {
-  return `<tr><td>${esc(i.created_at)}</td><td><span class="host">${esc(i.openid || "—")}</span></td><td>${esc(i.nickname || "—")}</td><td>${esc(i.path || "—")}</td></tr>`;
+  return `<tr><td>${esc(i.created_at)}</td><td><span class="host">${esc(i.openid || "—")}</span></td><td>${esc(i.nickname || "—")}</td><td>${esc(i.path || "—")}</td><td>${esc(i.env_version || "—")}</td><td><span class="host">${esc(i.api_base || "—")}</span></td></tr>`;
 }
 
 function sourceRow(i) {

@@ -100,6 +100,9 @@ class Binding(Base):
     code_sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
     last_follow_mtime: Mapped[int] = mapped_column(Integer, default=0)
     bound_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # 绑定时的客户端环境，用于排查审核/体验版连错环境
+    env_version: Mapped[str] = mapped_column(String(16), default="")
+    api_base: Mapped[str] = mapped_column(String(128), default="")
 
 
 class RobotCursor(Base):
@@ -260,6 +263,8 @@ class VisitEvent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
     path: Mapped[str] = mapped_column(String(128), default="")
+    env_version: Mapped[str] = mapped_column(String(16), default="")
+    api_base: Mapped[str] = mapped_column(String(128), default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow_naive, index=True)
 
 

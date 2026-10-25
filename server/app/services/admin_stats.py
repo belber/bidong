@@ -758,6 +758,8 @@ def visit_detail(
                 "openid": (user.openid if user else "") or "",
                 "nickname": (user.nickname if user else "") or "",
                 "path": event.path,
+                "env_version": event.env_version or "",
+                "api_base": event.api_base or "",
             }
             for event, user in rows
         ],

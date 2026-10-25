@@ -491,6 +491,9 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 - **明细**：按访问时间倒序，每行展示访问时间（上海时区）、用户 openid、昵称（有则显示）、页面 `path`；`q` 支持按 openid / 昵称 / 页面搜索，支持分页。
 - **口径**：UV 为 `visit_event.user_id` 去重数——只有登录用户才会上报，因此 UV 等于"访问过的微信用户数"；「累计去重用户」不受天数区间限制，用于对齐 500 访客目标。
 - **已知限制**：`path` 目前恒为 `pages/home/home`（只在首页上报）；若以后要在其他页面补埋点，明细无需改动即可区分。
+- **客户端环境诊断**（2026-10-25）：`visit_event` 与 `binding` 记录客户端上报的
+  `env_version`（develop / trial / release）和 `api_base`；访问监控明细展示这两列，
+  用来排查审核版/体验版是否连到局域网地址。
 
 ### 10.9 解析监控
 

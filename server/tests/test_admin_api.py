@@ -540,8 +540,20 @@ def test_visit_monitor_lists_openid_and_counts(admin_client, db_engine):
     now = utcnow_naive()
     db.add_all(
         [
-            VisitEvent(user_id=u1.id, path="pages/home/home", created_at=now),
-            VisitEvent(user_id=u1.id, path="pages/home/home", created_at=now),
+            VisitEvent(
+                user_id=u1.id,
+                path="pages/home/home",
+                env_version="trial",
+                api_base="https://api.beastnotes.cn",
+                created_at=now,
+            ),
+            VisitEvent(
+                user_id=u1.id,
+                path="pages/home/home",
+                env_version="trial",
+                api_base="https://api.beastnotes.cn",
+                created_at=now,
+            ),
             VisitEvent(user_id=u2.id, path="pages/home/home", created_at=now),
         ]
     )
@@ -568,6 +580,8 @@ def test_visit_monitor_lists_openid_and_counts(admin_client, db_engine):
     assert set(by_openid) == {"openid-v1", "openid-v2"}
     assert by_openid["openid-v1"]["nickname"] == "小明"
     assert by_openid["openid-v1"]["path"] == "pages/home/home"
+    assert by_openid["openid-v1"]["env_version"] == "trial"
+    assert by_openid["openid-v1"]["api_base"] == "https://api.beastnotes.cn"
     assert by_openid["openid-v2"]["nickname"] == ""
     assert detail["items"][0]["created_at"]
 
