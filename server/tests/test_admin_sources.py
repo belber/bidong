@@ -106,6 +106,7 @@ def test_admin_page_exposes_sources_view(admin_client):
     assert 'data-view="sources"' in html
     assert 'id="view-sources"' in html
     assert "视频出处" in html
+    assert "上报方" in html
 
 
 def test_admin_uploads_repost_avatar(admin_client):

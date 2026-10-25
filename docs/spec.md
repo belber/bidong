@@ -536,9 +536,11 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 | `source_url` / `source_video_id` | 源视频链接与 ID |
 | `bili_published_at` | B站发布日；**源站发布时间拿不到** |
 | `note` | 拿不到时的原因，如 `parse失败 404` |
+| `reporter` | 上报方标识（多方可上报；批次级 `reporter` 可为整批兜底，逐条优先） |
 
 **约定**：拿不到就留空 + `note` 写原因，**不猜**；一条视频只报一条「主要出处」= 画面来源，
-混源视频（画面来自 X、BGM 来自抖音）只报画面来源。
+混源视频（画面来自 X、BGM 来自抖音）只报画面来源。`reporter` 记录最近一次上报方，
+管理端「视频出处」明细展示并支持搜索。
 
 ### 11.3 上报接口
 
