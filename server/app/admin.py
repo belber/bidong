@@ -147,10 +147,11 @@ def parse_stats(
     source: str = Query("local", pattern="^(local|robot)$"),
     days: int = Query(30),
     platform: str = Query("", pattern="^(bilibili|douyin)?$"),
+    reporter: str = "",
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    return stats.parse_summary(db, source, days, platform)
+    return stats.parse_summary(db, source, days, platform, reporter)
 
 
 @router.get("/stats/parse/detail")
@@ -162,10 +163,13 @@ def parse_detail(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     platform: str = Query("", pattern="^(bilibili|douyin)?$"),
+    reporter: str = "",
     _: str = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    return stats.parse_detail(db, source, q, result, days, page, size, platform)
+    return stats.parse_detail(
+        db, source, q, result, days, page, size, platform, reporter
+    )
 
 
 # ---------------------------------------------------------------------------

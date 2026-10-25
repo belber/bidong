@@ -12,6 +12,7 @@ from ..models import (
     ParseLog,
     User,
     VideoCard,
+    VideoSource,
     VisitEvent,
 )
 from ..time import utcnow_naive
@@ -396,28 +397,54 @@ def activation_detail(
     }
 
 
-def parse_summary(db: Session, source: str, days: int = 30, platform: str = "") -> dict:
+def parse_summary(
+    db: Session,
+    source: str,
+    days: int = 30,
+    platform: str = "",
+    reporter: str = "",
+) -> dict:
     # days=0 和下载监控一致，表示全部历史（只影响接口，页面给的是 7 / 30 / 90）
     filters = [ParseLog.source == source]
     if platform:
         filters.append(ParseLog.platform == platform)
     if days > 0:
         filters.append(ParseLog.created_at >= _range_start_utc(days))
-    base = db.query(ParseLog).filter(*filters)
+    # B站 链接解析按 bvid 关联出处台账，用 reporter 区分多方上报
+    base = db.query(ParseLog).outerjoin(
+        VideoSource, VideoSource.bvid == ParseLog.bvid
+    )
+    if reporter:
+        if reporter == "unknown":
+            base = base.filter(
+                or_(VideoSource.reporter.is_(None), VideoSource.reporter == "")
+            )
+        else:
+            base = base.filter(VideoSource.reporter == reporter)
+    base = base.filter(*filters)
     total = base.count()
     ok = base.filter(ParseLog.ok.is_(True)).count()
     fail = total - ok
     reasons = (
-        db.query(ParseLog.reason, func.count(ParseLog.id))
-        .filter(*filters, ParseLog.ok.is_(False))
+        base.with_entities(ParseLog.reason, func.count(ParseLog.id))
+        .filter(ParseLog.ok.is_(False))
         .group_by(ParseLog.reason)
+        .all()
+    )
+    reporter_rows = (
+        base.with_entities(
+            func.coalesce(VideoSource.reporter, ""), func.count(ParseLog.id)
+        )
+        .group_by(func.coalesce(VideoSource.reporter, ""))
         .all()
     )
 
     # 趋势和关注 / 下载 / 访问几个页面同一口径：按上海时区日期分桶。
     # 成功和失败分开数，图上是堆叠柱——一眼能看出解析量掉没掉、失败集中在哪几天。
     per_day: dict[str, dict[str, int]] = {}
-    for created_at, row_ok in db.query(ParseLog.created_at, ParseLog.ok).filter(*filters).all():
+    for created_at, row_ok in base.with_entities(
+        ParseLog.created_at, ParseLog.ok
+    ).all():
         bucket = per_day.setdefault(
             _shanghai_date(created_at).isoformat(), {"ok": 0, "fail": 0}
         )
@@ -429,6 +456,10 @@ def parse_summary(db: Session, source: str, days: int = 30, platform: str = "") 
         "ok": ok,
         "fail": fail,
         "fail_by_reason": [{"reason": r or "other", "count": c} for r, c in reasons],
+        "by_reporter": [
+            {"reporter": r or "未知", "count": c}
+            for r, c in sorted(reporter_rows, key=lambda item: -item[1])
+        ],
         "trend": [
             {
                 "date": d,
@@ -449,6 +480,7 @@ def parse_detail(
     page: int = 1,
     size: int = 20,
     platform: str = "",
+    reporter: str = "",
 ) -> dict:
     filters = [ParseLog.source == source]
     if platform:
@@ -461,15 +493,27 @@ def parse_detail(
             (ParseLog.input.like(like))
             | (ParseLog.bvid.like(like))
             | (ParseLog.bili_uid.like(like))
+            | (VideoSource.reporter.ilike(like))
         )
+    if reporter:
+        if reporter == "unknown":
+            filters.append(
+                or_(VideoSource.reporter.is_(None), VideoSource.reporter == "")
+            )
+        else:
+            filters.append(VideoSource.reporter == reporter)
     if result == "ok":
         filters.append(ParseLog.ok.is_(True))
     elif result == "fail":
         filters.append(ParseLog.ok.is_(False))
-    total = db.query(ParseLog).filter(*filters).count()
-    rows = (
-        db.query(ParseLog, User)
+    query = (
+        db.query(ParseLog, User, VideoSource.reporter)
         .outerjoin(User, User.id == ParseLog.user_id)
+        .outerjoin(VideoSource, VideoSource.bvid == ParseLog.bvid)
+    )
+    total = query.filter(*filters).count()
+    rows = (
+        query
         .filter(*filters)
         .order_by(ParseLog.created_at.desc())
         .offset((page - 1) * size)
@@ -478,7 +522,9 @@ def parse_detail(
     )
     # 回填视频标题（历史记录或解析失败时 from video_card）
     titles: dict[str, str] = {}
-    missing = [p.bvid for p, _ in rows if p.bvid and not (p.video_title or "").strip()]
+    missing = [
+        p.bvid for p, _, _ in rows if p.bvid and not (p.video_title or "").strip()
+    ]
     if missing:
         for bvid, title in (
             db.query(VideoCard.bvid, VideoCard.title)
@@ -503,8 +549,9 @@ def parse_detail(
                 "video_title": p.video_title or titles.get(p.bvid, ""),
                 "ok": p.ok,
                 "reason": p.reason,
+                "reporter": reporter_value or "",
             }
-            for p, user in rows
+            for p, user, reporter_value in rows
         ],
     }
 
