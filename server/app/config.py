@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     douyin_note_api_base_url: str = ""
     douyin_note_api_key: str = ""
     douyin_note_api_wait_seconds: int = 20
+    # 审核员专用激活码（逗号分隔）：可重复绑定，每个微信用户各建一条审核绑定
+    reviewer_activation_codes: str = "YVVQKMLKAE"
     # 解析节点标识，仅用于展示与排障：tencent（机房）/ home（住宅）
     douyin_parse_node: str = "tencent"
     robot_bili_jct: str = ""

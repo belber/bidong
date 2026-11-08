@@ -169,6 +169,48 @@ def test_ingest_partial_batch_keeps_valid_items(client, db_engine):
     db.close()
 
 
+def test_ingest_records_reporter_per_batch_and_item(client, db_engine):
+    """多方上报：批次可带 reporter，逐条 reporter 优先，后一次上报覆盖为最新上报方。"""
+    _configure_token(db_engine)
+    client.post(
+        ENDPOINT,
+        json={"reporter": "hermes", "items": [_item()]},
+        headers=_headers(),
+    )
+    db = _db(db_engine)
+    row = db.query(VideoSource).filter(VideoSource.bvid == "BV15Pbj6yEKg").one()
+    assert row.reporter == "hermes"
+    db.close()
+
+    client.post(
+        ENDPOINT,
+        json={
+            "reporter": "batch-name",
+            "items": [_item(author_name="小山坡改名", reporter="partner-a")],
+        },
+        headers=_headers(),
+    )
+    db = _db(db_engine)
+    row = db.query(VideoSource).filter(VideoSource.bvid == "BV15Pbj6yEKg").one()
+    assert row.author_name == "小山坡改名"
+    assert row.reporter == "partner-a"
+    db.close()
+
+
+def test_list_sources_exposes_and_searches_reporter(client, db_engine):
+    _configure_token(db_engine)
+    client.post(
+        ENDPOINT,
+        json={"reporter": "hermes", "items": [_item()]},
+        headers=_headers(),
+    )
+    db = _db(db_engine)
+    data = repost_source.list_sources(db, q="hermes")
+    assert data["total"] == 1
+    assert data["items"][0]["reporter"] == "hermes"
+    db.close()
+
+
 def test_ingest_rejects_more_than_500_items(client, db_engine):
     _configure_token(db_engine)
     items = [_item(bvid=f"BV{i:010d}") for i in range(501)]

@@ -5,6 +5,7 @@ import httpx
 import pytest
 import respx
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
@@ -22,8 +23,10 @@ from app.models import (
     ParseLog,
     User,
     VideoCard,
+    VideoSource,
     VisitEvent,
 )
+from app.services import admin_stats
 from app.time import utcnow_naive
 
 
@@ -146,6 +149,66 @@ def test_parse_summary_and_detail(admin_client, db_engine):
     assert detail["total"] == 2
 
 
+def test_parse_monitor_breaks_down_reporter(admin_client, db_engine):
+    """B站链接解析按出处台账的 reporter 汇总/筛选，明细带上报方。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    db.add_all([
+        VideoSource(bvid="BV1xx411c7mD", reporter="hol"),
+        VideoSource(bvid="BV1yy411c7mD", reporter="belber"),
+    ])
+    db.add_all([
+        ParseLog(source="local", platform="bilibili", input="a", bvid="BV1xx411c7mD", ok=True),
+        ParseLog(source="local", platform="bilibili", input="a2", bvid="BV1xx411c7mD", ok=False, reason="x"),
+        ParseLog(source="local", platform="bilibili", input="b", bvid="BV1yy411c7mD", ok=True),
+        ParseLog(source="local", platform="bilibili", input="c", bvid="BV1zz411c7mD", ok=True),
+    ])
+    db.commit()
+    db.close()
+
+    token = _login(admin_client).json()["token"]
+    data = admin_client.get(
+        "/api/admin/stats/parse?source=local&platform=bilibili", headers=_auth(token)
+    ).json()
+    counts = {r["reporter"]: r["count"] for r in data["by_reporter"]}
+    assert counts == {"hol": 2, "belber": 1, "未知": 1}
+
+    detail = admin_client.get(
+        "/api/admin/stats/parse/detail?source=local&platform=bilibili",
+        headers=_auth(token),
+    ).json()
+    by_input = {i["input"]: i["reporter"] for i in detail["items"]}
+    assert by_input["a"] == "hol"
+    assert by_input["b"] == "belber"
+    assert by_input["c"] == ""
+
+    filtered = admin_client.get(
+        "/api/admin/stats/parse/detail?source=local&platform=bilibili&reporter=hol",
+        headers=_auth(token),
+    ).json()
+    assert filtered["total"] == 2
+    assert {i["reporter"] for i in filtered["items"]} == {"hol"}
+
+
+def test_parse_summary_groups_reporters_by_joined_column(db_engine):
+    """上报方聚合要按裸列分组，避免 PostgreSQL 拒绝 coalesce 聚合表达式。"""
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(db_engine, "before_cursor_execute", capture)
+    try:
+        admin_stats.parse_summary(db, "local", platform="bilibili")
+    finally:
+        event.remove(db_engine, "before_cursor_execute", capture)
+        db.close()
+
+    assert any("GROUP BY video_source.reporter" in sql for sql in statements)
+
+
 def test_parse_trend_buckets_by_shanghai_date(admin_client, db_engine):
     """解析趋势按上海时区日期分桶，和关注 / 下载 / 访问几个页面同一口径。"""
     Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
@@ -204,6 +267,29 @@ def test_admin_parse_view_has_trend_chart(admin_client):
     assert 'drawChart("chart-parse"' in html
     # 平台切换要同时作用于卡片与趋势，别只筛明细
     assert '"/stats/parse?source=local&days=" + days + "&platform=" + platform' in html
+    # 解析监控按上报方汇总/筛选，明细也有这一列
+    assert "上报方分布" in html
+    assert "parseReporter" in html
+    assert "<th>上报方</th>" in html
+
+
+def test_admin_charts_load_echarts_from_local_static(admin_client):
+    """管理端图表不能依赖外部 CDN，否则 CDN 不可达时所有趋势图都不显示。"""
+    html = admin_client.get("/admin/").text
+    assert '<script src="/admin/vendor/echarts.min.js"></script>' in html
+
+    script = admin_client.get("/admin/vendor/echarts.min.js")
+    assert script.status_code == 200
+    assert "javascript" in script.headers["content-type"]
+    assert "echarts" in script.text.lower()
+
+
+def test_admin_crawler_page_distinguishes_api_paths(admin_client):
+    """爬虫表里来源=请求头 记的是 API 路径，别把列名写成「页面」误导人。"""
+    html = admin_client.get("/admin/index.html").text
+    assert "爬虫访问路径" in html
+    assert "路径（API / 页面）" in html
+    assert "记的是 API 请求路径" in html
 
 
 def test_parse_detail_supports_history_pagination(admin_client, db_engine):
@@ -532,8 +618,20 @@ def test_visit_monitor_lists_openid_and_counts(admin_client, db_engine):
     now = utcnow_naive()
     db.add_all(
         [
-            VisitEvent(user_id=u1.id, path="pages/home/home", created_at=now),
-            VisitEvent(user_id=u1.id, path="pages/home/home", created_at=now),
+            VisitEvent(
+                user_id=u1.id,
+                path="pages/home/home",
+                env_version="trial",
+                api_base="https://api.beastnotes.cn",
+                created_at=now,
+            ),
+            VisitEvent(
+                user_id=u1.id,
+                path="pages/home/home",
+                env_version="trial",
+                api_base="https://api.beastnotes.cn",
+                created_at=now,
+            ),
             VisitEvent(user_id=u2.id, path="pages/home/home", created_at=now),
         ]
     )
@@ -560,6 +658,8 @@ def test_visit_monitor_lists_openid_and_counts(admin_client, db_engine):
     assert set(by_openid) == {"openid-v1", "openid-v2"}
     assert by_openid["openid-v1"]["nickname"] == "小明"
     assert by_openid["openid-v1"]["path"] == "pages/home/home"
+    assert by_openid["openid-v1"]["env_version"] == "trial"
+    assert by_openid["openid-v1"]["api_base"] == "https://api.beastnotes.cn"
     assert by_openid["openid-v2"]["nickname"] == ""
     assert detail["items"][0]["created_at"]
 

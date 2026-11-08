@@ -12,8 +12,11 @@ def detect_platform(text: str | None) -> str | None:
     raw = (text or "").strip()
     if not raw:
         return None
-    if SHORT_URL_RE.search(raw) or AWEME_ID_RE.search(raw) or "douyin.com" in raw:
+    # 明确的域名优先：B站 域名里混进数字 id 时不能反手去解析抖音
+    if "douyin.com" in raw or SHORT_URL_RE.search(raw):
         return "douyin"
     if B23_RE.search(raw) or BVID_RE.search(raw) or "bilibili.com" in raw:
         return "bilibili"
+    if AWEME_ID_RE.search(raw):
+        return "douyin"
     return None

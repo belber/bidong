@@ -23,7 +23,7 @@ const videoRow = wxml.slice(
   wxml.indexOf('isDouyin && media.clean'), wxml.indexOf('isDouyin && media.audio')
 );
 const audioRow = wxml.slice(
-  wxml.indexOf('isDouyin && media.audio'), wxml.indexOf('isDouyin && isNote')
+  wxml.indexOf('isDouyin && media.audio'), wxml.indexOf('<!-- 抖音图集')
 );
 
 describe('抖音结果页的媒体大小', () => {

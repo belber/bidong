@@ -83,7 +83,15 @@ describe('结果页标题与分享', () => {
     const { ctx, titles } = loadPage(PAGE);
     ctx.applyResult(CARD);
     expect(titles.some(t => t.includes('【小视频】167-国贸街拍'))).toBe(true);
-    expect(titles.some(t => t.includes('壁咚咚藏链阁'))).toBe(true);
+    expect(titles.some(t => t.includes('B站视频下载'))).toBe(true);
+  });
+
+  test('抖音内容页标题带「抖音视频下载」，不带 B站 词', () => {
+    const { ctx, titles } = loadPage(PAGE);
+    ctx.applyResult({ ...CARD, platform: 'douyin', bvid: '7698027358250432602' });
+    const last = titles[titles.length - 1];
+    expect(last).toContain('抖音视频下载');
+    expect(last).not.toContain('B站');
   });
 
   test('分享卡片指向这条视频，而不是笼统的首页', () => {

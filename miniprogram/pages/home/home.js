@@ -17,6 +17,7 @@ Page(Object.assign({
     platformLabel: '',
     parsing: false,
     showRobotGuide: true,
+    guideExpanded: false,
     homeAdUnitId: AD_UNIT_IDS.homeBanner,
     homeAdError: false
   },
@@ -35,6 +36,10 @@ Page(Object.assign({
   onHomeAdError(e) {
     console.warn('[ad] 首页横幅加载失败', e && e.detail);
     this.setData({ homeAdError: true });
+  },
+
+  onToggleGuide() {
+    this.setData({ guideExpanded: !this.data.guideExpanded });
   },
 
   trackVisit() {
@@ -102,8 +107,11 @@ Page(Object.assign({
     const parseReq = api.parse(link.url);
     Promise.all([parseReq, minWait])
       .then(([card]) => {
+        const now = Date.now();
         getApp().globalData.pendingResult = card;
+        getApp().globalData.pendingAt = now;
         wx.setStorageSync('pending_result', card);
+        wx.setStorageSync('pending_at', now);
         // 带上 bvid：这样结果页的 URL 是自包含的（可分享、可被微信搜索爬虫直接打开），
         // 不再依赖 globalData / storage 传参
         const target = (card.platform === 'douyin')

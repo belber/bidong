@@ -67,6 +67,7 @@ Hermes（家里小主机）
 | `source_video_id` | string | | 源站视频 ID |
 | `bili_published_at` | string | | B站发布日 `YYYY-MM-DD`（源站发布时间拿不到） |
 | `note` | string | | 拿不到时的原因，如 `parse失败 404` |
+| `reporter` | string | | 上报方标识（多方上报时区分来源；也可在批次顶层传一次） |
 
 **约定：** 拿不到就留空并在 `note` 写明原因，**不要猜**。一条视频只报一条「主要出处」= 画面来源；
 混源视频（画面来自 X、BGM 来自抖音）只报画面来源。
@@ -86,6 +87,7 @@ video_source (
   source_video_id   text default '',
   bili_published_at text default '',   -- YYYY-MM-DD
   note              text default '',
+  reporter          text default '',   -- 最近一次上报方
   created_at        timestamp,
   updated_at        timestamp
 )

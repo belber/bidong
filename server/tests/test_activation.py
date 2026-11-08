@@ -2,7 +2,7 @@ import pytest
 
 from app.errors import AppError
 from app.models import Binding
-from app.services.activation import bind, generate_code, issue_activation
+from app.services.activation import bind, generate_code, issue_activation, unbind
 
 
 def test_generate_code_shape_and_uniqueness():
@@ -68,4 +68,75 @@ def test_bind_rejects_second_account_for_same_user(db_engine):
 
     with pytest.raises(AppError):
         bind(db, 11, second.activation_code)
+    db.close()
+
+
+def test_reviewer_code_can_bind_multiple_users(db_engine):
+    """审核码不能被第一个测试账号消耗掉，每个审核账号都能绑定成功。"""
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+
+    first = bind(db, 101, "YVVQKMLKAE")
+    second = bind(db, 102, "YVVQKMLKAE")
+
+    assert first.user_id == 101
+    assert second.user_id == 102
+    assert first.activation_code != second.activation_code
+    assert first.bili_name == "微信审核专用"
+    assert db.query(Binding).filter(Binding.activation_code.like("YVVQKMLKAE-%")).count() == 2
+    db.close()
+
+
+def test_reviewer_code_same_user_repeat_and_rebind(db_engine):
+    """同一审核用户重复提交/解绑后重绑都应成功。"""
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+
+    first = bind(db, 201, "YVVQKMLKAE")
+    again = bind(db, 201, "YVVQKMLKAE")
+    assert again.id == first.id
+
+    unbind(db, 201)
+    rebound = bind(db, 201, "YVVQKMLKAE")
+    assert rebound.id == first.id
+    assert rebound.user_id == 201
+    db.close()
+
+
+def test_reviewer_code_does_not_bypass_normal_binding(db_engine):
+    """已经绑定了普通账号的用户，不能再用审核码换绑。"""
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    normal = issue_activation(db, "777")
+    bind(db, 301, normal.activation_code)
+
+    with pytest.raises(AppError):
+        bind(db, 301, "YVVQKMLKAE")
+    db.close()
+
+
+def test_bind_records_client_env(db_engine):
+    """绑定记录要带上客户端 envVersion / apiBase，便于排查审核环境。"""
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+    issued = issue_activation(db, "888")
+
+    bound = bind(
+        db,
+        401,
+        issued.activation_code,
+        env_version="develop",
+        api_base="http://192.168.31.179:8000",
+    )
+
+    assert bound.env_version == "develop"
+    assert bound.api_base == "http://192.168.31.179:8000"
     db.close()

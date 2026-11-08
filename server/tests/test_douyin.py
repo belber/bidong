@@ -30,6 +30,11 @@ class TestDetectPlatform:
         assert link_platform.detect_platform("https://www.douyin.com/video/7685688911658323392") == "douyin"
         assert link_platform.detect_platform("https://www.douyin.com/note/7300000000000000000") == "douyin"
         assert link_platform.detect_platform("7.43 复制打开抖音 https://v.douyin.com/iRNBho6/") == "douyin"
+        # B站 域名优先：路径里的数字 id 再像 aweme_id，也不能反手去解析抖音
+        assert (
+            link_platform.detect_platform("https://www.bilibili.com/video/7698027358250432602")
+            == "bilibili"
+        )
 
     def test_returns_none_for_other_text(self):
         assert link_platform.detect_platform("https://www.youtube.com/watch?v=xxx") is None

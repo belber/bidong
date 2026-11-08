@@ -24,7 +24,13 @@ def bind_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    binding = bind_code(db, user.id, payload.code)
+    binding = bind_code(
+        db,
+        user.id,
+        payload.code,
+        env_version=payload.env_version,
+        api_base=payload.api_base,
+    )
     return _binding_out(binding)
 
 

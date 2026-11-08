@@ -13,6 +13,8 @@
   display: flex;
   align-items: center;
   gap: 16rpx;
+  flex: 1;
+  min-width: 0;
 }
 
 .brand-logo {
@@ -86,8 +88,17 @@
 }
 
 .brand-name {
+  min-width: 0;
   font-size: 34rpx;
   font-weight: 750;
   color: #2B1E23;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-name.compact {
+  font-size: 28rpx;
+  letter-spacing: 0;
 }

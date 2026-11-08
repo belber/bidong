@@ -205,6 +205,10 @@ Page({
     tags: [],
     tagsText: '',
     desc: '',
+    tagsExpanded: false,
+    descExpanded: false,
+    tagsLong: false,
+    descLong: false,
     stats: { like: 0, reply: 0, favorite: 0, coin: 0 },
     coverUrl: '',
     origin: null,
@@ -227,24 +231,40 @@ Page({
     activeQn: null,
     publicView: false,
     audioUnavailable: false,
-    imagePercent: 0
+    imagePercent: 0,
+    imageStatus: '',
+    loadingVisible: false,
+    loadingText: '解析中',
+    loadingSub: '图文解析可能需要几秒，请稍候'
   },
 
   onLoad(options) {
     this.loadUiConfig();
-    const platform = (options && options.platform) === 'douyin' ? 'douyin' : 'bilibili';
+    // 老链接/朋友圈只带 id= 时也按抖音处理，避免拼成 bilibili.com/video/<aweme_id>
+    const explicitPlatform = options && options.platform;
+    const platform =
+      explicitPlatform === 'douyin' || (!explicitPlatform && options && options.id)
+        ? 'douyin'
+        : 'bilibili';
     // B站 走 ?bvid=，抖音走 ?platform=douyin&id=<aweme_id>；旧的 B站 分享链接继续有效
     const videoId = (options && (options.bvid || options.id)) || '';
     const pending =
       getApp().globalData.pendingResult || wx.getStorageSync('pending_result');
     if (videoId) {
       // URL 自包含：先用刚解析出来的结果秒开，再按 id 拉一次最新（静默，不闪 loading）
-      const fresh =
+      const match =
         pending && pending.bvid === videoId && (pending.platform || 'bilibili') === platform;
-      if (fresh) {
+      // 刚解析完（60 秒内）直接复用，不再二次请求：否则会出现「日志 503、页面却是成功的」
+      const pendingAt =
+        getApp().globalData.pendingAt || wx.getStorageSync('pending_at') || 0;
+      const fresh = match && pendingAt && Date.now() - pendingAt < 60000;
+      if (match) {
         this.applyResult(pending);
       }
-      this.loadByPlatform(platform, videoId, { silent: fresh });
+      if (fresh) {
+        return;
+      }
+      this.loadByPlatform(platform, videoId, { silent: match });
       return;
     }
     this.applyResult(pending);
@@ -272,17 +292,20 @@ Page({
   loadByPlatform(platform, videoId, opts) {
     const silent = !!(opts && opts.silent);
     if (!silent) {
-      wx.showLoading({ title: '加载中' });
+      this.showCountdownLoading('解析中');
     }
     api.parse(this.sourceOf(platform, videoId))
       .then((card) => {
-        wx.hideLoading();
+        this.hideCountdownLoading();
+        const now = Date.now();
         getApp().globalData.pendingResult = card;
+        getApp().globalData.pendingAt = now;
         wx.setStorageSync('pending_result', card);
+        wx.setStorageSync('pending_at', now);
         this.applyResult(card);
       })
       .catch((err) => {
-        wx.hideLoading();
+        this.hideCountdownLoading();
         // 没有登录态（未登录访客、微信搜索爬虫）或登录失效时，退回公开信息渲染：
         // 页面必须"打开就有内容"，否则分享出去/被爬虫抓到的都是空页面
         const authIssue = !err || !err.statusCode || err.statusCode === 401;
@@ -300,6 +323,18 @@ Page({
       });
   },
 
+  showCountdownLoading(text) {
+    this.setData({
+      loadingVisible: true,
+      loadingText: text || '解析中',
+      loadingSub: '图文解析可能需要几秒，请稍候'
+    });
+  },
+
+  hideCountdownLoading() {
+    this.setData({ loadingVisible: false, loadingText: '解析中' });
+  },
+
   applyResult(r, opts) {
     if (!r) {
       toast('暂无解析数据');
@@ -312,8 +347,14 @@ Page({
       timeText: formatDuration(s.t)
     }));
     const tags = Array.isArray(r.tags) ? r.tags : [];
+    const tagsText = tags.join(' ');
+    const descText = r.desc || '';
     const platform = r.platform === 'douyin' ? 'douyin' : 'bilibili';
     const media = r.media || { watermarked: false, clean: false, audio: false, images: 0 };
+    // 换了一张卡片就丢掉上一张的图片数据缓存
+    if (this.data.cardId !== r.id) {
+      this._imagesCache = null;
+    }
     this.setData({
       cardId: r.id,
       platform,
@@ -327,8 +368,12 @@ Page({
       douyinId: r.author_id || '',
       pubText: formatDateTime(r.pubdate),
       tags,
-      tagsText: tags.join(' '),
-      desc: r.desc,
+      tagsText,
+      desc: descText,
+      tagsExpanded: false,
+      descExpanded: false,
+      tagsLong: tagsText.length > 24,
+      descLong: descText.length > 45,
       stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0, share: 0 },
       coverUrl: api.resolveMediaUrl(r.cover_url),
       origin: resolveOriginAvatar(mapOrigin(r.origin)),
@@ -340,11 +385,17 @@ Page({
       subtitles,
       subPreview: subtitles.slice(0, 5),
       exports: initialExports(),
+      savingImages: false,
+      imagePercent: 0,
+      imageProgress: '',
+      imageStatus: '',
       publicView
     });
     // 导航标题跟着视频走：搜索结果里的标题相关性靠它
+    // 标题按平台带对应的搜索词：内容页的相关性比品牌后缀更值钱
+    const titleSuffix = platform === 'douyin' ? '抖音视频下载' : 'B站视频下载';
     wx.setNavigationBarTitle({
-      title: this.data.title ? this.data.title + ' · 壁咚咚藏链阁' : '解析结果 · 壁咚咚藏链阁'
+      title: this.data.title ? this.data.title + ' · ' + titleSuffix : titleSuffix
     });
     this.loadMediaSize(r.id);
   },
@@ -378,6 +429,15 @@ Page({
 
   onCopyTag(e) {
     this.copy(e.currentTarget.dataset.field);
+  },
+
+  onToggleField(e) {
+    const field = e.currentTarget.dataset.field;
+    if (field === 'tags') {
+      this.setData({ tagsExpanded: !this.data.tagsExpanded });
+    } else if (field === 'desc') {
+      this.setData({ descExpanded: !this.data.descExpanded });
+    }
   },
 
   // 复制原作者昵称：粉丝拿到手机上最顺手的动作是去抖音/微博搜索框粘贴查人，
@@ -474,11 +534,19 @@ Page({
     if (this.data.savingImages) {
       return;
     }
+    // 守卫必须在请求前落下：取图要 1~2 秒，这期间按钮仍可点，晚设会重复跑整组下载
     this._sessionId = newSessionId();
-    api.douyinImages(this.data.cardId)
+    this.setData({
+      savingImages: true,
+      imageProgress: '',
+      imageStatus: '正在准备图片…',
+      imagePercent: 0
+    });
+    this.loadDouyinImages()
       .then((payload) => {
         const list = payload.items || [];
         if (!list.length) {
+          this.resetSavingImages();
           const message = '图片下载失败，请稍后重试';
           this.reportDownload('resolve', 'fail', {
             kind: 'image',
@@ -488,12 +556,12 @@ Page({
           toast(message);
           return;
         }
-        this.setData({ savingImages: true, imageProgress: '0/' + list.length, imagePercent: 0 });
+        this.setData({ imageStatus: '正在保存 0/' + list.length + ' 张', imagePercent: 0 });
         let done = 0;
         let failed = (payload.failed || []).length;
         let lastError = '';
         const finish = () => {
-          this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+          this.resetSavingImages();
           this.reportDownload('save', failed ? 'fail' : 'success', {
             kind: 'image',
             error_type: failed ? 'wx_save_image' : '',
@@ -509,7 +577,7 @@ Page({
           }
           const item = list[i];
           this.setData({
-            imageProgress: i + '/' + list.length,
+            imageStatus: '正在保存 ' + (i + 1) + '/' + list.length + ' 张',
             imagePercent: Math.round((i / list.length) * 100)
           });
           let buffer;
@@ -527,18 +595,19 @@ Page({
             .then(() => saveImageToAlbum(filePath))
             .then(() => {
               done += 1;
-              next(i + 1);
+              // 让出一次事件循环，先让进度条上屏，再处理下一张
+              setTimeout(() => next(i + 1), 0);
             })
             .catch((err) => {
               failed += 1;
               lastError = (err && err.errMsg) || (err && err.message) || '保存失败';
-              next(i + 1);
+              setTimeout(() => next(i + 1), 0);
             });
         };
         ensureAlbumPermission()
-          .then(() => next(0))
+          .then(() => setTimeout(() => next(0), 0))
           .catch((err) => {
-            this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+            this.resetSavingImages();
             const wxErr = (err && err.errMsg) || 'auth deny scope.writePhotosAlbum';
             this.reportDownload('save', 'fail', {
               kind: 'image',
@@ -550,7 +619,7 @@ Page({
           });
       })
       .catch((err) => {
-        this.setData({ savingImages: false, imageProgress: '', imagePercent: 0 });
+        this.resetSavingImages();
         const message = (err && err.message) || '图片下载失败';
         this.reportDownload('resolve', 'fail', {
           kind: 'image',
@@ -559,6 +628,27 @@ Page({
         });
         toast(message);
       });
+  },
+
+  // 图片数据按卡片缓存：同一组图重复“保存全部”时不再重新拉一遍 2MB+ 的 base64
+  loadDouyinImages() {
+    const cache = this._imagesCache;
+    if (cache && cache.cardId === this.data.cardId) {
+      return Promise.resolve(cache.payload);
+    }
+    return api.douyinImages(this.data.cardId).then((payload) => {
+      this._imagesCache = { cardId: this.data.cardId, payload };
+      return payload;
+    });
+  },
+
+  resetSavingImages() {
+    this.setData({
+      savingImages: false,
+      imageProgress: '',
+      imageStatus: '',
+      imagePercent: 0
+    });
   },
 
   // 抖音没有可以在微信里跳过去的小程序，只能复制作品链接 + 提示去 App
@@ -930,7 +1020,9 @@ Page({
   onShareTimeline() {
     return {
       title: this.shareTitle(),
-      query: 'bvid=' + this.data.bvid,
+      query: this.data.isDouyin
+        ? 'platform=douyin&id=' + this.data.bvid
+        : 'bvid=' + this.data.bvid,
       imageUrl: this.data.coverUrl
     };
   }

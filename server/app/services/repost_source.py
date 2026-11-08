@@ -51,6 +51,7 @@ FIELD_LIMITS = {
     "source_video_id": 64,
     "bili_published_at": 10,
     "note": 200,
+    "reporter": 64,
 }
 
 VALUE_FIELDS = (
@@ -64,6 +65,7 @@ VALUE_FIELDS = (
     "source_video_id",
     "bili_published_at",
     "note",
+    "reporter",
 )
 
 
@@ -157,9 +159,11 @@ def effective_handle(row: VideoSource) -> str:
 # ---------------------------------------------------------------------------
 def normalize_payload(raw: Any) -> list[dict]:
     """把 {items:[...]} / 单条对象 / 数组三种形态统一成 list[dict]。"""
+    top_reporter = ""
     if isinstance(raw, list):
         items = raw
     elif isinstance(raw, dict):
+        top_reporter = str(raw.get("reporter") or "").strip()
         if "items" in raw:
             items = raw["items"]
             if not isinstance(items, list):
@@ -176,6 +180,9 @@ def normalize_payload(raw: Any) -> list[dict]:
     for item in items:
         if not isinstance(item, dict):
             raise AppError(400, "items 里每一项都必须是对象")
+        # 支持在整个批次上统一标上报方，逐条 reporter 优先
+        if top_reporter and not str(item.get("reporter") or "").strip():
+            item["reporter"] = top_reporter
     return items
 
 
@@ -343,6 +350,7 @@ def _source_item(row: VideoSource) -> dict:
         "source_url": row.source_url,
         "bili_published_at": row.bili_published_at,
         "note": row.note,
+        "reporter": row.reporter,
         "updated_at": row.updated_at,
     }
 
@@ -373,6 +381,7 @@ def list_sources(
                 VideoSource.author_id.ilike(like),
                 VideoSource.author_url.ilike(like),
                 VideoSource.source_url.ilike(like),
+                VideoSource.reporter.ilike(like),
             )
         )
 

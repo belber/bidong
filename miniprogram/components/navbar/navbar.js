@@ -1,4 +1,15 @@
 Component({
+  properties: {
+    title: {
+      type: String,
+      value: '壁咚咚藏链阁'
+    },
+    compact: {
+      type: Boolean,
+      value: false
+    }
+  },
+
   data: {
     statusBarHeight: 20
   },

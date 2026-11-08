@@ -7,7 +7,14 @@
 
   <view class="card">
     <view class="sec-label">理念</view>
-    <view class="txt">壁咚咚帮你解析并保存 B站视频的信息——封面、标题、UP主、视频分类、字幕等，都整理成卡片方便回看。</view>
+    <view class="txt">壁咚咚支持 B站 / 抖音视频下载与提取：保存视频、封面、音频，并把标题、UP主、分区等信息整理成卡片，方便回看和收藏。</view>
     <view class="txt" wx:if="{{showRobotGuide}}">亮点：关注 @壁咚咚私藏，在评论区 @它 + 视频链接，就能快速把视频收进你的收藏夹。</view>
+  </view>
+
+  <view class="card">
+    <view class="sec-label">能做什么</view>
+    <view class="txt">· B站视频下载：粘贴 BV 号、b23.tv 短链或视频链接，解析后保存视频、封面、音频与字幕。</view>
+    <view class="txt">· 抖音视频下载 / 提取：粘贴抖音分享链接，支持视频下载或提取；图文作品可分别保存图片和音频。</view>
+    <view class="txt">· 视频提取与整理：粘贴链接即可提取视频和封面，解析过的视频按月份收进收藏夹，随时回看。</view>
   </view>
 </view>
