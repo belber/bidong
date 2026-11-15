@@ -15,3 +15,10 @@ test('点击处理栈内立即调用分享',()=>{
  const obj=vm.runInNewContext('({'+body+'})',{wx:{getFileSystemManager:()=>({accessSync(){}})},shareFilePromise:()=>{shares++;return new Promise(()=>{});}});
  obj.data={exports:{audio:{path:'/exists'}}};obj.exportName=()=> 'a.m4a';obj.shareExport('audio');assert.equal(shares,1);
 });
+test('音频分享成功不显示额外提示',async()=>{
+ const messages=[];
+ const body=js.slice(js.indexOf('  shareExport(kind) {'),js.indexOf('  computeDownloadSpeed')).trim().replace(/,$/,'');
+ const obj=vm.runInNewContext('({'+body+'})',{wx:{getFileSystemManager:()=>({accessSync(){}})},shareFilePromise:()=>Promise.resolve(),markExportSaved:x=>x,toast:s=>messages.push(s)});
+ obj.data={exports:{audio:{path:'/exists'}}};obj.exportName=()=> 'a.m4a';obj.setData=()=>{};obj.reportDownload=()=>{};
+ obj.shareExport('audio');await new Promise(r=>setImmediate(r));assert.deepEqual(messages,[]);
+});

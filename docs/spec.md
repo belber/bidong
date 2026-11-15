@@ -892,3 +892,6 @@ Server 酱使用 `SendKey`，调用 `POST https://sctapi.ftqq.com/<SendKey>.send
 
 ### 文件分享用户手势（2026-11-15）
 - 评论、音频等文件分享必须在点击调用栈内触发 shareFileMessage。转发前仅同步校验本地文件，不在异步文件检查回调或 Promise.then 中发起分享。
+
+### 音频分享提示（2026-11-16）
+- 音频唤起文件分享成功时不再显示“已唤起文件分享”Toast；失败提示保留，其他文件行为不变。

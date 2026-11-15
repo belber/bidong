@@ -999,7 +999,7 @@ Page({
     shareFilePromise(item.path, filename).then(() => {
       this.setData({ exports: markExportSaved(this.data.exports, kind) });
       this.reportDownload('share', 'success', { kind });
-      toast('已唤起文件分享');
+      if (kind !== 'audio') toast('已唤起文件分享');
     }).catch((err) => {
       if (err && err.missingFile) {
         this.setData({exports:failExport(this.data.exports, kind)});
