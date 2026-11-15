@@ -20,7 +20,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // 抖音两张媒体卡：视频行 → 音频行 → 图文行
 const videoRow = wxml.slice(
-  wxml.indexOf('isDouyin && media.clean'), wxml.indexOf('isDouyin && media.audio')
+  wxml.indexOf('media.clean && !publicView'), wxml.indexOf('isDouyin && media.audio')
 );
 const audioRow = wxml.slice(
   wxml.indexOf('isDouyin && media.audio'), wxml.indexOf('<!-- 抖音图集')
@@ -43,12 +43,16 @@ describe('抖音结果页的媒体大小', () => {
     expect(ctx.data.mediaSize).toEqual({ video: '约 1.4 MB', audio: '约 1.0 MB' });
   });
 
-  test('抖音视频行把大小显示在描述位，取不到时回落成原描述', () => {
-    expect(videoRow).toContain("mediaSize.video || '无水印，直接在手机上保存'");
+  test('抖音视频行在名称旁显示带括号大小，未知时保留说明', () => {
+    expect(videoRow).toContain('（{{mediaSize.video}}）');
+    expect(videoRow).toContain('视频下载');
+    expect(videoRow).not.toContain('无水印 · 保留原声');
   });
 
   test('抖音音频行同理', () => {
-    expect(audioRow).toContain("mediaSize.audio || '原声 / BGM'");
+    expect(audioRow).toContain('（{{mediaSize.audio}}）');
+    expect(audioRow).toContain('wx:if="{{!mediaSize.audio}}"');
+    expect(audioRow).toContain('原声 / BGM');
   });
 
   test('B站 三行的键名不变（watermarked / clean / audio）', async () => {

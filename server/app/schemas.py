@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Literal
 
 
 class LoginRequest(BaseModel):
@@ -171,3 +172,18 @@ class BindingOut(BaseModel):
     bound: bool
     bili_uid: str | None = None
     bili_name: str | None = None
+
+
+class TranscriptSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
+class TranscriptOut(BaseModel):
+    id: int | None = None
+    status: Literal["idle", "queued", "processing", "completed", "no_speech", "failed"]
+    source: str = ""
+    language: str = ""
+    error: str = ""
+    segments: list[TranscriptSegment] = Field(default_factory=list)

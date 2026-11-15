@@ -211,6 +211,9 @@ class BiliClient:
         return resp.content, content_type
 
     def get_subtitles(self, bvid: str, cid: int) -> list[dict]:
+        return [{"t": int(s["start"]), "text": s["text"]} for s in self.get_transcript_segments(bvid, cid)]
+
+    def get_transcript_segments(self, bvid: str, cid: int) -> list[dict]:
         """拉取视频字幕，返回 [{t: 秒, text: 内容}, ...]。失败或无字幕时返回空列表。"""
         if not cid:
             return []
@@ -254,7 +257,12 @@ class BiliClient:
             text = item.get("content")
             if t is None or not text:
                 continue
-            out.append({"t": int(float(t)), "text": str(text)})
+            try:
+                start, end = float(t), float(item.get("to", float(t) + 2))
+            except (TypeError, ValueError):
+                continue
+            if start >= 0 and end > start:
+                out.append({"start": start, "end": end, "text": str(text)})
         return out
 
     def _normalize_stream(self, item: dict) -> dict:
@@ -268,9 +276,14 @@ class BiliClient:
             "label": _qn_label(qn),
             "url": url,
             "backup_urls": [u for u in backups if u],
+            "codecs": item.get("codecs") or "",
+            "codecid": item.get("codecid") or 0,
+            "mime_type": item.get("mimeType") or item.get("mime_type") or "",
+            "bandwidth": item.get("bandwidth") or 0,
+            "size": item.get("size") or 0,
         }
 
-    def get_playurl(self, bvid: str, cid: int, fnval: int = 16, platform: str = "") -> dict:
+    def get_playurl(self, bvid: str, cid: int, fnval: int = 16, platform: str = "", qn: int | None = None) -> dict:
         if not cid:
             return {"durl": [], "video": [], "audio": []}
         self._ensure_anonymous_session()
@@ -278,6 +291,8 @@ class BiliClient:
             raw = {"bvid": bvid, "cid": str(cid), "fnval": str(fnval), "fourk": "1"}
             if platform:
                 raw["platform"] = platform
+            if qn is not None:
+                raw["qn"] = str(qn)
             params = WbiSigner(self.client).sign(raw)
             resp = self.client.get(
                 "https://api.bilibili.com/x/player/wbi/playurl", params=params
@@ -321,6 +336,9 @@ class BiliClient:
                 "qn": qn,
                 "label": _qn_label(qn),
                 "url": first.get("url") or "",
+                "complete": len(durl) == 1,
+                "format": d.get("format") or "",
+                "size": first.get("size") or 0,
                 "backup_urls": [u for u in (first.get("backup_url") or []) if u],
             }]
         return {
@@ -383,6 +401,9 @@ class BiliClient:
                 "qn": qn,
                 "label": _qn_label(qn),
                 "url": first.get("url") or "",
+                "complete": len(durl) == 1,
+                "format": d.get("format") or "",
+                "size": first.get("size") or 0,
                 "backup_urls": [u for u in (first.get("backup_url") or []) if u],
             }]
         return []

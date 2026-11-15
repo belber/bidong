@@ -9,10 +9,30 @@
   </view>
   <view class="section card">
     <view class="sec-title">使用指引</view>
-    <view class="step">① 首页粘贴 B站链接，点「解析视频」自动收藏</view>
+    <view class="step">① 首页粘贴 B站或抖音链接，点「解析视频」自动收藏</view>
     <view class="step">② 在 B站评论区 @壁咚咚私藏，视频自动进收藏夹</view>
     <view class="step">③ 点收藏夹卡片，查看视频解析结果</view>
     <view class="step">④ 关注 @壁咚咚私藏，私信收激活码后绑定</view>
+  </view>
+
+  <view class="section card">
+    <view class="sec-title">视频文案提取</view>
+    <view class="faq">
+      <view class="q">怎么提取文案？</view>
+      <view class="a">首页粘贴 B站或抖音视频链接，解析后点击「视频文案」右侧的「提取文案」。普通解析和下载不会自动启动文案提取；图文作品不支持。</view>
+    </view>
+    <view class="faq">
+      <view class="q">提取完成后怎么看、怎么导出？</view>
+      <view class="a">点击「查看文案」，可切换「时间轴文案」与「纯文本」，也可「复制全文」。点击「导出TXT」先下载文件，完成后点击「转发到微信」，选择聊天发送。</view>
+    </view>
+    <view class="faq">
+      <view class="q">提取中、无语音或失败怎么办？</view>
+      <view class="a">提取中可稍后返回查看。只有背景音乐或没有可识别人声时，可能提示无语音。失败时按页面提示重试；识别受口音、音乐和噪声影响，使用前请核对文字。</view>
+    </view>
+    <view class="faq">
+      <view class="q">视频文案和「更多信息」里的字幕有什么区别？</view>
+      <view class="a">文案优先使用可用的平台字幕，没有时尝试语音识别。「更多信息」仅展示平台原字幕，没有原字幕时不显示，不会用识别文案替代。</view>
+    </view>
   </view>
 
   <view class="section card">

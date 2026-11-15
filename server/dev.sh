@@ -3,7 +3,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # 一键同时启动 FastAPI 服务器和机器人 worker；Ctrl+C 一起停止
-trap 'kill 0' INT TERM
+pids=()
+cleanup() {
+  trap - EXIT INT TERM
+  for pid in ${pids[@]+"${pids[@]}"}; do kill "$pid" 2>/dev/null || true; done
+  wait || true
+}
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 # 统一注入到所有进程，避免 API 与管理端环境变量不一致导致开关取值差异
 export ENABLE_WATERMARKED_VIDEO="true"
@@ -15,10 +22,19 @@ echo "跑数据库迁移…"
 .venv/bin/python -m alembic upgrade head
 
 .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --reload &
+pids+=("$!")
 
 .venv/bin/python -m uvicorn app.admin_app:app --host 0.0.0.0 --port "${ADMIN_PORT:-8081}" --reload &
+pids+=("$!")
 
 .venv/bin/python -m app.robot.worker &
+pids+=("$!")
 
-echo "已启动：uvicorn(API:8000) + 管理端(:${ADMIN_PORT:-8081}) + 机器人 worker。按 Ctrl+C 同时停止。"
+.venv/bin/python -m app.transcript_worker &
+pids+=("$!")
+
+.venv/bin/python -m app.video_download_worker &
+pids+=("$!")
+
+echo "已启动：uvicorn(API:8000) + 管理端(:${ADMIN_PORT:-8081}) + 机器人 worker + 文案 worker + 视频准备 worker。按 Ctrl+C 同时停止。"
 wait

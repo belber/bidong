@@ -161,6 +161,9 @@ function publicRequest(method, path, data) {
 
 module.exports = {
   resolveMediaUrl,
+  startTranscript(id) { return request('POST', '/api/cards/' + id + '/transcript'); },
+  getTranscript(id) { return request('GET', '/api/cards/' + id + '/transcript'); },
+  transcriptExport(id, format) { return fileDownload('/api/cards/' + id + '/transcript/export?format=' + encodeURIComponent(format)); },
   parse(url) {
     return request('POST', '/api/parse', { url });
   },
@@ -208,6 +211,12 @@ module.exports = {
   },
   unbind() {
     return request('DELETE', '/api/binding');
+  },
+  prepareVideo(id, qn) {
+    return request('POST', '/api/cards/' + id + '/video-download', qn ? {qn} : {});
+  },
+  videoPreparation(id) {
+    return request('GET', '/api/cards/' + id + '/video-download');
   },
   mediaOptions(id, kind) {
     return request('GET', '/api/cards/' + id + '/media-options?kind=' + encodeURIComponent(kind));

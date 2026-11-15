@@ -1,4 +1,6 @@
 const api = require('../../utils/api.js');
+const videoClient = require('../../utils/videoDownload.js');
+const transcriptClient = require('../../utils/transcript.js');
 const { formatDuration, formatDateTime } = require('../../utils/format.js');
 const { mapOrigin } = require('../../utils/origin.js');
 const { downloadMediaParallel, downloadUrlErrorType, configuredCandidates, classifyError } = require('../../utils/mediaDownload.js');
@@ -195,6 +197,18 @@ Page({
   data: {
     resultAdUnitId: require('../../utils/ads.js').AD_UNIT_IDS.resultBanner,
     resultAdError: false,
+    moreInfoExpanded: false,
+    transcript: transcriptClient.decorate(),
+    transcriptSubmitting: false,
+    transcriptReadError: '',
+    duration: 0,
+    durationText: '未知',
+    hasMediaDownloads: false,
+    coverFailed: false,
+    videoPreparation: {status:'idle'},
+    videoPreparing: false,
+    videoSubmitting: false,
+    videoReadError: '',
     cardId: 0,
     bvid: '',
     sourceUrl: '',
@@ -237,6 +251,26 @@ Page({
     loadingText: '解析中',
     loadingSub: '图文解析可能需要几秒，请稍候'
   },
+
+  onShow() {
+    this._transcriptVisible = true;
+    transcriptClient.refresh(this);
+
+  },
+  onHide() { videoClient.stop(this); transcriptClient.stop(this); },
+  onUnload() { videoClient.stop(this); transcriptClient.stop(this); this.hideCountdownLoading(); },
+  onToggleMoreInfo() { this.setData({moreInfoExpanded: !this.data.moreInfoExpanded}); },
+  onTranscriptTap() {
+    if (this.data.publicView || this.data.isNote) return;
+    if (this.data.transcript.status === 'completed') {
+      const query = '?id=' + this.data.cardId + '&title=' + encodeURIComponent(this.data.title || '') +
+        '&author=' + encodeURIComponent(this.data.upName || '') + '&duration=' + this.data.duration;
+      wx.navigateTo({url:'/pages/transcript/transcript' + query});
+      return;
+    }
+    if(this.data.transcript.status !== 'no_speech') return transcriptClient.start(this);
+  },
+
 
   onLoad(options) {
     this.loadUiConfig();
@@ -353,10 +387,18 @@ Page({
     const media = r.media || { watermarked: false, clean: false, audio: false, images: 0 };
     // 换了一张卡片就丢掉上一张的图片数据缓存
     if (this.data.cardId !== r.id) {
+      videoClient.stop(this);
+      this.setData({videoPreparation:{status:'idle'},videoPreparing:false,videoSubmitting:false,videoReadError:'',mediaSize:{}});
       this._imagesCache = null;
+      clearTimeout(this._transcriptTimer);
+      this._transcriptEpoch = (this._transcriptEpoch || 0)+1;
+      this.setData({transcript:transcriptClient.decorate(), transcriptReadError:''});
     }
     this.setData({
       cardId: r.id,
+      duration: r.duration || 0,
+      durationText: r.duration > 0 ? formatDuration(r.duration) : '未知',
+      moreInfoExpanded: false,
       platform,
       isDouyin: platform === 'douyin',
       bvid: r.bvid,
@@ -376,8 +418,10 @@ Page({
       descLong: descText.length > 45,
       stats: r.stats || { like: 0, reply: 0, favorite: 0, coin: 0, share: 0 },
       coverUrl: api.resolveMediaUrl(r.cover_url),
+      coverFailed: false,
       origin: resolveOriginAvatar(mapOrigin(r.origin)),
       media,
+      hasMediaDownloads: platform === 'douyin' ? !!(media.clean || media.audio || media.images) : !!(media.watermarked || media.audio),
       imageCount: media.images || 0,
       isNote: media.note === true,
       features: r.features || { comment: true, danmaku: true },
@@ -398,6 +442,7 @@ Page({
       title: this.data.title ? this.data.title + ' · ' + titleSuffix : titleSuffix
     });
     this.loadMediaSize(r.id);
+    if(this._transcriptVisible) { transcriptClient.refresh(this);  }
   },
 
   loadMediaSize(cardId) {
@@ -408,6 +453,10 @@ Page({
       // 抖音同样报大小：视频用后端 detail 里的 data_size，音频由后端 HEAD 一次 CDN
       if (sizes.video) labels.video = '约 ' + formatSize(sizes.video);
       if (sizes.audio) labels.audio = '约 ' + formatSize(sizes.audio);
+      if(this.data.cardId && this.data.cardId!==cardId)return;
+      if (!this.data.isDouyin && labels.watermarked) labels.video = labels.watermarked;
+      const state=this.data.videoPreparation;
+      if(state && (state.size_bytes || state.estimated_size)) labels.video=(state.size_bytes ? '' : '约 ') + formatSize(state.size_bytes || state.estimated_size);
       this.setData({ mediaSize: labels });
     }).catch(() => {});
   },
@@ -710,10 +759,31 @@ Page({
         });
     }).catch((err) => {
       this.setData({ downloading: false });
-      this.openFallback(candidates);
+      if(candidates[0] && candidates[0].prepared) {
+        this.setData({videoPreparation:{status:'expired'}});
+        toast('下载失败或文件已过期，请重试');
+      } else this.openFallback(candidates);
     });
   },
 
+  onCoverError() { this.setData({coverFailed:true}); },
+  onUnifiedVideoTap(e) {
+    if(this.data.downloading) return;
+    if(this.data.isDouyin) return this.onDownloadDouyin(e);
+    return this.onDownloadVideo({currentTarget:{dataset:{kind:'watermarked'}}});
+  },
+  downloadPreparedVideo(state) {
+    this._sessionId=newSessionId();
+    this.setData({activeKind:'video',activeQn:state.qn});
+    if(state.has_audio===false)toast('原视频无声音');
+    if(state.mode==='file') {
+      const url=api.resolveMediaUrl(state.file_url);
+      this.saveMedia([{url,host:'',configured:true,prepared:true}],'video');
+    } else {
+      const candidates=configuredCandidates(state.candidates);
+      if(candidates.length)this.saveMedia(candidates,'video');else this.openFallback(state.candidates);
+    }
+  },
   onDownloadVideo(e) {
     const kind = e.currentTarget.dataset.kind || 'watermarked';
     this.setData({ activeKind: kind });
@@ -831,10 +901,15 @@ Page({
           // 音频文件可能很大（如整场演唱会 Hi-Res），复制到 wx.env.USER_DATA_PATH
           // 会触发「本地用户文件 200MB 上限」，因此直接使用下载的临时文件路径分享。
           const persist = kind === 'audio'
-            ? Promise.resolve(res.tempFilePath)
+            ? copyToNamed(res.tempFilePath, filename).catch(() => res.tempFilePath)
             : copyToNamed(res.tempFilePath, filename);
-          persist.then((filePath) => {
+          persist.then(filePath => new Promise((resolve,reject) => wx.getFileSystemManager().getFileInfo({
+            filePath, success:info => info.size > 0 ? resolve(filePath) : reject(new Error('下载文件为空')), fail:reject
+          }))).then((filePath) => {
             this.setData({ exports: completeExport(this.data.exports, kind, filePath) });
+            if (kind === 'audio') wx.getFileSystemManager().getFileInfo({filePath,
+              success: info => { if (info.size > 0) this.setData({mediaSize:Object.assign({},this.data.mediaSize,{audio:formatSize(info.size)})}); }
+            });
             this.reportDownload('download', 'success', { kind });
             toast('已下载，请点击保存');
             if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
@@ -913,11 +988,24 @@ Page({
   shareExport(kind) {
     const item = this.data.exports[kind];
     const filename = this.exportName(kind);
+    try {
+      wx.getFileSystemManager().accessSync(item.path);
+    } catch (err) {
+      this.setData({exports:failExport(this.data.exports, kind)});
+      toast('文件已失效，请点击重试重新下载');
+      return;
+    }
+    // Must invoke synchronously from the user's tap, before any async boundary.
     shareFilePromise(item.path, filename).then(() => {
       this.setData({ exports: markExportSaved(this.data.exports, kind) });
       this.reportDownload('share', 'success', { kind });
       toast('已唤起文件分享');
     }).catch((err) => {
+      if (err && err.missingFile) {
+        this.setData({exports:failExport(this.data.exports, kind)});
+        toast('文件已失效，请点击重试重新下载');
+        return;
+      }
       const msg = (err && err.errMsg) || '分享失败';
       this.reportDownload('share', 'fail', { kind, error_type: 'wx_error', error_message: msg });
       toast(msg);

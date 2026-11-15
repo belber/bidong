@@ -41,6 +41,9 @@ services:
     env_file: ${APP_ENV_FILE:-.env}
     volumes:
       - ./logs:/logs
+      - video_download_cache:/video-downloads
+    environment:
+      VIDEO_DOWNLOAD_CACHE_DIR: /video-downloads
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -72,5 +75,47 @@ services:
         condition: service_completed_successfully
     command: ["sh", "-c", "mkdir -p /logs && exec python -m app.robot.worker 2>&1 | tee -a /logs/worker.log"]
 
+  transcript:
+    init: true
+    build: .
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    environment:
+      TRANSCRIPT_MODEL_PATH: /models/ggml-base-q5_1.bin
+      TRANSCRIPT_SENSEVOICE_MODEL_PATH: /models/sensevoice/model.int8.onnx
+      TRANSCRIPT_SENSEVOICE_TOKENS_PATH: /models/sensevoice/tokens.txt
+      TRANSCRIPT_VAD_PATH: /models/silero_vad.onnx
+      TRANSCRIPT_TEMP_DIR: /tmp/transcript
+    volumes:
+      - transcript_models:/models
+      - ./logs:/logs
+    cpus: 1.0
+    mem_limit: 768m
+    stop_grace_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.transcript_worker"]
+
+  video-download:
+    init: true
+    build: .
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    environment:
+      VIDEO_DOWNLOAD_CACHE_DIR: /video-downloads
+      VIDEO_DOWNLOAD_FFMPEG_BIN: ffmpeg
+    volumes:
+      - video_download_cache:/video-downloads
+    cpus: 1.0
+    mem_limit: 256m
+    stop_grace_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.video_download_worker"]
+
 volumes:
+  video_download_cache:
+  transcript_models:
   pgdata:

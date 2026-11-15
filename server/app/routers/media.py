@@ -216,6 +216,10 @@ def media_options(
 ):
     _require_enabled(kind, db)
     card = _get_owned_card(db, user, card_id)
+    if kind == "video":
+        from ..services import video_download
+        video_download.require_enabled(db)
+        return [MediaOption(qn=p['qn'], label=p['label']) for p in video_download.resolve_plans(card)]
     client = BiliClient()
     try:
         streams = _streams(client, card, kind)
@@ -256,19 +260,11 @@ def download(
     media_type = "audio/mp4" if kind == "audio" else "video/mp4"
     suffix = "m4a" if kind == "audio" else "mp4"
 
-    def gen():
-        # 中转下载要「慢没关系、但不能断」：只限制连接超时，读取超时禁用，
-        # 避免 B站源 30 秒无数据就把整条下载链路掐断。
-        timeout = httpx.Timeout(connect=15.0, read=None, write=60.0, pool=15.0)
-        with httpx.stream("GET", url, headers=MEDIA_HEADERS, timeout=timeout, follow_redirects=True) as resp:
-            resp.raise_for_status()
-            yield from resp.iter_bytes(chunk_size=65536)
-
-    return StreamingResponse(
-        gen(),
-        media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{card.bvid}_{kind}.{suffix}"'},
-    )
+    from ..services.media_stream import open_stream
+    urls = [u for stream in streams for u in [stream.get('url'), *stream.get('backup_urls', [])] if u]
+    chunks, headers = open_stream(urls, MEDIA_HEADERS)
+    headers['Content-Disposition'] = f'attachment; filename="{card.bvid}_{kind}.{suffix}"'
+    return StreamingResponse(chunks, media_type=media_type, headers=headers)
 
 
 @router.get("/api/cards/{card_id}/download-url")
@@ -533,6 +529,7 @@ def media_size(
             return {}
     switches = config_store.media_switches(db)
     result = {}
+    collected = {}
     client = BiliClient()
     try:
         for kind in ("watermarked", "clean", "audio"):
@@ -540,15 +537,37 @@ def media_size(
                 continue
             try:
                 streams = _streams(client, card, kind)
+                collected[kind] = streams
+                if kind == "audio" and streams:
+                    stream = streams[0]
+                    estimate = stream.get("size") or int((stream.get("bandwidth") or 0) * (card.duration or 0) / 8)
+                    if estimate > 0:
+                        result[kind] = estimate
                 url = streams[0]["url"] if streams else ""
                 if not url:
                     continue
                 resp = httpx.head(url, headers=MEDIA_HEADERS, timeout=10, follow_redirects=True)
                 size = int(resp.headers.get("content-length", 0))
-                if size > 0:
+                if resp.is_success and size > 0:
                     result[kind] = size
             except Exception:
                 pass
     finally:
         client.close()
+    if switches.get('clean'):
+        try:
+            from ..services.video_download import plans_from_data
+            audio = collected.get('audio')
+            if audio is None:
+                fresh = BiliClient()
+                try:
+                    audio = fresh.get_dash_audio(card.bvid, card.cid)
+                finally:
+                    fresh.close()
+            plans = plans_from_data({'video':collected.get('clean', []),'audio':audio},
+                                    {'durl':collected.get('watermarked', [])},card.duration)
+            if plans and plans[0]['estimated_size']:
+                result['video'] = plans[0]['estimated_size']
+        except Exception:
+            pass
     return result

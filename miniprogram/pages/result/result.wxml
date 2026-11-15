@@ -1,4 +1,15 @@
 <view class="page">
+  <view class="visitor-tip" wx:if="{{publicView}}">以访客身份查看 · 登录后才能下载与导出</view>
+
+  <view class="card video-summary">
+    <view class="summary-cover">
+      <image wx:if="{{coverUrl && !coverFailed}}" class="summary-thumbnail" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewCover" binderror="onCoverError" />
+      <view wx:else class="summary-placeholder"><view class="media-item-icon icon-video"></view><text>暂无封面</text></view>
+    </view>
+    <view class="summary-copy"><view class="summary-title">{{title || '无标题'}}</view>
+    <view class="summary-author">{{upName || '未知作者'}}</view></view>
+  </view>
+
   <!-- 帅哥录屏专属：只有该账号的稿件，后端才会返回 origin -->
   <view class="card source-card" wx:if="{{origin}}">
     <view class="sec-title">
@@ -23,8 +34,108 @@
     <view class="src-hint" wx:if="{{origin.pending}}">这条的出处还在整理，稍后再来看看</view>
   </view>
 
-  <view class="visitor-tip" wx:if="{{publicView}}">以访客身份查看 · 登录后才能下载与导出</view>
 
+  <view class="card media-download-card">
+    <view class="section-heading"><view class="section-icon icon-download" aria-hidden="true"></view><text>媒体下载</text></view>
+    <view class="media-empty" wx:if="{{publicView || (!hasMediaDownloads && !isNote)}}">{{publicView ? '登录后可查看下载选项' : '当前暂无可用下载项'}}</view>
+    <view class="media-hint" wx:if="{{isDouyin && isNote && !publicView}}">抖音图文作品：{{imageCount ? imageCount + ' 张图片' : '图片'}}和音频需要分开下载</view>
+    <view class="field export-field download-field media-row" wx:if="{{(isDouyin ? media.clean : media.watermarked) && !publicView}}">
+      <view class="media-item-main">
+        <view class="media-item-icon icon-video" aria-hidden="true"></view>
+        <view class="media-item-copy"><view class="media-item-line"><text class="media-item-name">视频下载</text><text class="media-item-size" wx:if="{{mediaSize.video}}">（{{mediaSize.video}}）</text></view>
+
+        </view>
+      </view>
+      <text class="action download-btn {{downloading ? 'disabled' : ''}}" bindtap="onUnifiedVideoTap" data-kind="video">{{downloading && (activeKind === 'video' || activeKind === 'watermarked') ? downloadProgress + '%' : '下载'}}</text>
+      <view class="export-progress" wx:if="{{downloading && (activeKind === 'video' || activeKind === 'watermarked')}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{downloadProgress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{downloadSizeText}}">{{downloadSizeText}}</text>
+      </view>
+    </view>
+
+    <view class="field export-field download-field media-row" wx:if="{{isDouyin && media.audio && !publicView}}">
+      <view class="media-item-main">
+        <view class="media-item-icon icon-audio" aria-hidden="true"></view>
+        <view class="media-item-copy"><view class="media-item-line"><text class="media-item-name">音频</text><text class="media-item-size" wx:if="{{mediaSize.audio}}">（{{mediaSize.audio}}）</text></view><view class="media-item-detail" wx:if="{{!mediaSize.audio}}">原声 / BGM</view></view>
+      </view>
+      <text
+        class="action download-btn {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
+        bindtap="onExportTap"
+        data-kind="audio"
+      >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
+      <view class="export-progress" wx:if="{{exports.audio.state === 'downloading'}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{exports.audio.progress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{exports.audio.sizeText}}">{{exports.audio.sizeText}}</text>
+      </view>
+
+    </view>
+
+    <!-- 抖音图集：图片与音频分开保存 -->
+    <view class="field media-row" wx:if="{{isDouyin && isNote && !imageCount}}">
+      <view class="media-item-main"><view class="media-item-icon icon-images" aria-hidden="true"></view><view class="media-item-copy"><text class="media-item-name">图片</text><view class="media-item-detail">这是抖音图文作品，图片暂不支持保存</view></view></view>
+    </view>
+    <view class="field export-field download-field media-row" wx:if="{{isDouyin && imageCount && !publicView}}">
+      <view class="media-item-main">
+        <view class="media-item-icon icon-images" aria-hidden="true"></view>
+        <view class="media-item-copy"><view class="media-item-line"><text class="media-item-name">图片</text><text class="media-item-size">（共 {{imageCount}} 张）</text></view></view>
+      </view>
+      <text
+        class="action download-btn {{savingImages ? 'disabled' : ''}}"
+        bindtap="onSaveImages"
+      >{{savingImages ? '保存中' : '保存全部'}}</text>
+      <view class="export-progress" wx:if="{{savingImages}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{imagePercent}}%"></view></view>
+        <text class="export-progress-text">{{imageStatus || '正在保存…'}}</text>
+      </view>
+
+    </view>
+
+    <view class="field export-field download-field media-row" wx:if="{{!isDouyin && media.audio && !publicView}}">
+      <view class="media-item-main">
+        <view class="media-item-icon icon-audio" aria-hidden="true"></view>
+        <view class="media-item-copy"><view class="media-item-line"><text class="media-item-name">音频</text><text class="media-item-size" wx:if="{{mediaSize.audio && !audioUnavailable}}">（{{mediaSize.audio}}）</text></view><view class="media-item-detail" wx:if="{{audioUnavailable}}">这条视频没有单独的音轨，下载上面的「视频」即可（视频里含声音）</view></view>
+      </view>
+      <text
+        wx:if="{{!audioUnavailable}}"
+        class="action download-btn {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
+        bindtap="onExportTap"
+        data-kind="audio"
+      >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
+      <view class="export-progress" wx:if="{{exports.audio.state === 'downloading'}}">
+        <view class="export-track"><view class="progress-bar" style="width: {{exports.audio.progress}}%"></view></view>
+        <text class="export-progress-text" wx:if="{{exports.audio.sizeText}}">{{exports.audio.sizeText}}</text>
+      </view>
+
+    </view>
+
+    <view class="field media-download-status" wx:if="{{downloading && !isDouyin && !publicView}}">
+      <view class="content"><view class="progress-wrap"><view class="progress-bar" style="width: {{downloadProgress}}%"></view></view><text class="progress-text">{{downloadProgress}}%{{downloadSizeText}}</text></view>
+    </view>
+  </view>
+
+  <view class="card transcript-card" wx:if="{{!publicView && !isNote}}">
+    <view class="transcript-header">
+    <view class="section-heading"><view class="section-icon icon-document" aria-hidden="true"></view><text>视频文案</text></view>
+      <button class="transcript-button" bindtap="onTranscriptTap" disabled="{{transcript.busy || transcriptSubmitting || transcript.status === 'no_speech'}}"><text>{{transcriptSubmitting ? '提交中' : transcript.button}}</text><view wx:if="{{transcript.status === 'completed'}}" class="transcript-chevron" aria-hidden="true"></view></button>
+    </view>
+    <view class="transcript-action-row" wx:if="{{transcript.status !== 'idle' || transcriptSubmitting}}">
+      <view class="transcript-status">
+        <view class="transcript-status-icon status-{{transcript.status}} {{transcriptSubmitting ? 'is-submitting' : ''}}" aria-hidden="true"></view>
+        <view class="transcript-status-copy">
+          <view class="transcript-state">{{transcriptSubmitting ? '正在提交' : transcript.statusTitle}}</view>
+          <view class="transcript-meta" wx:if="{{transcript.status === 'completed'}}"><text wx:if="{{transcript.languageText}}">识别语言：{{transcript.languageText}}<text class="meta-divider"> | </text></text><text>时长：{{durationText}}</text></view>
+          <view class="transcript-hint" wx:else>{{transcript.statusHint}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="transcript-read-error" wx:if="{{transcriptReadError}}">{{transcriptReadError}}</view>
+  </view>
+
+  <view class="card more-info">
+    <view class="more-toggle" bindtap="onToggleMoreInfo" role="button" aria-expanded="{{moreInfoExpanded}}">
+      <text>更多信息</text><text class="more-arrow">{{moreInfoExpanded ? '收起 ⌃' : '展开 ⌄'}}</text>
+    </view>
+    <view wx:if="{{moreInfoExpanded}}" class="more-content">
   <view class="card">
     <view class="sec-title"><text class="bar"></text><text>基本信息</text></view>
 
@@ -76,10 +187,8 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="sec-title"><text class="bar"></text><text>媒体</text></view>
-    <view class="media-hint" wx:if="{{isDouyin && isNote && !publicView}}">抖音图文作品：{{imageCount ? imageCount + ' 张图片' : '图片'}}和音频需要分开下载</view>
 
+  <view class="card">
     <view class="field">
       <text class="label">封面</text>
       <view class="content">
@@ -88,101 +197,11 @@
       </view>
     </view>
 
-    <view class="field export-field download-field" wx:if="{{isDouyin && media.clean && !publicView}}">
-      <text class="label">视频</text>
-      <view class="content muted">{{mediaSize.video || '无水印，直接在手机上保存'}}</view>
-      <text
-        class="action download-btn {{downloading && activeKind === 'video' ? 'disabled' : ''}}"
-        bindtap="onDownloadDouyin"
-        data-kind="video"
-      >{{downloading && activeKind === 'video' ? downloadProgress + '%' : '下载'}}</text>
-      <view class="export-progress" wx:if="{{downloading && activeKind === 'video'}}">
-        <view class="export-track"><view class="progress-bar" style="width: {{downloadProgress}}%"></view></view>
-        <text class="export-progress-text" wx:if="{{downloadSizeText}}">{{downloadSizeText}}</text>
-      </view>
-    </view>
-
-    <view class="field export-field" wx:if="{{isDouyin && media.audio && !publicView}}">
-      <text class="label">音频</text>
-      <view class="content muted">{{mediaSize.audio || '原声 / BGM'}}</view>
-      <text
-        class="action download-btn {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
-        bindtap="onExportTap"
-        data-kind="audio"
-      >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
-      <view class="export-progress" wx:if="{{exports.audio.state === 'downloading'}}">
-        <view class="export-track"><view class="progress-bar" style="width: {{exports.audio.progress}}%"></view></view>
-        <text class="export-progress-text" wx:if="{{exports.audio.sizeText}}">{{exports.audio.sizeText}}</text>
-      </view>
-    </view>
-
-    <!-- 抖音图集：接口拿不到图片 URL 时，明确说「暂不支持」，不要说「图不存在」 -->
-    <view class="field" wx:if="{{isDouyin && isNote && !imageCount}}">
-      <text class="label">图片</text>
-      <view class="content muted">这是抖音图文作品，图片暂不支持保存</view>
-    </view>
-
-    <view class="field export-field" wx:if="{{isDouyin && imageCount && !publicView}}">
-      <text class="label">图片</text>
-      <view class="content muted">共 {{imageCount}} 张</view>
-      <text
-        class="action download-btn {{savingImages ? 'disabled' : ''}}"
-        bindtap="onSaveImages"
-      >{{savingImages ? '保存中' : '保存全部'}}</text>
-      <view class="export-progress" wx:if="{{savingImages}}">
-        <view class="export-track"><view class="progress-bar" style="width: {{imagePercent}}%"></view></view>
-        <text class="export-progress-text">{{imageStatus || '正在保存…'}}</text>
-      </view>
-    </view>
-
-    <view class="field download-field" wx:if="{{!isDouyin && media.watermarked && !publicView}}">
-      <text class="label">视频</text>
-      <view class="content muted">{{mediaSize.watermarked || '单文件流，含音频'}}</view>
-      <text class="action download-btn" bindtap="onDownloadVideo" data-kind="watermarked">下载</text>
-    </view>
-
-    <view class="field download-field" wx:if="{{!isDouyin && media.clean && !publicView}}">
-      <text class="label">无水印视频</text>
-      <view class="content muted">{{mediaSize.clean || '高清视频轨，不含音频'}}</view>
-      <text class="action download-btn" bindtap="onDownloadVideo" data-kind="clean">下载</text>
-    </view>
-
-    <view class="field export-field" wx:if="{{!isDouyin && media.audio && !publicView}}">
-      <text class="label">纯音频</text>
-      <view class="content muted" wx:if="{{!audioUnavailable}}">{{mediaSize.audio || '音频轨'}}</view>
-      <view class="content muted" wx:else>这条视频没有单独的音轨，下载上面的「视频」即可（视频里含声音）</view>
-      <text
-        wx:if="{{!audioUnavailable}}"
-        class="action download-btn {{exports.audio.state === 'downloading' ? 'disabled' : exports.audio.state === 'ready' ? 'primary' : ''}}"
-        bindtap="onExportTap"
-        data-kind="audio"
-      >{{exports.audio.state === 'downloading' ? exports.audio.progress + '%' : exports.audio.state === 'ready' ? '保存' : exports.audio.state === 'saved' ? '再次保存' : exports.audio.state === 'failed' ? '重试' : '下载'}}</text>
-      <view class="export-progress" wx:if="{{exports.audio.state === 'downloading'}}">
-        <view class="export-track"><view class="progress-bar" style="width: {{exports.audio.progress}}%"></view></view>
-        <text class="export-progress-text" wx:if="{{exports.audio.sizeText}}">{{exports.audio.sizeText}}</text>
-      </view>
-    </view>
-
-    <!-- 下载进度 -->
-    <view class="field" wx:if="{{downloading && !isDouyin && !publicView}}">
-      <text class="label">下载中</text>
-      <view class="content">
-        <view class="progress-wrap">
-          <view class="progress-bar" style="width: {{downloadProgress}}%"></view>
-        </view>
-        <text class="progress-text">{{downloadProgress}}%{{downloadSizeText}}</text>
-      </view>
-    </view>
   </view>
-
-  <view class="ad-banner" wx:if="{{!resultAdError}}">
-    <ad unit-id="{{resultAdUnitId}}" binderror="onResultAdError" />
-  </view>
-
-  <view class="card" wx:if="{{!publicView && !isDouyin}}">
+  <view class="card" wx:if="{{!publicView && (subtitles.length || !isDouyin)}}">
     <view class="sec-title"><text class="bar"></text><text>文本</text></view>
 
-    <view class="field export-field">
+    <view class="field export-field" wx:if="{{subtitles.length}}">
       <text class="label">字幕</text>
       <view class="content" wx:if="{{subtitles.length}}">
         <view wx:for="{{showAllSub ? subtitles : subPreview}}" wx:key="t" class="sub">{{item.timeText}} {{item.text}}</view>
@@ -196,14 +215,13 @@
           >{{exports.subtitle.state === 'downloading' ? exports.subtitle.progress + '%' : exports.subtitle.state === 'ready' ? '保存' : exports.subtitle.state === 'saved' ? '再次保存' : exports.subtitle.state === 'failed' ? '重试' : '下载'}}</text>
         </view>
       </view>
-      <view class="content muted" wx:else>无字幕</view>
       <view class="export-progress" wx:if="{{exports.subtitle.state === 'downloading'}}">
         <view class="export-track"><view class="progress-bar" style="width: {{exports.subtitle.progress}}%"></view></view>
         <text class="export-progress-text" wx:if="{{exports.subtitle.sizeText}}">{{exports.subtitle.sizeText}}</text>
       </view>
     </view>
 
-    <view class="field export-field" wx:if="{{features.danmaku}}">
+    <view class="field export-field" wx:if="{{!isDouyin && features.danmaku}}">
       <text class="label">弹幕</text>
       <view class="content" wx:if="{{danmakuCount}}">共 {{danmakuCount}} 条</view>
       <view class="content muted" wx:else>无弹幕</view>
@@ -220,7 +238,7 @@
       </view>
     </view>
 
-    <view class="field export-field" wx:if="{{features.comment}}">
+    <view class="field export-field" wx:if="{{!isDouyin && features.comment}}">
       <text class="label">评论</text>
       <view class="content" wx:if="{{stats.reply}}">共 {{stats.reply}} 条</view>
       <view class="content muted" wx:else>无评论</view>
@@ -236,6 +254,13 @@
         <text class="export-progress-text" wx:if="{{exports.comment.sizeText}}">{{exports.comment.sizeText}}</text>
       </view>
     </view>
+  </view>
+
+    </view>
+  </view>
+
+  <view class="ad-banner" wx:if="{{!resultAdError}}">
+    <ad unit-id="{{resultAdUnitId}}" binderror="onResultAdError" />
   </view>
 
   <view class="bottom-bar">

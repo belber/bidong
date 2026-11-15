@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Literal
 
 
 class Settings(BaseSettings):
@@ -95,6 +96,33 @@ class Settings(BaseSettings):
 
     # 微信搜索：爬虫签名校验用的 Token（小程序后台「消息推送」里的 Token）
     wechat_msg_token: str = ""
+
+    # 文案 worker 独立运行；API 不导入 ONNX 或加载识别模型。
+    transcript_engine: Literal["sensevoice", "whisper"] = "sensevoice"
+    transcript_sensevoice_model_path: str = "./var/models/sensevoice/model.int8.onnx"
+    transcript_sensevoice_tokens_path: str = "./var/models/sensevoice/tokens.txt"
+    transcript_chunk_seconds: int = 12
+    transcript_chunk_context_seconds: float = 1.0
+    transcript_asr_enabled: bool = False
+    transcript_whisper_bin: str = "whisper-cli"
+    transcript_model_path: str = "./var/models/ggml-base-q5_1.bin"
+    transcript_vad_path: str = "./var/models/silero_vad.onnx"
+    transcript_ffmpeg_bin: str = "ffmpeg"
+    transcript_temp_dir: str = "./var/transcript-tmp"
+    transcript_max_seconds: int = 1800
+    transcript_max_bytes: int = 256 * 1024 * 1024
+    transcript_timeout_seconds: int = 7200
+    transcript_queue_limit: int = 10
+    transcript_language: str = "zh"
+    transcript_cache_version: str = "sensevoice-20240717-int8-ctc-v2"
+
+    video_download_cache_dir: str = "./var/video-downloads"
+    video_download_max_input_bytes: int = 512 * 1024 * 1024
+    video_download_cache_max_bytes: int = 2 * 1024 * 1024 * 1024
+    video_download_cache_seconds: int = 1800
+    video_download_timeout_seconds: int = 600
+    video_download_queue_limit: int = 10
+    video_download_ffmpeg_bin: str = ""
 
 
 settings = Settings()

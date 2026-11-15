@@ -11,7 +11,7 @@ const wxss = fs.readFileSync(
 );
 
 // 媒体卡片：从「媒体」标题到「文本」卡片之间
-const mediaCard = wxml.slice(wxml.indexOf('<text>媒体</text>'), wxml.indexOf('<text>文本</text>'));
+const mediaCard = wxml.slice(wxml.indexOf('<text>媒体下载</text>'), wxml.indexOf('class="card transcript-card"'));
 
 describe('抖音图文的媒体区说明', () => {
   test('说明落在媒体区块里，且只在抖音图文、非公开视图显示', () => {

@@ -2,6 +2,7 @@
   "pages": [
     "pages/home/home",
     "pages/result/result",
+    "pages/transcript/transcript",
     "pages/collect/collect",
     "pages/mine/mine",
     "pages/bind/bind",

@@ -12,7 +12,7 @@ const wxss = fs.readFileSync(
 describe('媒体下载按钮', () => {
   test('视频 / 音频 / 图片的主操作都用 download-btn', () => {
     const count = (wxml.match(/download-btn/g) || []).length;
-    expect(count).toBeGreaterThanOrEqual(6); // 抖音视频/音频/图片 + B站视频x2/音频
+    expect(count).toBe(4); // 统一视频入口 + 两个平台音频 + 抖音图集
   });
 
   test('按钮是实心胶囊，不是纯文字链接', () => {

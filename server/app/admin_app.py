@@ -54,32 +54,14 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_admin_requests(request: Request, call_next):
+    # 管理端请求/响应含 Cookie、密码及 token；日志只记录路由、状态和耗时。
     path = request.url.path
     start = time.monotonic()
-    qs = str(request.query_params) if request.query_params else ""
-    body = b""
-    if request.method in ("POST", "PUT", "PATCH"):
-        body = await request.body()
-        async def receive():
-            return {"type": "http.request", "body": body}
-        request._receive = receive
-    body_str = body.decode("utf-8", errors="replace")[:1000] if body else ""
-    if qs:
-        logger.info(">>> [admin] %s %s?%s body=%s", request.method, path, qs, body_str)
-    else:
-        logger.info(">>> [admin] %s %s body=%s", request.method, path, body_str)
+    logger.info(">>> [admin] %s %s", request.method, path)
     response = await call_next(request)
-    resp_body = b""
-    async for chunk in response.body_iterator:
-        resp_body += chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
-    resp_str = resp_body.decode("utf-8", errors="replace")[:1000]
     duration = int((time.monotonic() - start) * 1000)
-    logger.info("<<< [admin] %s %s %d (%dms) resp=%s", request.method, path, response.status_code, duration, resp_str)
-    from starlette.responses import Response as StarletteResponse
-    return StarletteResponse(
-        content=resp_body, status_code=response.status_code,
-        headers=dict(response.headers), media_type=response.media_type,
-    )
+    logger.info("<<< [admin] %s %s %d (%dms)", request.method, path, response.status_code, duration)
+    return response
 
 
 @app.middleware("http")

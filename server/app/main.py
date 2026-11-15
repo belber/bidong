@@ -27,6 +27,8 @@ from .routers import (
     sources,
     tags,
     tracking,
+    transcript,
+    video_download,
 )
 from .services import daily_report
 from .services import wechat_search
@@ -101,6 +103,8 @@ for router in (
     tracking.router,
     sources.router,
     public.router,
+    transcript.router,
+    video_download.router,
 ):
     app.include_router(router)
 
@@ -128,30 +132,8 @@ async def log_requests(request: Request, call_next):
     if not path.startswith("/api/"):
         return await call_next(request)
     start = time.monotonic()
-    # 入参
-    qs = str(request.query_params) if request.query_params else ""
-    body = b""
-    if request.method in ("POST", "PUT", "PATCH"):
-        body = await request.body()
-        async def receive():
-            return {"type": "http.request", "body": body}
-        request._receive = receive
-    body_str = body.decode("utf-8", errors="replace")[:1000] if body else ""
-    if qs:
-        logger.info(">>> %s %s?%s body=%s", request.method, path, qs, body_str)
-    else:
-        logger.info(">>> %s %s body=%s", request.method, path, body_str)
-    # 执行
+    # Preserve streaming responses: never accumulate an MP4 (or log signed URLs/tokens).
     response = await call_next(request)
-    # 出参
-    resp_body = b""
-    async for chunk in response.body_iterator:
-        resp_body += chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
-    resp_str = resp_body.decode("utf-8", errors="replace")[:1000]
     duration = int((time.monotonic() - start) * 1000)
-    logger.info("<<< %s %s %d (%dms) resp=%s", request.method, path, response.status_code, duration, resp_str)
-    from starlette.responses import Response as StarletteResponse
-    return StarletteResponse(
-        content=resp_body, status_code=response.status_code,
-        headers=dict(response.headers), media_type=response.media_type,
-    )
+    logger.info("%s %s -> %d (%dms)", request.method, path, response.status_code, duration)
+    return response

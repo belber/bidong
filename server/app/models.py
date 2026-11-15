@@ -316,3 +316,65 @@ class CrawlerVisit(Base):
     # 签名校验结果：None = 没配 Token 无法校验
     signature_verified: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow_naive, index=True)
+
+
+class TranscriptQueue(Base):
+    """单行队列锁：SQLite/PG 均使用 UPDATE 串行化提交和领取。"""
+    __tablename__ = "transcript_queue"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    revision: Mapped[int] = mapped_column(default=0)
+    worker_token: Mapped[str] = mapped_column(String(64), default="")
+    lease_until: Mapped[int] = mapped_column(default=0)
+    heartbeat_at: Mapped[int] = mapped_column(default=0)
+
+
+class TranscriptJob(Base):
+    __tablename__ = "transcript_job"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String(64), unique=True)
+    input_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="queued", index=True)
+    source: Mapped[str] = mapped_column(String(16), default="")
+    language: Mapped[str] = mapped_column(String(32), default="")
+    segments_json: Mapped[str] = mapped_column(Text, default="[]")
+    error: Mapped[str] = mapped_column(Text, default="")
+    recoveries: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+
+
+class TranscriptRequest(Base):
+    __tablename__ = "transcript_request"
+    __table_args__ = (UniqueConstraint("user_id", "job_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("transcript_job.id"), index=True)
+
+
+class VideoDownloadQueue(Base):
+    __tablename__ = 'video_download_queue'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    revision: Mapped[int] = mapped_column(default=0)
+    worker_token: Mapped[str] = mapped_column(String(64), default='')
+    lease_until: Mapped[int] = mapped_column(default=0)
+    heartbeat_at: Mapped[int] = mapped_column(default=0)
+
+
+class VideoDownloadJob(Base):
+    __tablename__ = 'video_download_job'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String(64), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'), index=True)
+    card_id: Mapped[int | None] = mapped_column(ForeignKey('video_card.id', ondelete='SET NULL'), nullable=True, index=True)
+    qn: Mapped[int] = mapped_column()
+    input_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default='queued', index=True)
+    has_audio: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    estimated_size: Mapped[int] = mapped_column(BigInteger, default=0)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    expires_at: Mapped[int] = mapped_column(default=0)
+    serve_until: Mapped[int] = mapped_column(default=0)
+    recoveries: Mapped[int] = mapped_column(default=0)
+    error: Mapped[str] = mapped_column(Text, default='')
+    created_at: Mapped[datetime] = mapped_column(default=utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow_naive)

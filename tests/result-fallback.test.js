@@ -58,10 +58,10 @@ describe('download fallback behavior', () => {
     expect(js).not.toContain('startAudioExport');
   });
 
-  test('音频下载成功直接用临时文件，不复制到本地用户目录', () => {
+  test('音频优先具名文件，大文件复制失败回退临时路径', () => {
     const exportBlock = js.slice(js.indexOf('startExport(kind)'));
     expect(exportBlock).toContain("kind === 'audio'");
-    expect(exportBlock).toContain('Promise.resolve(res.tempFilePath)');
+    expect(exportBlock).toContain('copyToNamed(res.tempFilePath, filename).catch(() => res.tempFilePath)');
   });
 
   test('视频下载使用并发候选，任一成功即返回', () => {

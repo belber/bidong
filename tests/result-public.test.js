@@ -106,9 +106,9 @@ describe('公开视图的界面约束', () => {
   test('页面有访客提示，且下载/导出入口按 publicView 隐藏', () => {
     expect(wxml).toContain('visitor-tip');
     expect(wxml).toContain('以访客身份查看');
-    expect(wxml).toContain('{{!isDouyin && media.watermarked && !publicView}}');
+    expect(wxml).toContain('{{media.clean && !publicView}}');
     expect(wxml).toContain('{{!isDouyin && media.audio && !publicView}}');
-    expect(wxml).toContain('wx:if="{{!publicView && !isDouyin}}"');
+    expect(wxml).toContain("wx:if=\"{{!publicView && (!isDouyin || transcript.status === 'completed')}}\"");
   });
 });
 
@@ -198,9 +198,9 @@ describe('抖音音频走导出状态机（和 B站 一致）', () => {
   });
 
   test('抖音视频仍然走相册保存', () => {
-    const start = wxml.indexOf('isDouyin && media.clean');
+    const start = wxml.indexOf('media.clean && !publicView');
     const row = wxml.slice(start, wxml.indexOf('isDouyin && media.audio'));
-    expect(row).toContain('bindtap="onDownloadDouyin"');
+    expect(row).toContain('bindtap="onUnifiedVideoTap"');
     expect(row).toContain("data-kind=\"video\"");
   });
 

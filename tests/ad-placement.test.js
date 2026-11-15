@@ -17,10 +17,10 @@ describe('广告位位置', () => {
     expect(ad).toBeLessThan(indexOf(wxml, 'class="home-footer-note"'));
   });
 
-  test('结果页广告在媒体卡之后、文本卡之前', () => {
+  test('结果页广告在更多信息之后、底栏之前', () => {
     const wxml = read('pages/result/result.wxml');
     const ad = indexOf(wxml, 'class="ad-banner"');
-    expect(ad).toBeGreaterThan(indexOf(wxml, '<text>媒体</text>'));
-    expect(ad).toBeLessThan(indexOf(wxml, '<text>文本</text>'));
+    expect(ad).toBeGreaterThan(indexOf(wxml, '<text>更多信息</text>'));
+    expect(ad).toBeLessThan(indexOf(wxml, 'class="bottom-bar"'));
   });
 });
