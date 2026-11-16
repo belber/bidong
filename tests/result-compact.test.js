@@ -1,9 +1,12 @@
 const fs=require('fs');const path=require('path');
 const xml=fs.readFileSync(path.join(__dirname,'../miniprogram/pages/result/result.wxml'),'utf8');
 const css=fs.readFileSync(path.join(__dirname,'../miniprogram/pages/result/result.wxss'),'utf8');
-test('default media explanation removed while important status messages stay',()=>{
+test('default media explanation removed and video uses the current direct-download flow',()=>{
  expect(xml).not.toContain('无水印 · 保留原声');
- expect(xml).toContain('原视频无声音');expect(xml).toContain('准备中，可稍后回来');expect(xml).toContain('videoPreparation.error');
+ expect(xml).not.toContain('准备中，可稍后回来');
+ expect(xml).not.toContain('videoPreparation.error');
+ expect(xml).toContain('bindtap="onUnifiedVideoTap"');
+ expect(xml).toContain("{{downloading && (activeKind === 'video' || activeKind === 'watermarked')}}");
 });
 test('transcript title and action share compact header; idle status row is not rendered',()=>{
  const header=xml.match(/<view class="transcript-header">([\s\S]*?)<\/button>\s*<\/view>/);

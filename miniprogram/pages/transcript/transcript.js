@@ -1,11 +1,13 @@
 const api = require('../../utils/api');
 const transcriptClient = require('../../utils/transcript');
 const {formatDuration} = require('../../utils/format');
+const yuanbao = require('../../utils/yuanbao');
 function toast(title) { wx.showToast({title,icon:'none'}); }
 function decode(value) { try {return decodeURIComponent(value || '');} catch(e) {return '';} }
 Page({
   data: {cardId:0,title:'',author:'',durationText:'',languageText:'',tab:'timeline',lines:[],plainText:'',
-    transcript:transcriptClient.decorate(),transcriptReadError:'',exportState:'idle',exportPath:'',exportName:''},
+    transcript:transcriptClient.decorate(),transcriptReadError:'',exportState:'idle',exportPath:'',exportName:'',
+    canSummarize:false,summaryVisible:false,summaryCopying:false,summaryOpening:false},
   onLoad(options) {
     const id=Number(options.id);
     this.setData({cardId:Number.isInteger(id) && id>0 ? id:0,title:decode(options.title),author:decode(options.author),
@@ -13,11 +15,60 @@ Page({
     if(!this.data.cardId) toast('视频信息无效，请返回重试');
   },
   onShow() {this._transcriptVisible=true;transcriptClient.refresh(this);},
-  onHide() {transcriptClient.stop(this);},
-  onUnload() {transcriptClient.stop(this);if(this._exportTask) this._exportTask.abort();},
+  onHide() {transcriptClient.stop(this);this.onCloseSummary();},
+  onUnload() {transcriptClient.stop(this);this.onCloseSummary();if(this._exportTask) this._exportTask.abort();},
   onTranscriptUpdate(value) {
     const lines=(value.segments || []).map(s => Object.assign({},s,{timeText:formatDuration(s.start)}));
-    this.setData({lines,plainText:lines.map(s => s.text).join('\n'),languageText:value.language === 'zh' ? '中文':(value.language || '')});
+    const plainText = lines.map(s => s.text).join('\n');
+    const canSummarize = value.status === 'completed' && !!plainText.trim();
+    if (plainText !== this.data.plainText || !canSummarize) this.onCloseSummary();
+    this.setData({lines,plainText,canSummarize,languageText:value.language === 'zh' ? '中文':(value.language || '')});
+  },
+  onOpenSummary() {
+    if (!this.data.canSummarize || this.data.summaryCopying || this.data.summaryOpening || this.data.summaryVisible) return;
+    this.onCloseSummary();
+    const epoch = this._summaryEpoch;
+    this.setData({summaryCopying:true});
+    wx.setClipboardData({data:yuanbao.summaryText(this.data.plainText),
+      success:() => {
+        if (epoch !== this._summaryEpoch) return;
+        this.setData({summaryCopying:false,summaryVisible:true});
+      },
+      fail:() => {
+        if (epoch !== this._summaryEpoch) return;
+        this.onCloseSummary();
+        toast('复制未完成，请重试');
+      }
+    });
+  },
+  onCloseSummary() {
+    // 取消、离开或正文变化后，不允许迟到的复制回调重新弹框。
+    this._summaryEpoch = (this._summaryEpoch || 0) + 1;
+    this.setData({summaryVisible:false,summaryCopying:false,summaryOpening:false});
+  },
+  onSummaryTouchMove() {},
+  onOpenYuanbao() {
+    if (!this.data.summaryVisible || !this.data.canSummarize || this.data.summaryOpening) return;
+    const epoch = this._summaryEpoch;
+    const failed = () => {
+      if (epoch !== this._summaryEpoch) return;
+      this.onCloseSummary();
+      wx.showModal({title:'暂时无法打开元宝',content:'文案已复制，可在微信搜索“元宝”，粘贴已复制内容。',showCancel:false,confirmText:'知道了'});
+    };
+    if (!wx.navigateToMiniProgram) return failed();
+    this.setData({summaryOpening:true});
+    // 确认按钮直接触发跳转，保留微信要求的用户点击手势。
+    try {
+      wx.navigateToMiniProgram({appId:yuanbao.APP_ID,envVersion:'release',
+        success:() => {if (epoch === this._summaryEpoch) this.onCloseSummary();},
+        fail:err => {
+          if (epoch !== this._summaryEpoch) return;
+          if (/cancel/i.test(err.errMsg || '')) this.onCloseSummary();
+          else failed();
+        },
+        complete:() => {if (epoch === this._summaryEpoch) this.setData({summaryOpening:false});}
+      });
+    } catch (err) { failed(); }
   },
   onTab(e) {this.setData({tab:e.currentTarget.dataset.tab === 'plain' ? 'plain':'timeline'});},
   onCopyText() {

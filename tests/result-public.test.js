@@ -106,9 +106,9 @@ describe('公开视图的界面约束', () => {
   test('页面有访客提示，且下载/导出入口按 publicView 隐藏', () => {
     expect(wxml).toContain('visitor-tip');
     expect(wxml).toContain('以访客身份查看');
-    expect(wxml).toContain('{{media.clean && !publicView}}');
+    expect(wxml).toContain('{{(isDouyin ? media.clean : media.watermarked) && !publicView}}');
     expect(wxml).toContain('{{!isDouyin && media.audio && !publicView}}');
-    expect(wxml).toContain("wx:if=\"{{!publicView && (!isDouyin || transcript.status === 'completed')}}\"");
+    expect(wxml).toContain("wx:if=\"{{!publicView && (subtitles.length || !isDouyin)}}\"");
   });
 });
 
@@ -134,7 +134,7 @@ describe('抖音下载的进度反馈', () => {
 
   test('视频、音频、图文三种都有进度条', () => {
     // 视频走相册保存（自己的 downloading/activeKind）
-    expect(wxml).toContain('{{downloading && activeKind === \'video\'}}');
+    expect(wxml).toContain("{{downloading && (activeKind === 'video' || activeKind === 'watermarked')}}");
     expect(wxml).toContain('width: {{downloadProgress}}%');
     // 音频走导出状态机（和 B站 同一套）
     expect(wxml).toContain("{{exports.audio.state === 'downloading'}}");
@@ -198,7 +198,7 @@ describe('抖音音频走导出状态机（和 B站 一致）', () => {
   });
 
   test('抖音视频仍然走相册保存', () => {
-    const start = wxml.indexOf('media.clean && !publicView');
+    const start = wxml.indexOf('(isDouyin ? media.clean : media.watermarked) && !publicView');
     const row = wxml.slice(start, wxml.indexOf('isDouyin && media.audio'));
     expect(row).toContain('bindtap="onUnifiedVideoTap"');
     expect(row).toContain("data-kind=\"video\"");

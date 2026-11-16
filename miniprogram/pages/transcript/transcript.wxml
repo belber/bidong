@@ -3,6 +3,10 @@
     <view class="document-title">{{title || '视频文案'}}</view>
     <view class="document-meta">{{author}}<text wx:if="{{durationText}}"> · 时长 {{durationText}}</text><text wx:if="{{languageText}}"> · {{languageText}}</text></view>
   </view>
+  <view class="summary-entry" wx:if="{{canSummarize}}">
+    <text class="summary-entry-hint">想快速了解重点？</text>
+    <button class="summary-entry-button" bindtap="onOpenSummary" disabled="{{summaryCopying || summaryOpening}}">{{summaryCopying ? '复制中…' : '去元宝总结'}} <text aria-hidden="true">›</text></button>
+  </view>
   <view class="document-tabs" wx:if="{{transcript.status === 'completed'}}">
     <view class="document-tab {{tab === 'timeline' ? 'selected' : ''}}" data-tab="timeline" bindtap="onTab">时间轴文案</view>
     <view class="document-tab {{tab === 'plain' ? 'selected' : ''}}" data-tab="plain" bindtap="onTab">纯文本</view>
@@ -19,5 +23,16 @@
   <view class="document-actions" wx:if="{{transcript.status === 'completed'}}">
     <button class="document-copy" bindtap="onCopyText">复制全文</button>
     <button class="document-export" bindtap="onExportTxt" disabled="{{exportState === 'downloading'}}">{{exportState === 'downloading' ? '下载中' : exportState === 'ready' ? '转发到微信' : '导出TXT'}}</button>
+  </view>
+  <view class="summary-overlay" wx:if="{{summaryVisible}}" catchtouchmove="onSummaryTouchMove">
+    <view class="summary-mask" bindtap="onCloseSummary"></view>
+    <view class="summary-confirm" aria-role="dialog" aria-label="文案已复制">
+      <view class="summary-confirm-title">文案已复制</view>
+      <view class="summary-confirm-text">是否前往元宝粘贴并生成总结？</view>
+      <view class="summary-confirm-actions">
+        <button class="summary-cancel" bindtap="onCloseSummary" disabled="{{summaryOpening}}">取消</button>
+        <button class="summary-go" bindtap="onOpenYuanbao" disabled="{{summaryOpening}}">{{summaryOpening ? '正在打开…' : '前往元宝'}}</button>
+      </view>
+    </view>
   </view>
 </view>

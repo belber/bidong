@@ -17,7 +17,8 @@
     "backgroundColor": "#F6F4F2"
   },
   "navigateToMiniProgramAppIdList": [
-    "wx7564fd5313d24844"
+    "wx7564fd5313d24844",
+    "wxd5201eb08d2fa15c"
   ],
   "tabBar": {
     "custom": true,

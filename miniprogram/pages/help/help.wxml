@@ -1,81 +1,37 @@
 <view class="page">
-  <view class="section card group" wx:if="{{showGroup}}">
-    <view class="sec-title">QQ 群</view>
-    <view class="group-row">
-      <text class="group-no">{{groupNo}}</text>
-      <text class="copy" bindtap="onCopyGroup">复制群号</text>
-    </view>
-    <view class="group-tip">使用指引见下方。遇到使用问题、Bug、功能建议或其他需求，欢迎复制群号，加入 QQ 群交流反馈。</view>
-  </view>
-  <view class="section card">
-    <view class="sec-title">使用指引</view>
-    <view class="step">① 首页粘贴 B站或抖音链接，点「解析视频」自动收藏</view>
-    <view class="step">② 在 B站评论区 @壁咚咚私藏，视频自动进收藏夹</view>
-    <view class="step">③ 点收藏夹卡片，查看视频解析结果</view>
-    <view class="step">④ 关注 @壁咚咚私藏，私信收激活码后绑定</view>
+  <view class="section card quick-start">
+    <view class="sec-title">快速上手</view>
+    <view class="supported">支持 B站、BV 号、b23.tv 和抖音分享链接</view>
+    <view class="step"><text class="step-number">1</text><text>粘贴链接 → 解析视频</text></view>
+    <view class="step"><text class="step-number">2</text><text>下载视频或音频 → 保存</text></view>
+    <view class="step"><text class="step-number">3</text><text>需要文字 → 提取文案</text></view>
   </view>
 
-  <view class="section card">
-    <view class="sec-title">视频文案提取</view>
-    <view class="faq">
-      <view class="q">怎么提取文案？</view>
-      <view class="a">首页粘贴 B站或抖音视频链接，解析后点击「视频文案」右侧的「提取文案」。普通解析和下载不会自动启动文案提取；图文作品不支持。</view>
-    </view>
-    <view class="faq">
-      <view class="q">提取完成后怎么看、怎么导出？</view>
-      <view class="a">点击「查看文案」，可切换「时间轴文案」与「纯文本」，也可「复制全文」。点击「导出TXT」先下载文件，完成后点击「转发到微信」，选择聊天发送。</view>
-    </view>
-    <view class="faq">
-      <view class="q">提取中、无语音或失败怎么办？</view>
-      <view class="a">提取中可稍后返回查看。只有背景音乐或没有可识别人声时，可能提示无语音。失败时按页面提示重试；识别受口音、音乐和噪声影响，使用前请核对文字。</view>
-    </view>
-    <view class="faq">
-      <view class="q">视频文案和「更多信息」里的字幕有什么区别？</view>
-      <view class="a">文案优先使用可用的平台字幕，没有时尝试语音识别。「更多信息」仅展示平台原字幕，没有原字幕时不显示，不会用识别文案替代。</view>
-    </view>
-  </view>
-
-  <view class="section card">
+  <view class="section card questions">
     <view class="sec-title">常见问题</view>
-    <view class="faq">
-      <view class="q">支持哪些链接？</view>
-      <view class="a">B站视频链接、BV 号、b23.tv 短链。</view>
+    <view class="faq" wx:for="{{faqs}}" wx:key="id">
+      <view class="question" bindtap="onToggleFaq" data-id="{{item.id}}" aria-role="button" aria-expanded="{{expandedFaq === item.id}}">
+        <text class="question-title">{{item.title}}</text>
+        <text class="chevron {{expandedFaq === item.id ? 'expanded' : ''}}">⌄</text>
+      </view>
+      <view class="answer" wx:if="{{expandedFaq === item.id}}">{{item.answer}}</view>
     </view>
-    <view class="faq">
-      <view class="q">怎么删除收藏？</view>
-      <view class="a">收藏夹卡片右上角「删除」按钮。</view>
+  </view>
+
+  <view class="section card robot" wx:if="{{showRobotGuide}}">
+    <view class="question" bindtap="onToggleRobot" aria-role="button" aria-expanded="{{robotExpanded}}">
+      <text class="question-title">机器人收藏（B站）</text>
+      <text class="chevron {{robotExpanded ? 'expanded' : ''}}">⌄</text>
     </view>
-    <view class="faq">
-      <view class="q">怎么下载 / 提取 B站视频？</view>
-      <view class="a">在首页粘贴 B站视频链接、BV 号或 b23.tv 短链，点「解析视频」，进入结果页即可下载或提取视频。</view>
-    </view>
-    <view class="faq">
-      <view class="q">怎么保存视频封面？</view>
-      <view class="a">打开视频解析结果页，点「保存封面」即可保存到手机相册。</view>
-    </view>
-    <view class="faq">
-      <view class="q">怎么导出视频音频？</view>
-      <view class="a">在解析结果页选择音频导出，保存后可在手机中播放或分享。</view>
-    </view>
-    <view class="faq">
-      <view class="q">怎么导出字幕？</view>
-      <view class="a">视频有可用字幕时，可在解析结果页导出 SRT 字幕文件。</view>
-    </view>
-    <view class="faq">
-      <view class="q">怎么提取视频？</view>
-      <view class="a">粘贴视频链接后点「解析视频」，在结果页点「视频」右侧的「下载」，保存后可从手机相册查看。</view>
-    </view>
-    <view class="faq">
-      <view class="q">支持抖音视频下载吗？</view>
-      <view class="a">支持。在首页粘贴抖音分享链接，即可解析并保存抖音视频；图文作品可分别保存图片和音频。</view>
-    </view>
-    <view class="faq">
-      <view class="q">怎么提取抖音视频？</view>
-      <view class="a">在首页粘贴抖音分享链接，点「解析视频」进入结果页，即可下载或提取抖音视频。</view>
-    </view>
-    <view class="faq">
-      <view class="q">@壁咚咚私藏 没反应？</view>
-      <view class="a">确认已关注，并在评论区正确 @它，稍等后台解析。</view>
+    <view class="answer" wx:if="{{robotExpanded}}">先关注 @壁咚咚私藏，收到私信激活码后，在「我的」完成绑定。再到 B站视频评论区 @壁咚咚私藏，视频就会自动进入收藏夹。</view>
+  </view>
+
+  <view class="section card feedback" wx:if="{{showGroup}}">
+    <view class="sec-title">联系反馈</view>
+    <view class="feedback-tip">问题或建议，欢迎进群反馈</view>
+    <view class="group-row">
+      <view class="group-label">QQ 群 <text class="group-no">{{groupNo}}</text></view>
+      <button class="copy-group" bindtap="onCopyGroup">复制群号</button>
     </view>
   </view>
 </view>
